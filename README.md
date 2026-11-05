@@ -78,6 +78,78 @@ displays recorded events; it does not recreate the complete simulation. Mock rep
 test the plumbing, not social or creative quality. Inspect the transcript, action
 outcomes, and truncation counts in live runs.
 
+### Defining starting organizations and communication paths in JSON
+
+Experiment JSON can define an initial organization, let it evolve, or freeze its
+structure for a control experiment. See [examples/defined_society.json](examples/defined_society.json)
+and the editor-compatible [JSON Schema](schemas/society_config.schema.json).
+
+```bash
+CHAMBER_COPY_DIR='' python3 chamber.py --config examples/defined_society.json --mock
+```
+
+The example starts a council and a workers' group, seeds membership, restricts
+speech and whispers to directed routes, and provides a coordinator-only announcement
+channel. It uses local endpoints for live inference; `--mock` needs no model server.
+
+The relevant configuration fields are:
+
+```json
+{
+  "society": {
+    "authorities": [],
+    "frozen": false,
+    "groups": {
+      "council": {"members": ["A", "B"], "frozen": true},
+      "commons": {"members": ["C"], "invited": ["B"], "admission": "open"}
+    }
+  },
+  "communication": {
+    "public": {"A": ["B"], "B": ["A", "C"], "C": ["B"]},
+    "whispers": {"A": ["B"], "B": ["A"]}
+  }
+}
+```
+
+This is a fragment to merge into a full config with matching agents. Groups can
+specify `members`, `invited`, `compelled`, `creator`, `admission`, and `frozen`.
+Compelled participants must already be members; a specified creator must be a member.
+Members automatically subscribe to their group's channel within subscription limits.
+Names, references, duplicate members, and inconsistent memberships are validated
+before generation. The schema covers these definition fields; runtime validation
+also checks roster references and limits without requiring a schema package.
+
+`admission` defaults to `invite`; `open` allows joining without an invitation.
+`society.frozen: true` rejects all group creation, invitations, joining, leaving,
+compulsion, and release. A group's own `frozen: true` freezes just that group's
+membership and invitations. Posting and conversation continue. With both flags
+false, the initial organization is a starting condition that participants can change
+using the implemented membership actions. Neither flag freezes the world ledger or
+participants' speech. Authority is still configured rather than elected.
+
+`communication.public` maps a speaker to recipients of their ordinary speech.
+Speakers also see their own speech. `communication.whispers` maps senders to permitted
+recipients; prohibited whispers are rejected. In a supplied mapping, an omitted
+sender has no recipients. If the entire mapping is omitted, existing unrestricted
+behavior remains. These routes stay fixed for the run and survive continuation.
+
+`communication.channels` can restrict an existing channel with `readers` and
+`writers` arrays. Declare ordinary channels in top-level `channels`; group channels
+are created by `society.groups`. Writers must also be readers. Reader permission is
+required to subscribe; writer permission is required to publish. Group membership
+is additionally required for group posts. Unspecified channels retain their normal
+permissions. Channel readers still need a subscription to receive posts.
+
+These controls govern conversation paths, not all information in the experiment:
+shared artifacts and the blackboard remain shared, memberships remain public, and
+`dm_visibility: "notice"` still exposes whisper metadata. Participants can relay
+received information along allowed paths. The run operator can inspect all messages.
+Transcripts are an operator's combined view; agent prompts enforce recipient filters.
+
+Local runs, transcript outputs, generated anomaly reports/specimens, caches, and
+locks are ignored by Git. The public repository contains source, definitions, tests,
+and documentation rather than recorded local runs.
+
 ### Using Dory as an agent
 
 The `dory` endpoint connects to the separate Dory-enabled llama.cpp server in

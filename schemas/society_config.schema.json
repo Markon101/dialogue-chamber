@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dialogue Chamber society and communication definitions",
+  "type": "object",
+  "$defs": {
+    "participants": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "routes": {"type": "object", "additionalProperties": {"$ref": "#/$defs/participants"}},
+    "group": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "members": {"$ref": "#/$defs/participants"},
+        "invited": {"$ref": "#/$defs/participants"},
+        "compelled": {"$ref": "#/$defs/participants"},
+        "creator": {"type": "string", "minLength": 1},
+        "frozen": {"type": "boolean", "default": false},
+        "admission": {"enum": ["invite", "open"], "default": "invite"}
+      }
+    }
+  },
+  "properties": {
+    "society": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "authorities": {"$ref": "#/$defs/participants"},
+        "max_groups": {"type": "integer", "minimum": 1, "maximum": 32},
+        "frozen": {"type": "boolean", "default": false},
+        "groups": {
+          "type": "object", "propertyNames": {"pattern": "^[a-z][a-z0-9_-]{0,23}$"},
+          "additionalProperties": {"$ref": "#/$defs/group"}
+        }
+      }
+    },
+    "communication": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "public": {"$ref": "#/$defs/routes"},
+        "whispers": {"$ref": "#/$defs/routes"},
+        "channels": {
+          "type": "object", "additionalProperties": {
+            "type": "object", "additionalProperties": false, "required": ["readers", "writers"],
+            "properties": {"readers": {"$ref": "#/$defs/participants"}, "writers": {"$ref": "#/$defs/participants"}}
+          }
+        }
+      }
+    }
+  }
+}

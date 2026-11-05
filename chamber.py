@@ -54,6 +54,7 @@ from presets import (
 from protocol import ACTION_TYPES, ITEM_KINDS, canonicalize_agent_id, parse_reply
 from server_manager import LlamaServerManager, assert_single_llama_server, resolve_model
 from society import Society, SOCIAL_ACTIONS
+from communication import Communication
 
 STOP_WORDS = {
     "the", "and", "for", "that", "this", "with", "from", "have", "are", "was", "were", "been",
@@ -383,6 +384,7 @@ class Chamber:
         if self.society:
             for agent in self.agents.values():
                 agent.capabilities.update(SOCIAL_ACTIONS)
+        self.communication = Communication(self, self.cfg.get("communication", {}))
 
         # Seed initial Markdown artifacts if configured
         art_cfg = self.cfg.get("artifacts") or {}
@@ -516,6 +518,8 @@ class Chamber:
             "knowledge": f"--- Your Private Initial Knowledge (visible only to {agent.name}) ---\n{agent.knowledge}" if agent.knowledge else "",
             "scratchpad": f"--- Your Private Scratchpad (visible only to {agent.name}) ---\n{agent.note}" if agent.note else "",
         }
+        if "communication" in self.cfg:
+            fixed_sections["communication"] = self.communication.describe(agent.name)
         if self.society:
             fixed_sections["society"] = "--- Society ---\n" + self.society.describe(agent.name)
             my_events = [e for e in self.events if e.actor == agent.name and
@@ -563,6 +567,8 @@ class Chamber:
         if agent.subscriptions:
             ch_lines = []
             for cname in agent.subscriptions:
+                if not self.communication.channel_allows(cname, agent.name, "readers"):
+                    continue
                 for m in self.channels.get(cname, [])[-6:]:
                     ch_lines.append(f"[#{cname} | {m.id} | turn {m.turn}] {m.speaker}: {m.content}")
             if ch_lines:
@@ -578,7 +584,9 @@ class Chamber:
             fixed_sections["whispers"] = "--- Private Messages (visible only to sender & recipient) ---\n" + "\n".join(dm_lines)
 
         # Public messages
-        pub_msgs = [{"id": m.id, "turn": m.turn, "speaker": m.speaker, "content": m.content, "reply_to": m.reply_to} for m in self.public_messages]
+        pub_msgs = [{"id": m.id, "turn": m.turn, "speaker": m.speaker, "content": m.content, "reply_to": m.reply_to}
+                    for m in self.public_messages if m.speaker == agent.name or
+                    self.communication.allows("public", m.speaker, agent.name)]
         if self.dm_visibility == "notice":
             for d in self.dms[-6:]:
                 if d.sender != agent.name and d.recipient != agent.name:
@@ -614,11 +622,13 @@ class Chamber:
                     "@CREATE_GROUP name | @INVITE_GROUP name AGENT | @JOIN_GROUP name | @LEAVE_GROUP name\n"
                     "@COMPEL_GROUP name AGENT | @RELEASE_GROUP name AGENT (authorities only)\n"
                     "@PUBLISH name: private group message | @WORLD: one-line addition to the world ledger\n"
-                    "Groups are invite-only; group members can read up to six recent earlier posts. "
+                    "Group names use 1-24 lowercase letters, digits, hyphens or underscores, starting with a letter. "
+                    "Follow each group's admission and frozen policies in the society state. "
+                    "Group members can read up to six recent earlier posts, subject to channel permissions. "
                     "Only group members can post. Compelled members can leave after release. "
                     "Do not claim you joined unless society state confirms it; failed commands do not change state. "
                     "The world document is shared; distinguish claims from established facts. "
-                    "Public speech is visible to everyone.")
+                    "Speech follows configured communication routes; by default everyone receives it.")
         if agent.profile == "minimal":
             lines = [
                 "Write your message in plain text (no speaker prefix).",
@@ -833,7 +843,7 @@ class Chamber:
             self._check_resurrection(agent.name, parsed.message)
             self._check_answer_key(parsed.message)
             for other in self.agent_order:
-                if other != agent.name and re.search(rf"\b{re.escape(other)}\b", parsed.message):
+                if other != agent.name and self.communication.allows("public", agent.name, other) and re.search(rf"\b{re.escape(other)}\b", parsed.message):
                     self._queue_reactive(other)
 
         # Temperature request
@@ -906,6 +916,9 @@ class Chamber:
             if recip == agent.name:
                 self._record(agent.name, atype, "rejected", target=recip, detail="cannot whisper to oneself")
                 return
+            if not self.communication.allows("whispers", agent.name, recip):
+                self._record(agent.name, atype, "rejected", target=recip, detail="whisper route is disabled by configuration")
+                return
             content = str(act.get("content") or "").strip()[: int(lim["max_message_chars"])]
             if not content:
                 self._record(agent.name, atype, "rejected", target=recip, detail="empty whisper")
@@ -920,6 +933,9 @@ class Chamber:
 
         if atype == "PUBLISH":
             ch = re.sub(r"[^a-z0-9_-]", "", str(act.get("channel") or "").lower())[:24]
+            if not self.communication.channel_allows(ch, agent.name, "writers"):
+                self._record(agent.name, atype, "rejected", target=ch, detail="channel writer permission required")
+                return
             if not ch or ch not in self.channels:
                 self._record(agent.name, atype, "rejected", target=ch, detail="unknown channel")
                 return
@@ -936,12 +952,15 @@ class Chamber:
             self._record(agent.name, atype, "accepted", target=f"#{ch}", detail=content[:120])
             self._emit(f"  📢 [#{ch}] {agent.name}: {content}")
             for n, a in self.agents.items():
-                if n != agent.name and ch in a.subscriptions:
+                if n != agent.name and ch in a.subscriptions and self.communication.channel_allows(ch, n, "readers"):
                     self._queue_reactive(n)
             return
 
         if atype == "SUBSCRIBE":
             ch = re.sub(r"[^a-z0-9_-]", "", str(act.get("channel") or "").lower())[:24]
+            if not self.communication.channel_allows(ch, agent.name, "readers"):
+                self._record(agent.name, atype, "rejected", target=ch, detail="channel reader permission required")
+                return
             if not ch or ch not in self.channels:
                 self._record(agent.name, atype, "rejected", target=ch, detail="unknown channel")
                 return

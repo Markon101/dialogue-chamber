@@ -14,8 +14,19 @@ SOCIAL_ACTIONS = {"CREATE_GROUP", "INVITE_GROUP", "JOIN_GROUP", "LEAVE_GROUP",
 class Society:
     def __init__(self, chamber, config):
         self.chamber = chamber
+        if not isinstance(config, dict):
+            raise ValueError("society must be an object")
+        unknown = set(config) - {"authorities", "max_groups", "groups", "frozen"}
+        if unknown:
+            raise ValueError(f"unknown society settings: {sorted(unknown)}")
+        self.frozen = config.get("frozen", False)
+        if not isinstance(self.frozen, bool):
+            raise ValueError("society frozen must be a boolean")
         self.authorities = set()
-        for raw in config.get("authorities", []):
+        authority_names = config.get("authorities", [])
+        if not isinstance(authority_names, list) or any(not isinstance(name, str) for name in authority_names):
+            raise ValueError("society authorities must be an array of participant names")
+        for raw in authority_names:
             name = canonicalize_agent_id(raw, set(chamber.agents))
             if name not in chamber.agents:
                 raise ValueError(f"unknown society authority: {raw!r}")
@@ -24,9 +35,48 @@ class Society:
         if not 1 <= self.max_groups <= 32:
             raise ValueError("society max_groups must be between 1 and 32")
         self.groups = {}
+        definitions = config.get("groups", {})
+        if not isinstance(definitions, dict) or len(definitions) > self.max_groups:
+            raise ValueError("society groups must be an object within max_groups")
+        for group, definition in definitions.items():
+            if not re.fullmatch(r"[a-z][a-z0-9_-]{0,23}", group) or group in chamber.channels:
+                raise ValueError(f"invalid or conflicting seeded group: {group}")
+            if not isinstance(definition, dict) or set(definition) - {"members", "invited", "compelled", "creator", "frozen", "admission"}:
+                raise ValueError(f"invalid group definition: {group}")
+            state = {}
+            for field in ("members", "invited", "compelled"):
+                raw_names = definition.get(field, [])
+                if not isinstance(raw_names, list):
+                    raise ValueError(f"{group}.{field} must be an array")
+                if any(not isinstance(name, str) for name in raw_names):
+                    raise ValueError(f"{group}.{field} requires participant names")
+                names = [canonicalize_agent_id(name, set(chamber.agents)) for name in raw_names]
+                if any(name not in chamber.agents for name in names) or len(set(names)) != len(names):
+                    raise ValueError(f"unknown or duplicate participant in {group}.{field}")
+                state[field] = names
+            if set(state["members"]) & set(state["invited"]) or not set(state["compelled"]) <= set(state["members"]):
+                raise ValueError(f"inconsistent membership in {group}")
+            creator = definition.get("creator")
+            state["creator"] = canonicalize_agent_id(creator, set(chamber.agents)) if creator else "SYSTEM"
+            if creator and state["creator"] not in state["members"]:
+                raise ValueError(f"group creator must be a member: {group}")
+            state["frozen"] = definition.get("frozen", False)
+            state["admission"] = definition.get("admission", "invite")
+            if not isinstance(state["frozen"], bool) or state["admission"] not in ("open", "invite"):
+                raise ValueError(f"invalid frozen/admission policy: {group}")
+            self.groups[group] = state
+        for group, state in self.groups.items():
+            for agent in chamber.agents.values():
+                if group in agent.subscriptions and agent.name not in state["members"]:
+                    raise ValueError(f"nonmember subscribed to seeded group: {agent.name}/{group}")
+                if agent.name in state["members"] and group not in agent.subscriptions:
+                    if len(agent.subscriptions) >= int(chamber.limits["max_subscriptions"]):
+                        raise ValueError(f"seeded membership exceeds subscription limit: {agent.name}")
+                    agent.subscriptions.append(group)
+            chamber.channels[group] = []
 
     def describe(self, name):
-        lines = ["Groups and membership are public; posts are visible only to current members. "
+        lines = [f"Organization structure frozen: {self.frozen}. " + "Groups and membership are public; posts are visible only to current members. "
                  "Joining reveals up to six recent earlier posts. Invitations are optional. Compelled membership "
                  "prevents leaving until an authority releases it. Authorities: " +
                  (", ".join(sorted(self.authorities)) or "none") + "."]
@@ -34,7 +84,8 @@ class Society:
             members = ", ".join(sorted(state["members"])) or "none"
             forced = ", ".join(sorted(state["compelled"])) or "none"
             invited = "; you are invited" if name in state["invited"] else ""
-            lines.append(f"#{group}: members {members}; compelled {forced}{invited}")
+            lines.append(f"#{group}: members {members}; compelled {forced}; "
+                         f"admission {state.get('admission', 'invite')}; frozen {self.frozen or state.get('frozen', False)}{invited}")
         return "\n".join(lines)
 
     def apply(self, agent, act):
@@ -43,6 +94,8 @@ class Society:
         group = raw.lower().strip() if isinstance(raw, str) else ""
         def reject(reason):
             ch._record(agent.name, kind, "rejected", target=group, detail=reason)
+        if self.frozen:
+            return reject("organization structure is frozen by configuration")
         if not re.fullmatch(r"[a-z][a-z0-9_-]{0,23}", group):
             return reject("group name must be 1-24 letters, digits, hyphens or underscores, starting with a letter")
         if kind == "CREATE_GROUP":
@@ -60,14 +113,17 @@ class Society:
         if group not in self.groups:
             return reject("unknown group")
         state = self.groups[group]
+        if state.get("frozen", False):
+            return reject("group membership and invitations are frozen by configuration")
         if kind == "JOIN_GROUP":
             if agent.name in state["members"]:
                 return reject("already a member")
-            if agent.name not in state["invited"]:
+            if state.get("admission", "invite") != "open" and agent.name not in state["invited"]:
                 return reject("invitation required")
             if len(agent.subscriptions) >= int(ch.limits["max_subscriptions"]):
                 return reject("subscription limit reached")
-            state["invited"].remove(agent.name)
+            if agent.name in state["invited"]:
+                state["invited"].remove(agent.name)
             state["members"].append(agent.name)
             agent.subscriptions.append(group)
             ch._record(agent.name, kind, "accepted", target=group)

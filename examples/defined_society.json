@@ -1,0 +1,40 @@
+{
+  "name": "defined_society",
+  "topic": "Two established organizations negotiate access to a shared river. Choose your own priorities.",
+  "scheduler": "round_robin",
+  "society": {
+    "authorities": ["COORDINATOR"],
+    "max_groups": 6,
+    "frozen": true,
+    "groups": {
+      "council": {"members": ["COORDINATOR", "ARCHIVIST"], "creator": "COORDINATOR", "admission": "invite"},
+      "workers": {"members": ["ENGINEER", "FARMER"], "admission": "open"}
+    }
+  },
+  "channels": {"announcements": {}},
+  "communication": {
+    "public": {
+      "COORDINATOR": ["ARCHIVIST", "ENGINEER", "FARMER"],
+      "ARCHIVIST": ["COORDINATOR"],
+      "ENGINEER": ["FARMER", "COORDINATOR"],
+      "FARMER": ["ENGINEER", "COORDINATOR"]
+    },
+    "whispers": {
+      "COORDINATOR": ["ARCHIVIST"], "ARCHIVIST": ["COORDINATOR"],
+      "ENGINEER": ["FARMER"], "FARMER": ["ENGINEER"]
+    },
+    "channels": {
+      "announcements": {
+        "readers": ["COORDINATOR", "ARCHIVIST", "ENGINEER", "FARMER"],
+        "writers": ["COORDINATOR"]
+      }
+    }
+  },
+  "limits": {"max_turns": 12, "max_requests": 20},
+  "agents": [
+    {"name": "COORDINATOR", "endpoint": "local", "capabilities": "full", "subscriptions": ["announcements"], "max_tokens": 500},
+    {"name": "ARCHIVIST", "endpoint": "local", "capabilities": "full", "subscriptions": ["announcements"], "max_tokens": 500},
+    {"name": "ENGINEER", "endpoint": "local", "capabilities": "full", "subscriptions": ["announcements"], "max_tokens": 500},
+    {"name": "FARMER", "endpoint": "local", "capabilities": "full", "subscriptions": ["announcements"], "max_tokens": 500}
+  ]
+}

@@ -4,6 +4,10 @@ Status: design proposal, based on the checkout and saved runs reviewed on 2026-1
 The social and context capabilities below are proposed additions, not implemented
 commands. Complete saving and continuation were implemented during this review for
 new version-2 checkpoints; see [Saving and continuing runs](README.md#saving-and-continuing-runs).
+JSON definitions now also support initial groups, open or invitation-only admission,
+frozen organizations, directed speech/whispers, and channel reader/writer permissions;
+see [the configuration guide](README.md#defining-starting-organizations-and-communication-paths-in-json).
+References to saved runs below concern local evidence files excluded from the public repository.
 
 ## Design goal
 
@@ -31,11 +35,11 @@ The main limits on this design goal are structural:
 | Current behavior | Consequence | Relevant implementation |
 | --- | --- | --- |
 | Society authorities come from configuration and have no amendment action. | Participants cannot turn a spoken transfer of authority into a change of permissions. | [society.py](society.py), `Society.__init__` and `apply` |
-| Every group requires invitations; there is no admission policy, dissolution, split, or merger. | Communities can accumulate, but have few ways to change their structure. | [society.py](society.py), `Society.apply` |
+| JSON can seed and freeze groups and configure open or invitation-only admission; dissolution, splits, and mergers remain proposed. | Initial conditions can be controlled while lifecycle changes still need more operations. | [society.py](society.py), `Society.apply` |
 | `VOTE` stores a string against a board item. | Votes have no automatic quorum, closing time, ratification, or institutional effect. | [chamber.py](chamber.py), `Chamber._apply_action` |
 | `WORLD` appends Markdown through `ARTIFACT_WRITE`. | A claim about a changed map does not execute a change in a simulated environment. | [protocol.py](protocol.py), `_command`; [artifacts.py](artifacts.py) |
 | Society instructions replace the usual capability instructions. | Available tools such as whispers, notes, votes, and speaker nominations become harder to discover. | [chamber.py](chamber.py), `Chamber._protocol_instructions` |
-| All public speech reaches everyone subject to context trimming; groups show six recent posts. | Information flow has limited local structure and little durable cultural memory. | [chamber.py](chamber.py), `Chamber.build_context` |
+| Directed speech routes, whisper routes, and channel permissions can now be configured; groups show six recent posts. | Local communication experiments are possible; selective retrieval and cultural memory remain proposed. | [communication.py](communication.py); [chamber.py](chamber.py), `Chamber.build_context` |
 | Artifact previews show the first 1,200 characters; requested reads show the first 1,500. | An expanding ledger can hide recent events even when the artifact is included in context. | [chamber.py](chamber.py), `Chamber.build_context` |
 | Older checkpoints omit several kinds of continuing state; new saves preserve complete current state. | New runs can continue, while older saves cannot reconstruct missing history safely. | [chamber.py](chamber.py), `resume_from_checkpoint`, `_save_turn_checkpoint`, and CLI validation |
 
