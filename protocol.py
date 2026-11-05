@@ -285,6 +285,11 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
             issues.append("ARTIFACT_READ missing artifact name")
             return None
         res["name"] = name
+        offset = res.get("offset", 0)
+        if isinstance(offset, bool) or not re.fullmatch(r"0|[1-9][0-9]{0,5}", str(offset)):
+            issues.append("ARTIFACT_READ offset must be a nonnegative integer")
+            return None
+        res["offset"] = int(offset)
 
     elif act_type == "PROPOSE_NEXT":
         tgt = canonicalize_agent_id(res.get("target"), known_names)
@@ -375,7 +380,9 @@ def _command(word: str, rest: str, lines_after: List[str], known_names: Optional
         return {"type": "PROPOSE_TOPIC", "content": body or head}
 
     if w == "ARTIFACT_READ":
-        return {"type": "ARTIFACT_READ", "name": head.split()[0] if head else ""}
+        parts = head.split()
+        return {"type": "ARTIFACT_READ", "name": parts[0] if parts else "",
+                "offset": parts[1] if len(parts) == 2 else (0 if len(parts) == 1 else "invalid")}
 
     if w == "ARTIFACT_LIST":
         return {"type": "ARTIFACT_LIST"}

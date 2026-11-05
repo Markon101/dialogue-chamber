@@ -40,7 +40,7 @@ The main limits on this design goal are structural:
 | `WORLD` appends Markdown through `ARTIFACT_WRITE`. | A claim about a changed map does not execute a change in a simulated environment. | [protocol.py](protocol.py), `_command`; [artifacts.py](artifacts.py) |
 | Society instructions replace the usual capability instructions. | Available tools such as whispers, notes, votes, and speaker nominations become harder to discover. | [chamber.py](chamber.py), `Chamber._protocol_instructions` |
 | Directed speech routes, whisper routes, and channel permissions can now be configured; groups show six recent posts. | Local communication experiments are possible; selective retrieval and cultural memory remain proposed. | [communication.py](communication.py); [chamber.py](chamber.py), `Chamber.build_context` |
-| Artifact previews show the first 1,200 characters; requested reads show the first 1,500. | An expanding ledger can hide recent events even when the artifact is included in context. | [chamber.py](chamber.py), `Chamber.build_context` |
+| Artifact previews now show a bounded beginning and recent tail; agents can request a 1,500-character window by offset. | Recent ledger changes remain visible, and omitted middle sections are accessible by explicit read. Relevance-based recall is still proposed. | [chamber.py](chamber.py), `Chamber.build_context` |
 | Older checkpoints omit several kinds of continuing state; new saves preserve complete current state. | New runs can continue, while older saves cannot reconstruct missing history safely. | [chamber.py](chamber.py), `resume_from_checkpoint`, `_save_turn_checkpoint`, and CLI validation |
 
 Two saved observations help prioritize the work:
@@ -145,7 +145,8 @@ and retrievable history. Include recent ledger changes as well as its introducti
 Any summary is an attributed interpretation with links back to its sources. Private
 information must stay private through retrieval, summaries, and inheritance.
 
-Dynamic context should follow the participant's current activity. A participant
+The bounded ledger preview and offset reads are a first implemented step. Dynamic
+context should follow the participant's current activity. A participant
 negotiating admission needs the group's current policy and pending invitation; one
 investigating a broken promise needs the promise and relevant later events. Give
 participants an explicit way to recall accessible history and choose their own

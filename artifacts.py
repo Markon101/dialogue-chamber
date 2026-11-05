@@ -132,7 +132,7 @@ class ArtifactManager:
         self.seen = seen
         self.log = list(snapshot["log"])
 
-    def read(self, agent, name, turn=0):
+    def read(self, agent, name, turn=0, mark_seen=True):
         try:
             fname = self.normalize(name)
             if fname not in self.versions:
@@ -141,7 +141,8 @@ class ArtifactManager:
         except ArtifactError as e:
             self.log.append(dict(turn=turn, agent=agent, op="read", name=str(name)[:60], version=None, ok=False, detail=str(e)))
             raise
-        self.seen[(agent, fname)] = self.versions[fname]
+        if mark_seen:
+            self.seen[(agent, fname)] = self.versions[fname]
         self.log.append(dict(turn=turn, agent=agent, op="read", name=fname, version=self.versions[fname], ok=True, detail=""))
         return fname, self.versions[fname], text
 

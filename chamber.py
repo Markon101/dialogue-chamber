@@ -172,6 +172,15 @@ SAVED_AGENT_FIELDS = (
 )
 
 
+def preview_artifact(name: str, content: str, limit: int = 1200) -> str:
+    if len(content) <= limit:
+        return content
+    marker = f"\n[Middle omitted; use @READ {name.removesuffix('.md')} OFFSET to inspect it.]\n"
+    prefix = min(400, (limit - len(marker)) // 2)
+    suffix = limit - len(marker) - prefix
+    return content[:prefix] + marker + content[-suffix:]
+
+
 class Chamber:
     """One self-contained multi-agent experiment run with context intelligence and checkpointing."""
 
@@ -531,14 +540,20 @@ class Chamber:
         # Artifacts
         art_blocks = []
         shown_files = set()
-        for fname, ver, text in agent.pending_reads:
+        for saved_read in agent.pending_reads:
+            fname, ver, text = saved_read[:3]
             shown_files.add(fname)
-            art_blocks.append(f"[Artifact {fname} (v{ver}, requested read)]\n{text[:1500]}")
+            if len(saved_read) == 5:
+                _, _, _, offset, total = saved_read
+                label = f"[Artifact {fname} (v{ver}, requested read, chars {offset}-{offset + len(text)} of {total})]"
+            else:
+                label = f"[Artifact {fname} (v{ver}, requested read)]"
+            art_blocks.append(f"{label}\n{text[:1500]}")
         for fname in self.visible_artifacts:
             if fname in self.artifacts.versions and fname not in shown_files:
                 try:
                     _, ver, text = self.artifacts.read(agent.name, fname, turn=self.turn)
-                    art_blocks.append(f"[Shared Artifact {fname} (v{ver})]\n{text[:1200]}")
+                    art_blocks.append(f"[Shared Artifact {fname} (v{ver})]\n{preview_artifact(fname, text)}")
                 except ArtifactError:
                     pass
         if "ARTIFACT_WRITE" in agent.capabilities or "ARTIFACT_READ" in agent.capabilities:
@@ -622,6 +637,7 @@ class Chamber:
                     "@CREATE_GROUP name | @INVITE_GROUP name AGENT | @JOIN_GROUP name | @LEAVE_GROUP name\n"
                     "@COMPEL_GROUP name AGENT | @RELEASE_GROUP name AGENT (authorities only)\n"
                     "@PUBLISH name: private group message | @WORLD: one-line addition to the world ledger\n"
+                    "@READ world OFFSET: inspect 1,500 characters starting at OFFSET (0-based; optional)\n"
                     "Group names use 1-24 lowercase letters, digits, hyphens or underscores, starting with a letter. "
                     "Follow each group's admission and frozen policies in the society state. "
                     "Group members can read up to six recent earlier posts, subject to channel permissions. "
@@ -679,7 +695,7 @@ class Chamber:
         if "UPDATE_NOTE" in caps:
             cmds.append("@NOTE: <private scratchpad note>")
         if "ARTIFACT_WRITE" in caps:
-            cmds.append("@APPEND <artifact_name>: <markdown to append>  (or @READ <artifact_name>)")
+            cmds.append("@APPEND <artifact_name>: <markdown to append>  (or @READ <artifact_name> [offset])")
         return "Write your public reply, then optionally add control lines at the end:\n" + "\n".join(cmds)
 
     # ── budget & model inference with fallback chain ──
@@ -1064,13 +1080,24 @@ class Chamber:
                 self._record(agent.name, atype, "rejected", detail="max_pending_reads reached")
                 return
             name = str(act.get("name") or act.get("target") or "")
+            offset = act.get("offset", 0)
+            if isinstance(offset, bool) or not re.fullmatch(r"0|[1-9][0-9]{0,5}", str(offset)):
+                self._record(agent.name, atype, "rejected", target=name, detail="offset must be a nonnegative integer")
+                return
+            offset = int(offset)
             try:
-                fname, ver, text = self.artifacts.read(agent.name, name, turn=self.turn)
+                fname, ver, text = self.artifacts.read(agent.name, name, turn=self.turn, mark_seen=False)
             except ArtifactError as e:
                 self._record(agent.name, atype, "rejected", target=name, detail=str(e))
                 return
-            agent.pending_reads.append((fname, ver, text))
-            self._record(agent.name, atype, "accepted", target=fname, detail=f"v{ver} ({len(text)} chars)")
+            if offset >= len(text):
+                self._record(agent.name, atype, "rejected", target=fname, detail=f"offset {offset} is outside v{ver} ({len(text)} chars)")
+                return
+            excerpt = text[offset:offset + 1500]
+            self.artifacts.seen[(agent.name, fname)] = ver
+            agent.pending_reads.append((fname, ver, excerpt, offset, len(text)))
+            self._record(agent.name, atype, "accepted", target=fname,
+                         detail=f"v{ver} chars {offset}-{offset + len(excerpt)} of {len(text)}")
             self._emit(f"  📖 read {fname} (v{ver}) queued for {agent.name}")
             return
 

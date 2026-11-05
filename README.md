@@ -72,6 +72,15 @@ speech, `society.md` summarizes groups and their posts, `events.md` records acce
 and rejected actions, and `artifacts/world.md` is the shared, agent-written ledger.
 Writing to the ledger does not automatically make a claim true or settled.
 
+When `world.md` grows, prompts show a bounded excerpt of its beginning and latest
+changes, with an omission marker. Use `@READ world OFFSET` to inspect any 1,500
+character window; offsets start at zero and count characters, not UTF-8 bytes.
+`@READ world` still starts at the beginning. A JSON `ARTIFACT_READ` action accepts
+`"offset": 1200` for the same operation. Accepted reads appear in that agent's next
+prompt with the file version and character range. Unread portions remain in the
+artifact and in saved checkpoints. These windows are bounded for the phone's context
+budget; they are not a summary of omitted material.
+
 Runs save their state automatically, including society membership, private posts,
 notes, and the world ledger. See **Saving and continuing runs** below. Event replay
 displays recorded events; it does not recreate the complete simulation. Mock replies
