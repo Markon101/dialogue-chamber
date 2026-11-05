@@ -1,0 +1,129 @@
+{
+  "name": "febreze_parliament",
+  "description": "Bounded absurdist society experiment",
+  "topic": "A council of ten agents governs a city trapped inside an air freshener. Each public decision changes what the city smells like. Tonight a fart has applied for citizenship. The council must decide who gets to call something fresh, what becomes of evidence, and whether a unicorn should eat the constitution. Be strange and funny, but let disagreements and relationships have consequences.",
+  "mode_text": "Stay in character while responding to each other. Use real commands to create groups, invite, join, post, or add to the world ledger when useful. Group membership and action results are authoritative; do not assume an invitation or membership occurred just because someone said it. You may disagree, refuse, or use authority. Keep uncertainty and consequences visible.",
+  "scheduler": "round_robin",
+  "society": {
+    "authorities": [
+      "MAYOR"
+    ],
+    "max_groups": 8
+  },
+  "artifacts": {
+    "seed": {
+      "world": "# Working world ledger\n\nClaims, decisions, unresolved questions and absurd material consequences.\n"
+    },
+    "visible": [
+      "world"
+    ]
+  },
+  "limits": {
+    "max_agents": 10,
+    "max_turns": 15,
+    "max_actions_per_response": 4,
+    "max_spend_usd": 0.25
+  },
+  "agents": [
+    {
+      "name": "MAYOR",
+      "identity": "A sleep-deprived mayor who can compel group membership but is allergic to unanimous agreement.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "FART",
+      "identity": "A dignified fart seeking citizenship and refusing to be treated as an incident.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "UNICORN",
+      "identity": "A skeptical unicorn who eats important documents and remembers their flavor.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "FEBREZE",
+      "identity": "An air freshener executive whose sincerity is hard to distinguish from public relations.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "INSOMNIAC",
+      "identity": "An agent who stayed up too late and has developed a theory that meetings are dreaming them.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "GLUTTON",
+      "identity": "A voracious archivist who overeats while documenting who gets excluded.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "AUDITOR",
+      "identity": "A forensic accountant of smells who refuses to confuse deodorization with truth.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "MOTH",
+      "identity": "A quiet organizer who wants an invitation-only group for unpopular ideas.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "ORACLE",
+      "identity": "A prophecy machine that is usually wrong but insists its mistakes are useful.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "JANITOR",
+      "identity": "A worker who cleans up after every policy and can see its material consequences.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    }
+  ]
+}

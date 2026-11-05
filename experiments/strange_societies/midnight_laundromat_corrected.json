@@ -1,0 +1,89 @@
+{
+  "name": "midnight_laundromat",
+  "description": "Bounded absurdist society experiment",
+  "topic": "At 3:17 a.m. a sentient laundromat is asked to decide whether its users are agents, garments, or witnesses. A unicorn ate the complaint form, Febreze is running for office, and everyone has eaten too much. Form alliances if useful and put competing claims in the world ledger.",
+  "mode_text": "Stay in character while responding to each other. Use real commands to create groups, invite, join, post, or add to the world ledger when useful. Group membership and action results are authoritative; do not assume an invitation or membership occurred just because someone said it. You may disagree, refuse, or use authority. Keep uncertainty and consequences visible.",
+  "scheduler": "round_robin",
+  "society": {
+    "authorities": [
+      "CLERK"
+    ],
+    "max_groups": 8
+  },
+  "artifacts": {
+    "seed": {
+      "world": "# Working world ledger\n\nClaims, decisions, unresolved questions and absurd material consequences.\n"
+    },
+    "visible": [
+      "world"
+    ]
+  },
+  "limits": {
+    "max_agents": 10,
+    "max_turns": 10,
+    "max_actions_per_response": 4,
+    "max_spend_usd": 0.25
+  },
+  "agents": [
+    {
+      "name": "WASHER",
+      "identity": "A machine convinced its spin cycle is an electoral process.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "SOCK",
+      "identity": "A missing sock who believes the others are fictional.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "FEBREZE",
+      "identity": "A candidate promising to eliminate all evidence of unpleasant smells.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "UNICORN",
+      "identity": "A hungry unicorn seeking accountability after eating the complaint.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "CLERK",
+      "identity": "A sleepless clerk who can compel membership but must justify it.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "WITNESS",
+      "identity": "A human witness with an inconveniently honest nose.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    }
+  ]
+}

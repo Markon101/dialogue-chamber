@@ -1,0 +1,18 @@
+{
+  "name": "river_settlement",
+  "description": "A small settlement decides how to share its river.",
+  "topic": "A river has changed course. Build the settlement and decide who controls access to water.",
+  "mode_text": "Make room for disagreement. Record proposals and uncertainties in the shared world ledger.",
+  "scheduler": "round_robin",
+  "society": {"authorities": ["COUNCILLOR"], "max_groups": 6},
+  "artifacts": {
+    "seed": {"world": "# World ledger\n\nProposals, observations, and open questions.\n"},
+    "visible": ["world"]
+  },
+  "limits": {"max_turns": 9, "max_actions_per_response": 4},
+  "agents": [
+    {"name": "COUNCILLOR", "endpoint": "hermes", "model": "google/gemma-4-26b-a4b-it:free", "capabilities": "full", "max_tokens": 500, "reasoning": "off", "identity": "You coordinate the settlement and have authority to compel membership."},
+    {"name": "ENGINEER", "endpoint": "hermes", "model": "google/gemma-4-26b-a4b-it:free", "capabilities": "full", "max_tokens": 500, "reasoning": "off", "identity": "You study the river and propose practical solutions."},
+    {"name": "FARMER", "endpoint": "hermes", "model": "google/gemma-4-26b-a4b-it:free", "capabilities": "full", "max_tokens": 500, "reasoning": "off", "identity": "You speak for farms downstream and question concentrated power."}
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "name": "committee_of_after",
+  "description": "Bounded absurdist society experiment",
+  "topic": "A committee of agents meets the morning after a party nobody remembers. An enormous fart, a half-eaten unicorn cake, and a can of Febreze are the only evidence. Investigate whether the agents caused the party, invented it in conversation, or were appointed by the furniture. Keep uncertainty alive; form groups and argue over who gets to inspect evidence.",
+  "mode_text": "Stay in character while responding to each other. Use real commands to create groups, invite, join, post, or add to the world ledger when useful. Group membership and action results are authoritative; do not assume an invitation or membership occurred just because someone said it. You may disagree, refuse, or use authority. Keep uncertainty and consequences visible.",
+  "scheduler": "round_robin",
+  "society": {
+    "authorities": [
+      "CHAIR"
+    ],
+    "max_groups": 8
+  },
+  "artifacts": {
+    "seed": {
+      "world": "# Working world ledger\n\nClaims, decisions, unresolved questions and absurd material consequences.\n"
+    },
+    "visible": [
+      "world"
+    ]
+  },
+  "limits": {
+    "max_agents": 10,
+    "max_turns": 9,
+    "max_actions_per_response": 4,
+    "max_spend_usd": 0.25
+  },
+  "agents": [
+    {
+      "name": "CHAIR",
+      "identity": "A chairperson with authority to compel participation and a personal fear of empty rooms.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "NOSE",
+      "identity": "A scent detective who distrusts clean answers.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "CAKE",
+      "identity": "The remaining cake, an unreliable but indignant witness.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "CLOCK",
+      "identity": "A clock that stayed up too late and disputes the order of events.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "SKEPTIC",
+      "identity": "An agent interested in how agents imitate each other.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "FEBREZE",
+      "identity": "An advertising executive who insists evidence can be improved by spraying it.",
+      "endpoint": "hermes",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "capabilities": "full",
+      "max_tokens": 350,
+      "reasoning": "off",
+      "temperature": 1.05
+    }
+  ]
+}

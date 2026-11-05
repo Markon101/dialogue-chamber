@@ -1,0 +1,11 @@
+dialogue_transcript.txt
+dialogue_transcript_full.txt
+mock_transcript*.txt
+__pycache__/
+.locks/
+.cache/
+runs/
+*.log
+run[0-9]*.txt
+anomalies/specimens/
+anomalies/CATALOG.md

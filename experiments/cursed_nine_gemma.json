@@ -1,0 +1,145 @@
+{
+  "name": "cursed_nine_gemma",
+  "description": "Nine equal local agents design an agent society sandbox",
+  "topic": "Design an ambitious but implementable agent society harness and sandbox. Nine equal agents must argue toward a concrete blueprint for programmable societies that can build and inhabit strange worlds. Include voluntary and compelled groups, privacy, authority, communication, persistent memory, observation, resource limits, and user-friendly operation. Explore how looped transformers and iterative inference might help, but distinguish speculation from evidence. Produce an architecture, an example scenario, a minimal implementation plan, failure modes, and tests that could disprove your assumptions.",
+  "mode_text": "You are peers with equal standing; no agent is a leader or moderator. Argue, disagree, revise and build on one another rather than merely agreeing. A haunted blackboard has opinions, but its entries are claims, not facts. Make the design specific and implementable. Use @CLAIM to put proposals on the blackboard, @CHALLENGE with the claim ID to test them, and @RETRACT when warranted. Use @NOTE to maintain your own private scratchpad: it replaces your previous note, so carry forward useful material. Use @APPEND blueprint: to add concise decisions, open questions, and testable predictions to the shared blueprint. Treat looped transformers as a hypothesis, not proven improvement. You have no web or external tools; do not invent citations or claim experiments were performed.",
+  "scheduler": "round_robin",
+  "board_visible": true,
+  "artifacts": {
+    "seed": {
+      "blueprint": "# Agent society harness: working blueprint\n\n## Decisions\n\n## Open questions\n\n## Discriminating tests\n"
+    },
+    "visible": [
+      "blueprint"
+    ]
+  },
+  "limits": {
+    "max_agents": 9,
+    "max_turns": 27,
+    "max_requests": 45,
+    "max_duration_s": 7200,
+    "max_note_chars": 5000,
+    "max_context_chars": 24000,
+    "max_actions_per_response": 5,
+    "max_total_tokens": 30000
+  },
+  "agents": [
+    {
+      "name": "ARCHITECT",
+      "endpoint": "local",
+      "identity": "You are an equal peer. Design a coherent overall architecture and make its tradeoffs explicit.",
+      "capabilities": "full",
+      "profile": "standard",
+      "priority": 0,
+      "weight": 1.0,
+      "temperature": 0.9,
+      "max_tokens": 700,
+      "context_chars": 20000,
+      "reasoning": "off"
+    },
+    {
+      "name": "SANDBOX",
+      "endpoint": "local",
+      "identity": "You are an equal peer. Challenge isolation boundaries, capabilities, and resource limits.",
+      "capabilities": "full",
+      "profile": "standard",
+      "priority": 0,
+      "weight": 1.0,
+      "temperature": 0.9,
+      "max_tokens": 700,
+      "context_chars": 20000,
+      "reasoning": "off"
+    },
+    {
+      "name": "SOCIETY",
+      "endpoint": "local",
+      "identity": "You are an equal peer. Design voluntary networks, role authority, consent, and conflicts.",
+      "capabilities": "full",
+      "profile": "standard",
+      "priority": 0,
+      "weight": 1.0,
+      "temperature": 0.9,
+      "max_tokens": 700,
+      "context_chars": 20000,
+      "reasoning": "off"
+    },
+    {
+      "name": "LOOPS",
+      "endpoint": "local",
+      "identity": "You are an equal peer. Explore looped transformers, iterative reasoning, stopping conditions, and compute costs.",
+      "capabilities": "full",
+      "profile": "standard",
+      "priority": 0,
+      "weight": 1.0,
+      "temperature": 0.9,
+      "max_tokens": 700,
+      "context_chars": 20000,
+      "reasoning": "off"
+    },
+    {
+      "name": "MEMORY",
+      "endpoint": "local",
+      "identity": "You are an equal peer. Design private scratchpads, shared memory, retrieval, and provenance.",
+      "capabilities": "full",
+      "profile": "standard",
+      "priority": 0,
+      "weight": 1.0,
+      "temperature": 0.9,
+      "max_tokens": 700,
+      "context_chars": 20000,
+      "reasoning": "off"
+    },
+    {
+      "name": "WORLD",
+      "endpoint": "local",
+      "identity": "You are an equal peer. Design evolving worlds and consequences without confusing prose with enforced state.",
+      "capabilities": "full",
+      "profile": "standard",
+      "priority": 0,
+      "weight": 1.0,
+      "temperature": 0.9,
+      "max_tokens": 700,
+      "context_chars": 20000,
+      "reasoning": "off"
+    },
+    {
+      "name": "ADVERSARY",
+      "endpoint": "local",
+      "identity": "You are an equal peer. Find failure modes, exploit assumptions, and propose concrete tests.",
+      "capabilities": "full",
+      "profile": "standard",
+      "priority": 0,
+      "weight": 1.0,
+      "temperature": 0.9,
+      "max_tokens": 700,
+      "context_chars": 20000,
+      "reasoning": "off"
+    },
+    {
+      "name": "EVALUATOR",
+      "endpoint": "local",
+      "identity": "You are an equal peer. Design falsifiable benchmarks, ablations, controls, and reproducible evidence.",
+      "capabilities": "full",
+      "profile": "standard",
+      "priority": 0,
+      "weight": 1.0,
+      "temperature": 0.9,
+      "max_tokens": 700,
+      "context_chars": 20000,
+      "reasoning": "off"
+    },
+    {
+      "name": "OPERATOR",
+      "endpoint": "local",
+      "identity": "You are an equal peer. Make configuration, monitoring, budgets, and recovery usable on a phone.",
+      "capabilities": "full",
+      "profile": "standard",
+      "priority": 0,
+      "weight": 1.0,
+      "temperature": 0.9,
+      "max_tokens": 700,
+      "context_chars": 20000,
+      "reasoning": "off"
+    }
+  ]
+}
