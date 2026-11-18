@@ -16,6 +16,8 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from presets import SAMPLING_PARAMS
+
 
 @dataclass
 class Result:
@@ -78,7 +80,11 @@ def build_payload(
         "max_tokens": int(max_tokens),
     }
 
-    for k in ("top_p", "top_k", "min_p"):
+    for k, (_, _, _, llamacpp_only) in SAMPLING_PARAMS.items():
+        if k == "temperature":
+            continue
+        if llamacpp_only and provider != "llamacpp":
+            continue
         if agent_cfg.get(k) is not None:
             p[k] = agent_cfg[k]
 

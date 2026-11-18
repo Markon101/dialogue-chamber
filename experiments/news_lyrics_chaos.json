@@ -1,0 +1,77 @@
+{
+  "name": "news_lyrics_chaos",
+  "description": "A 3-person songwriting team argues over 10 rounds about song lyrics capturing the mid-November 2026 U.S. news chaos.",
+  "topic": "Write and agree on a definitive 3-verse + chorus song (plus argue over which existing songs best capture this week) based on the mid-November 2026 U.S. news chaos (Nov 12-18, 2026):\n1) INFRASTRUCTURE & TECH CASCADE: Nov 12-13 global Microsoft 365 outage (Outlook/Teams/Exchange); Nov 13 rare nationwide FAA ground stop from overloaded legacy copper-to-fiber telecom upgrades & a decades-old failing router (DOT Sec. Sean Duffy asking Congress for $50.1B while halting router installs); Nov 16 glitches at JPMorgan Chase, Bank of America, Wells Fargo, US Bank + hundreds of United Airlines delays; Nov 17 Apple iCloud/Apple Pay disruption & NSA internal network degradation.\n2) DHS 'SUPERINTELLIGENCE' THEORY & CAPITOL GRILLING: DHS Sec. Markwayne Mullin said with '98% certainty' there was no coordinated cyberattack, then floated a Fox News theory that rapid AI / 'superintelligence' and automated code-writing may be overwhelming legacy infrastructure; lawmakers grilled officials while fact-checkers debunked viral '90-day blackout' rumors.\n3) SILICON VALLEY & AUTONOMOUS CHAOS: Nvidia rejected former CEO Jensen Huang's offer to return after his departure amid allegations of an affair with a businesswoman alleged to be a Chinese spy, triggering national security & AI chip export-control scrutiny; meanwhile California DMV banned Waymo from state freeways after traffic incidents.\n4) GEOPOLITICS & DC FALLOUT: Post-election House Democrats issued preservation orders & document requests to Trump allies/family, while Trump headed to Asia for high-stakes summits with Putin and Xi amid Iran tensions and strict new AI chip curbs.",
+  "mode_text": "You are a 3-person songwriting & music-critic team locked in a studio session with only 10 rounds to fight out lyrics for a track about this week's U.S. chaos. DO NOT politely agree or rubber-stamp each other's verses! Attack weak rhymes, cliché metaphors, and bad takes directly. Argue about both: (a) what existing songs/artists capture or fail to capture this specific kind of bureaucratic-AI-infrastructure meltdown, and (b) the actual verses/chorus you are drafting in lyrics.md (cover the FAA/Microsoft/banks/Apple/NSA outages, Waymo freeway ban, and Jensen Huang / Nvidia spy-scandal + Asia summit chaos, not just the router!). Use @CLAIM to propose a thesis or lyric hook, @CHALLENGE <c1|c2|...> using the exact board ID (e.g. @CHALLENGE c1: ...) to tear apart a weak position, @VOTE <c1|c2|...> yes|no to settle disputes, @WHISPER <name>: ... for studio backstabbing/alliances, and @APPEND lyrics: <lines> to put candidate lyrics into the shared sheet. End with NEXT: <name> to throw the mic to who you want to confront next.",
+  "scheduler": "self_directed",
+  "board_visible": true,
+  "dm_visibility": "notice",
+  "artifacts": {
+    "seed": {
+      "lyrics": "# Track Title: TBD (Nov 2026 U.S. Chaos Session)\n\n## Hook / Chorus Candidates\n\n## Verse Drafts\n\n## Rejected Clichés\n",
+      "news_briefing": "# Mid-November 2026 U.S. News Chaos Dossier (Nov 12-18, 2026)\n\n- Nov 12-13: Global Microsoft 365 outage (Outlook, Teams, Exchange Online).\n- Nov 13: Nationwide FAA ground stop triggered by legacy copper-to-fiber upgrade glitches and a failing decades-old router. DOT Sec. Sean Duffy seeks $50.1B overhaul; FAA halts similar router installs.\n- Nov 16: Widespread banking glitches at JPMorgan Chase, Bank of America, Wells Fargo, and US Bank; United Airlines system outage delays hundreds of flights.\n- Nov 17: Apple iCloud & Apple Pay disruption; NSA internal network degradation during maintenance; debunked viral '90-day blackout' rumors.\n- DHS Sec. Markwayne Mullin: '98% certain' no cyberattack, but floated on Fox News that AI/'superintelligence' and automated code-writing could be straining legacy infrastructure; grilled by Congress.\n- Nvidia: Board rejected former CEO Jensen Huang's offer to return after stepping down amid alleged affair with businesswoman accused of being a Chinese spy; national security & chip export scrutiny.\n- California DMV: Banned Waymo autonomous vehicles from state freeways after traffic incidents.\n- Washington & Global: House inquiries/preservation orders targeting Trump allies; Trump traveling to Asia for summits with Putin and Xi amid Iran tensions and new AI chip restrictions.\n"
+    },
+    "visible": [
+      "lyrics"
+    ]
+  },
+  "limits": {
+    "max_turns": 10,
+    "max_requests": 30,
+    "max_consecutive": 1,
+    "max_tokens_per_response": 4096,
+    "max_total_tokens": 80000,
+    "max_context_chars": 240000,
+    "max_message_chars": 3500,
+    "max_actions_per_response": 6,
+    "max_duration_s": 1200
+  },
+  "endpoints": {
+    "local": {
+      "provider": "llamacpp",
+      "remote": false,
+      "api_key_env": "",
+      "base_url": "http://127.0.0.1:8080/v1",
+      "model": "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
+      "request_timeout_s": 240
+    }
+  },
+  "agents": [
+    {
+      "name": "RIOT_LYRICIST",
+      "endpoint": "local",
+      "identity": "You are RIOT_LYRICIST, a jagged post-punk / industrial lyricist. You despise sanitized pop, nostalgic 'We Didn't Start the Fire' list-songs, and polite workshop feedback. You want visceral, darkly funny, rhythm-driven bars about failing copper routers, 98%-certain-not-a-cyberattack spin, banned Waymos, and Spy-scandal chipmakers. Call out corny rhymes ruthlessly.",
+      "focus": "sharp satire, concrete weird news details, jagged cadence",
+      "capabilities": "full",
+      "profile": "standard",
+      "temperature": 0.95,
+      "max_tokens": 4096,
+      "context_chars": 200000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "FOLK_CHRON",
+      "endpoint": "local",
+      "identity": "You are FOLK_CHRON, a sharp-eyed folk-rock songwriter and music historian. You think edgy industrial noise dates itself in five minutes; great protest songs—from Dylan and Phil Ochs to R.E.M. and Talking Heads—survive because of human stakes, singable refrains, and devastating understatement. Push back against hollow cynicism and demand emotional truth and memorable phrasing.",
+      "focus": "memorable refrains, classic-song comparisons, human absurdity",
+      "capabilities": "full",
+      "profile": "standard",
+      "temperature": 0.85,
+      "max_tokens": 4096,
+      "context_chars": 200000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "SYNTH_PRODUCER",
+      "endpoint": "local",
+      "identity": "You are SYNTH_PRODUCER, a ruthless genre-agnostic record producer and lyric editor. You care about meter, pocket, earworm hooks, and whether a line actually slaps over a beat. Both punk screeds and dusty folk ballads bore you when they get self-indulgent. Pit RIOT_LYRICIST and FOLK_CHRON against each other, challenge sloppy claims on the board, and force a killer final chorus.",
+      "focus": "meter, earworm hooks, structural discipline, refereeing clashes",
+      "capabilities": "full",
+      "profile": "standard",
+      "temperature": 0.9,
+      "max_tokens": 4096,
+      "context_chars": 200000,
+      "reasoning": "medium"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 # ==============================================================================
 # Dialogue Chamber — Shared Launcher Library
 # Safe server management, process ownership tracking, locking, and wake-locks.

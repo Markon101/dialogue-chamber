@@ -79,17 +79,19 @@ def run_doctor(endpoints: Dict[str, Any], runs_dir: Path) -> Dict[str, Any]:
     except Exception as e:
         add_check("Storage", "Runs Directory", "FAIL", f"Cannot write to {runs_dir}: {e}")
 
-    # Phone mirror check
-    copy_dir = Path(os.environ.get("CHAMBER_COPY_DIR", "/sdcard/dialogue_chamber/runs"))
-    try:
-        if copy_dir.exists() and os.access(copy_dir, os.W_OK):
-            add_check("Storage", "Phone Storage Mirror", "PASS", f"Accessible: {copy_dir}")
-        elif copy_dir.exists():
-            add_check("Storage", "Phone Storage Mirror", "WARN", f"Exists but read-only: {copy_dir}")
-        else:
-            add_check("Storage", "Phone Storage Mirror", "INFO", f"Mirror path not created yet ({copy_dir})")
-    except Exception:
-        add_check("Storage", "Phone Storage Mirror", "INFO", "Mirror not accessible")
+    # Phone mirror check (only when configured or on Termux)
+    copy_dir_val = os.environ.get("CHAMBER_COPY_DIR", "/sdcard/dialogue_chamber/runs" if IS_TERMUX else "")
+    if copy_dir_val:
+        copy_dir = Path(copy_dir_val)
+        try:
+            if copy_dir.exists() and os.access(copy_dir, os.W_OK):
+                add_check("Storage", "Phone Storage Mirror", "PASS", f"Accessible: {copy_dir}")
+            elif copy_dir.exists():
+                add_check("Storage", "Phone Storage Mirror", "WARN", f"Exists but read-only: {copy_dir}")
+            else:
+                add_check("Storage", "Phone Storage Mirror", "INFO", f"Mirror path not created yet ({copy_dir})")
+        except Exception:
+            add_check("Storage", "Phone Storage Mirror", "INFO", "Mirror not accessible")
 
     # 4. Local llama-server & Models
     sm = LlamaServerManager()

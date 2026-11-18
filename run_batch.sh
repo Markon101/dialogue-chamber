@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 # ==============================================================================
 # Dialogue Chamber — Batch Runner (Compatibility Wrapper)
 # Delegates to Python-first batch runner with manifests, tracking, and recovery.

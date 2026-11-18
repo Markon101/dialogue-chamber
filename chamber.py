@@ -50,6 +50,8 @@ from presets import (
     LIMITS,
     PRESETS,
     RUNS_DIR,
+    SAMPLING_PARAMS,
+    normalize_sampling_param,
 )
 from protocol import ACTION_TYPES, ITEM_KINDS, canonicalize_agent_id, parse_reply
 from server_manager import LlamaServerManager, assert_single_llama_server, resolve_model
@@ -82,6 +84,14 @@ class AgentState:
     top_p: Optional[float] = None
     top_k: Optional[int] = None
     min_p: Optional[float] = None
+    typical_p: Optional[float] = None
+    xtc_probability: Optional[float] = None
+    xtc_threshold: Optional[float] = None
+    repeat_penalty: Optional[float] = None
+    presence_penalty: Optional[float] = None
+    frequency_penalty: Optional[float] = None
+    dry_multiplier: Optional[float] = None
+    dynatemp_range: Optional[float] = None
     max_tokens: int = 1200
     context_chars: int = 10000
     effective_context_tokens: int = 32768
@@ -162,11 +172,14 @@ SAVED_RUNTIME_FIELDS = (
     "requests_used", "retries_used", "prompt_tokens", "completion_tokens",
     "reasoning_tokens_total", "visible_tokens_total", "tracked_tokens", "remote_cost_usd",
     "remote_calls_without_cost", "empty_streak", "format_counts", "attribution_flags",
-    "temp_changes", "speaker_transitions", "resurrection_events", "fallbacks_triggered",
+    "temp_changes", "sampling_changes", "end_votes", "end_requested",
+    "speaker_transitions", "resurrection_events", "fallbacks_triggered",
     "solved_turn", "verified_synthesis_turn", "token_accounting_history",
 )
 SAVED_AGENT_FIELDS = (
-    "temperature", "note", "style", "pending_reads", "active", "finished_reason",
+    "temperature", "top_p", "top_k", "min_p", "typical_p", "xtc_probability", "xtc_threshold",
+    "repeat_penalty", "presence_penalty", "frequency_penalty", "dry_multiplier", "dynatemp_range",
+    "note", "style", "pending_reads", "active", "finished_reason",
     "turns_taken", "consecutive_turns", "last_turn", "failures", "empty_count",
     "total_prompt_tokens", "total_completion_tokens", "subscriptions",
 )
@@ -214,6 +227,13 @@ class Chamber:
         self.initial_topic = self.topic
         self.mode_text = str(self.cfg.get("mode_text") or "").strip()
         self.scheduler_mode = str(self.cfg.get("scheduler") or "self_directed").lower()
+        self.end_mode = str(self.cfg.get("end_mode") or "fixed_turns").lower()
+        if self.end_mode not in ("fixed_turns", "agent_decided"):
+            raise ValueError(f"unknown end_mode {self.end_mode!r}; expected 'fixed_turns' or 'agent_decided'")
+        self.end_policy = str(self.cfg.get("end_policy") or "majority").lower()
+        if self.end_policy not in ("majority", "unanimous", "any"):
+            raise ValueError(f"unknown end_policy {self.end_policy!r}; expected 'majority', 'unanimous', or 'any'")
+        self.min_turns_before_end = max(0, int(self.cfg.get("min_turns_before_end", 0)))
         self.board_visible = bool(self.cfg.get("board_visible", True))
         self.dm_visibility = str(self.cfg.get("dm_visibility") or "private")
         self.watch_terms = [t.lower() for t in (self.cfg.get("watch_terms") or [])]
@@ -356,6 +376,13 @@ class Chamber:
 
             fallbacks = list(merged.get("fallback_models") or [])
 
+            sampling_kwargs = {}
+            for sk in SAMPLING_PARAMS:
+                if sk == "temperature":
+                    continue
+                if merged.get(sk) is not None:
+                    _, sampling_kwargs[sk] = normalize_sampling_param(sk, merged[sk])
+
             ag = AgentState(
                 name=name,
                 endpoint_name=ep_name,
@@ -365,9 +392,7 @@ class Chamber:
                 focus=str(merged.get("focus") or ""),
                 knowledge=str(merged.get("knowledge") or ""),
                 temperature=temp,
-                top_p=merged.get("top_p"),
-                top_k=merged.get("top_k"),
-                min_p=merged.get("min_p"),
+                **sampling_kwargs,
                 max_tokens=max_tok,
                 context_chars=ctx_chars,
                 effective_context_tokens=eff_ctx,
@@ -434,6 +459,9 @@ class Chamber:
         self.format_counts = {"json": 0, "partial_json": 0, "commands": 0, "plain": 0, "empty": 0}
         self.attribution_flags: List[Tuple[int, str, str]] = []
         self.temp_changes: List[Tuple[int, str, float, float]] = []
+        self.sampling_changes: List[Tuple[int, str, dict]] = []
+        self.end_votes: Dict[str, str] = {}
+        self.end_requested: bool = False
         self.speaker_transitions: List[Tuple[int, str, str]] = []
         self.resurrection_events: List[dict] = []
         self.fallbacks_triggered: List[dict] = []
@@ -656,15 +684,28 @@ class Chamber:
                 lines.append("Optional board lines: @CLAIM: <idea> | @CHALLENGE <id>: <why> | @RETRACT <id>")
             if "WHISPER" in caps:
                 lines.append("Optional private line: @WHISPER <name>: <secret message>")
+            if self.end_mode == "agent_decided" and ("END_RUN" in caps or "FINISH" in caps):
+                lines.append(
+                    f"Run ending is agent-decided ({self.end_policy}, safety cap {self.limits['max_turns']} turns): "
+                    f"@END_RUN: <reason> to vote to conclude (or @FINISH: <reason> to exit)."
+                )
             return "\n".join(lines)
 
+        supports_extra_samplers = agent.endpoint.get("provider") == "llamacpp" and not agent.endpoint.get("externally_managed")
         if agent.profile == "rich":
             allowed = sorted(caps - {"SAY"})
+            extra = []
+            if supports_extra_samplers and "SET_SAMPLING" in caps:
+                extra.append('  "sampling_request": {"min_p": 0.05, "top_k": 40, "xtc_probability": 0.3, "xtc_threshold": 0.1},')
+            if self.end_mode == "agent_decided" and ("END_RUN" in caps or "FINISH" in caps):
+                extra.append(f'Run ending is agent-decided ({self.end_policy}, safety cap {self.limits["max_turns"]} turns): use END_RUN (or FINISH) action when ready to wrap up.')
+            extra_json = ('\n' + extra[0]) if (supports_extra_samplers and "SET_SAMPLING" in caps) else ''
+            extra_note = ('\n' + extra[-1]) if (self.end_mode == "agent_decided" and ("END_RUN" in caps or "FINISH" in caps)) else ''
             return (
                 "Respond with a JSON object (or plain text with @commands if you prefer):\n"
                 '{\n  "message": "your public speech",\n'
                 f'  "next_speaker": "one of {names} (optional)",\n'
-                f'  "temperature_request": 0.9,\n'
+                f'  "temperature_request": 0.9,{extra_json}\n'
                 '  "actions": [\n'
                 '    {"type": "CLAIM", "kind": "hypothesis|claim|question|proposal|decision|task", "content": "..."},\n'
                 '    {"type": "CHALLENGE", "target": "c1", "content": "counterargument"},\n'
@@ -676,10 +717,12 @@ class Chamber:
                 '    {"type": "ARTIFACT_WRITE", "name": "world", "mode": "create|append|replace", "content": "markdown"},\n'
                 '    {"type": "ARTIFACT_READ", "name": "world"}\n'
                 "  ]\n}\n"
-                f"Permitted action types for you: {', '.join(allowed)}."
+                f"Permitted action types for you: {', '.join(allowed)}.{extra_note}"
             )
 
         cmds = [f"NEXT: <name> ({names})", f"TEMP: <{lo}..{hi}>"]
+        if supports_extra_samplers and "SET_SAMPLING" in caps:
+            cmds.append("Optional sampling lines: TOP_P: <0..1> | TOP_K: <int> | MIN_P: <0..1> | XTC_PROB: <0..1> | XTC_THRESH: <0..0.5> | REPEAT_PENALTY: <0.5..2>")
         if "WHISPER" in caps:
             cmds.append("@WHISPER <name>: <private message>")
         if "PUBLISH" in caps and len(self.channels) > 1:
@@ -696,6 +739,8 @@ class Chamber:
             cmds.append("@NOTE: <private scratchpad note>")
         if "ARTIFACT_WRITE" in caps:
             cmds.append("@APPEND <artifact_name>: <markdown to append>  (or @READ <artifact_name> [offset])")
+        if self.end_mode == "agent_decided" and ("END_RUN" in caps or "FINISH" in caps):
+            cmds.append(f"@END_RUN: <reason> (vote to conclude session; policy: {self.end_policy}, cap: {self.limits['max_turns']} turns) | @FINISH: <reason>")
         return "Write your public reply, then optionally add control lines at the end:\n" + "\n".join(cmds)
 
     # ── budget & model inference with fallback chain ──
@@ -911,6 +956,30 @@ class Chamber:
             self._emit(f"  ⚙ temp {agent.name}: {old_t:.2f} → {new_t:.2f}{clamped}")
             return
 
+        if atype == "SET_SAMPLING":
+            raw_params = act.get("params") if isinstance(act.get("params"), dict) else {}
+            if not raw_params:
+                self._record(agent.name, atype, "rejected", detail="missing sampling parameters")
+                return
+            applied = {}
+            t_bounds = (float(lim["temp_min"]), float(lim["temp_max"]))
+            for rk, rv in raw_params.items():
+                try:
+                    ck, cv = normalize_sampling_param(rk, rv, temp_bounds=t_bounds)
+                except ValueError as exc:
+                    self._record(agent.name, atype, "rejected", detail=str(exc))
+                    return
+                old_v = getattr(agent, ck, None)
+                setattr(agent, ck, cv)
+                applied[ck] = {"old": old_v, "new": cv}
+                if ck == "temperature":
+                    self.temp_changes.append((self.turn, agent.name, float(old_v), float(cv)))
+            self.sampling_changes.append((self.turn, agent.name, {k: v["new"] for k, v in applied.items()}))
+            summary = ", ".join(f"{k}={v['new']}" for k, v in applied.items())
+            self._record(agent.name, atype, "accepted", detail=summary)
+            self._emit(f"  ⚙ sampling {agent.name}: {summary}")
+            return
+
         if atype == "PROPOSE_NEXT":
             raw_target = str(act.get("target") or "").strip()
             target = canonicalize_agent_id(raw_target, set(self.agents.keys()))
@@ -1124,7 +1193,48 @@ class Chamber:
             agent.finished_reason = reason
             self._record(agent.name, atype, "accepted", detail=reason)
             self._emit(f"  🚪 {agent.name} finished participating: {reason}")
+            if self.end_mode == "agent_decided":
+                self._evaluate_agent_end()
             return
+
+        if atype == "END_RUN":
+            if self.end_mode != "agent_decided":
+                self._record(agent.name, atype, "rejected", detail="END_RUN is only enabled in agent_decided end_mode")
+                return
+            reason = str(act.get("content") or "ready to conclude").strip()[:120]
+            if reason.lower() in ("cancel", "withdraw", "retract", "stay", "no"):
+                self.end_votes.pop(agent.name, None)
+                self._record(agent.name, atype, "accepted", detail="withdrew end vote")
+                self._emit(f"  ↩ {agent.name} withdrew vote to end run")
+                return
+            if self.turn < self.min_turns_before_end:
+                self._record(agent.name, atype, "rejected", detail=f"cannot end before turn {self.min_turns_before_end}")
+                return
+            self.end_votes[agent.name] = reason
+            self._record(agent.name, atype, "accepted", detail=reason)
+            self._emit(f"  🏁 {agent.name} voted to end run: {reason}")
+            self._evaluate_agent_end()
+            return
+
+    def _evaluate_agent_end(self):
+        active = [n for n in self.agent_order if self.agents[n].active]
+        if not active:
+            self.end_requested = True
+            self.stop_reason = "all participants finished"
+            return
+        voted = [n for n in active if n in self.end_votes]
+        if self.end_policy == "any" and len(voted) >= 1:
+            reached = True
+        elif self.end_policy == "unanimous" and len(voted) == len(active):
+            reached = True
+        elif self.end_policy == "majority" and len(voted) > (len(active) / 2):
+            reached = True
+        else:
+            reached = False
+        if reached:
+            self.end_requested = True
+            self.stop_reason = f"agents decided to end run ({self.end_policy}: {', '.join(voted)})"
+            self._record("SYSTEM", "END_RUN", "system", target=",".join(voted), detail=self.stop_reason)
 
     def _queue_reactive(self, target: str):
         if target in self.agents and self.agents[target].active and target not in self.reactive_queue:
@@ -1285,9 +1395,11 @@ class Chamber:
             self.society.authorities = set(state["authorities"])
         for name, saved in state["agents"].items():
             for attribute in SAVED_AGENT_FIELDS:
-                setattr(self.agents[name], attribute, copy.deepcopy(saved[attribute]))
+                if attribute in saved:
+                    setattr(self.agents[name], attribute, copy.deepcopy(saved[attribute]))
         for attribute in SAVED_RUNTIME_FIELDS:
-            setattr(self, attribute, copy.deepcopy(state["runtime"][attribute]))
+            if attribute in state["runtime"]:
+                setattr(self, attribute, copy.deepcopy(state["runtime"][attribute]))
         self.seed = state["seed"]
 
         def as_tuple(value):
@@ -1312,7 +1424,8 @@ class Chamber:
             f"{n}={self.agents[n].model} (ctx: {self.agents[n].effective_context_tokens // 1024}K, T={self.agents[n].temperature:.2f})"
             for n in self.agent_order
         ))
-        self._emit(f"Scheduler: {self.scheduler_mode} | Turn limit: {self.limits['max_turns']} | Run ID: {self.run_id}\n")
+        end_desc = f"{self.end_mode} ({self.end_policy})" if self.end_mode == "agent_decided" else self.end_mode
+        self._emit(f"Scheduler: {self.scheduler_mode} | End mode: {end_desc} | Turn limit: {self.limits['max_turns']} | Run ID: {self.run_id}\n")
         self._emit(f"Topic: {self.topic}\n")
 
         prev_sigint = signal.getsignal(signal.SIGINT)
@@ -1380,7 +1493,9 @@ class Chamber:
                 )
 
                 if not parsed.message and not parsed.actions:
-                    if res.reasoning:
+                    # Only promote reasoning text if generation was NOT cut off mid-thought;
+                    # if it hit length inside reasoning, retry with reasoning="off" first.
+                    if res.finish_reason != "length" and res.reasoning:
                         paras = [p.strip() for p in res.reasoning.split("\n\n") if p.strip()]
                         if paras:
                             parsed = parse_reply(paras[-1], res.reasoning, me=speaker, names=tuple(self.agent_order),
@@ -1390,6 +1505,8 @@ class Chamber:
                             res2 = self._call_model(ag, ctx, stops=stops, reasoning="off")
                             parsed = parse_reply(res2.content, res2.reasoning or res.reasoning, me=speaker,
                                                  names=tuple(self.agent_order), max_chars=int(self.limits["max_message_chars"]))
+                            if parsed.message or parsed.actions:
+                                res = res2
                         except InferenceError:
                             pass
 
@@ -1425,6 +1542,10 @@ class Chamber:
                 if not any(a.active for a in self.agents.values()):
                     self.next_speaker = None
                     self.stop_reason = "all participants finished"
+                    break
+
+                if self.end_requested:
+                    self.next_speaker = None
                     break
 
                 nxt = self._select_next_speaker(speaker)
@@ -1541,6 +1662,10 @@ class Chamber:
             remote_cost_usd=round(self.remote_cost_usd, 6),
             remote_calls_without_cost=self.remote_calls_without_cost,
             elapsed_s=round(self.elapsed_s, 2),
+            end_mode=self.end_mode,
+            end_policy=self.end_policy,
+            end_votes=dict(self.end_votes),
+            sampling_changes=list(self.sampling_changes),
             stop_reason=self.stop_reason,
             turns_by_agent=turns_by_agent,
             participation_share=shares,
@@ -1708,6 +1833,16 @@ class Chamber:
             f"- **Truncated generations (`finish_reason=length`)**: {metrics['truncated_generations']}",
         ])
 
+        if self.sampling_changes:
+            m_lines.extend(["", "### Sampling Parameter Changes"])
+            for turn_no, ag_name, changed in self.sampling_changes:
+                m_lines.append(f"- Turn {turn_no} (`{ag_name}`): {', '.join(f'{k}={v}' for k, v in changed.items())}")
+
+        if self.end_votes:
+            m_lines.extend(["", "### End-Run Votes"])
+            for ag_name, reason in self.end_votes.items():
+                m_lines.append(f"- `{ag_name}`: {reason}")
+
         if self.fallbacks_triggered:
             m_lines.extend(["", "### Model Fallbacks Triggered"])
             for fb in self.fallbacks_triggered:
@@ -1760,12 +1895,19 @@ def main(argv=None) -> int:
     ap.add_argument("--preset", "-p", default="two_agent_baseline", help="Experiment preset name")
     ap.add_argument("--list-presets", action="store_true", help="List available presets and exit")
     ap.add_argument("--turns", "-t", type=int, default=None, help="Override max_turns")
+    ap.add_argument("--end-mode", choices=("fixed_turns", "agent_decided"), default=None,
+                    help="Termination mode: fixed_turns (default) or agent_decided")
+    ap.add_argument("--end-policy", choices=("majority", "unanimous", "any"), default=None,
+                    help="When end-mode is agent_decided: majority (default), unanimous, or any")
+    ap.add_argument("--agent-end", action="store_true",
+                    help="Shorthand for --end-mode agent_decided (raises default turn cap to 40 unless --turns is set)")
     ap.add_argument("--requests", type=int, default=None, help="Override max_requests")
     ap.add_argument("--scheduler", "-s", default=None, help="Override scheduler mode")
     ap.add_argument("--topic", default=None, help="Override initial topic")
     ap.add_argument("--model", "-m", default=None, help="Override local model alias or path")
     ap.add_argument("--agent-model", action="append", default=[], help="Per-agent model override: AGENT=model_id")
     ap.add_argument("--agent-endpoint", action="append", default=[], help="Per-agent endpoint override: AGENT=dory (or local, hermes, etc.)")
+    ap.add_argument("--agent-sampling", action="append", default=[], help="Per-agent sampling overrides: AGENT=min_p=0.05,top_k=40,xtc_probability=0.3")
     ap.add_argument("--agent-instruction", "--agent-identity", dest="agent_instruction", action="append", default=[], help="Per-agent instructions: AGENT=instruction_text")
     ap.add_argument("--agent-focus", action="append", default=[], help="Per-agent angle/role: AGENT=focus_text")
     ap.add_argument("--config", default=None, help="Path to custom JSON or YAML experiment configuration file")
@@ -1994,6 +2136,28 @@ def main(argv=None) -> int:
                     if canonicalize_agent_id(a.get("name")) == ag_name:
                         a["focus"] = text.strip()
 
+    # Handle per-agent sampling overrides (--agent-sampling AGENT=min_p=0.05,top_k=40)
+    for override in args.agent_sampling:
+        if "=" not in override:
+            print(f"Error: --agent-sampling expects AGENT=key=val[,...], got {override!r}", file=sys.stderr)
+            return 1
+        raw_name, kv_spec = override.split("=", 1)
+        ag_name = canonicalize_agent_id(raw_name)
+        matches = [a for a in preset_cfg.get("agents", []) if canonicalize_agent_id(a.get("name")) == ag_name]
+        if len(matches) != 1:
+            print(f"Error: unknown agent in --agent-sampling {override!r}", file=sys.stderr)
+            return 1
+        for pair in re.split(r"[,;\s]+", kv_spec.strip()):
+            if not pair or "=" not in pair:
+                continue
+            rk, rv = pair.split("=", 1)
+            try:
+                ck, cv = normalize_sampling_param(rk, rv)
+            except ValueError as exc:
+                print(f"Error in --agent-sampling {override!r}: {exc}", file=sys.stderr)
+                return 1
+            matches[0][ck] = cv
+
     # Diagnostics execution
     if args.doctor:
         doc = run_doctor(endpoints_map, Path(RUNS_DIR))
@@ -2089,6 +2253,13 @@ def main(argv=None) -> int:
                 endpoints_map["dory"]["context_tokens"] = min(int(endpoints_map["dory"]["context_tokens"]), allocated)
         if needs_local and not args.mock:
             loc_model = endpoints_map["local"]["model"]
+            # If an external llama-server is already running and no model was explicitly requested, adopt it.
+            if not args.model and not os.environ.get("LOCAL_MODEL") and not server_mgr.is_server_owned(8080):
+                if server_mgr.check_health("127.0.0.1", 8080, timeout=1.5):
+                    running_info = server_mgr.query_server_info("127.0.0.1", 8080, timeout=1.5)
+                    if running_info.get("model_name"):
+                        loc_model = str(running_info["model_name"])
+                        endpoints_map["local"]["model"] = loc_model
             mode, mfile, def_ctx = resolve_model(loc_model)
             res = server_mgr.ensure_server(
                 host="127.0.0.1",
@@ -2102,8 +2273,21 @@ def main(argv=None) -> int:
                 started_server = True
 
         overrides: Dict[str, Any] = {"limits": {}}
+        if args.agent_end:
+            overrides["end_mode"] = "agent_decided"
+        if args.end_mode:
+            overrides["end_mode"] = args.end_mode
+        if args.end_policy:
+            overrides["end_policy"] = args.end_policy
         if args.turns is not None:
             overrides["limits"]["max_turns"] = args.turns
+        elif overrides.get("end_mode") == "agent_decided":
+            cur_max = int((preset_cfg.get("limits") or {}).get("max_turns", LIMITS["max_turns"]))
+            if cur_max < 40:
+                overrides["limits"]["max_turns"] = 40
+            cur_req = int((preset_cfg.get("limits") or {}).get("max_requests", LIMITS["max_requests"]))
+            if cur_req < 80:
+                overrides["limits"]["max_requests"] = 80
         if args.requests is not None:
             overrides["limits"]["max_requests"] = args.requests
         if args.scheduler:

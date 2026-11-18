@@ -13,10 +13,12 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from presets import SAMPLING_ALIASES, SAMPLING_PARAMS, normalize_sampling_param
+
 ACTION_TYPES = (
     "SAY", "WHISPER", "PUBLISH", "SUBSCRIBE", "CLAIM", "CHALLENGE", "RETRACT", "VOTE",
-    "PROPOSE_NEXT", "SET_TEMPERATURE", "SET_STYLE", "PROPOSE_TOPIC", "ARTIFACT_WRITE",
-    "ARTIFACT_READ", "ARTIFACT_LIST", "UPDATE_NOTE", "FINISH",
+    "PROPOSE_NEXT", "SET_TEMPERATURE", "SET_SAMPLING", "SET_STYLE", "PROPOSE_TOPIC", "ARTIFACT_WRITE",
+    "ARTIFACT_READ", "ARTIFACT_LIST", "UPDATE_NOTE", "FINISH", "END_RUN",
     "CREATE_GROUP", "INVITE_GROUP", "JOIN_GROUP", "LEAVE_GROUP", "COMPEL_GROUP", "RELEASE_GROUP"
 )
 
@@ -25,16 +27,19 @@ ALIASES = {
     "APPEND": "ARTIFACT_WRITE", "REPLACE": "ARTIFACT_WRITE", "CREATE": "ARTIFACT_WRITE", "WORLD": "ARTIFACT_WRITE",
     "READ": "ARTIFACT_READ", "LIST": "ARTIFACT_LIST", "NOTE": "UPDATE_NOTE", "NEXT": "PROPOSE_NEXT",
     "WITHDRAW": "RETRACT", "OBJECT": "CHALLENGE", "TOPIC": "PROPOSE_TOPIC", "STYLE": "SET_STYLE",
-    "TEMP": "SET_TEMPERATURE", "TEMPERATURE": "SET_TEMPERATURE"
+    "TEMP": "SET_TEMPERATURE", "TEMPERATURE": "SET_TEMPERATURE",
+    "SAMPLING": "SET_SAMPLING", "SET_PARAMS": "SET_SAMPLING",
+    "PROPOSE_END": "END_RUN", "END": "END_RUN", "DONE": "END_RUN",
 }
 
 ITEM_KINDS = (
     "hypothesis", "claim", "question", "objection", "decision", "proposal", "task", "fact", "topic"
 )
-JSON_KEYS = {"message", "actions", "next_speaker", "temperature_request"}
+JSON_KEYS = {"message", "actions", "next_speaker", "temperature_request", "sampling_request"}
 
+_SAMPLING_CTRL_KEYS = "|".join(sorted((k.upper() for k in SAMPLING_ALIASES if k not in ("temp", "temperature")), key=len, reverse=True))
 CMD_RE = re.compile(r"^\s*[@/]([A-Za-z_]+)\b[ \t]*(.*)$")
-CTRL_RE = re.compile(r"^\W*(NEXT(?:_SPEAKER)?|TEMP(?:ERATURE)?)\W*:\s*(.*)$", re.I)
+CTRL_RE = re.compile(rf"^\W*(NEXT(?:_SPEAKER)?|TEMP(?:ERATURE)?|{_SAMPLING_CTRL_KEYS})\W*:\s*(.*)$", re.I)
 TAIL_NEXT_RE = re.compile(r"\bNEXT\s*:\s*([A-Za-z][\w]{0,15})\W*$", re.I)
 LABEL_RE = re.compile(r"^\s*[*_]*\[?([A-Za-z][A-Za-z0-9_]{0,15})\]?[*_]*\s*:[*_]*\s*")
 TRANSCRIPT_TAG_RE = re.compile(r"^\s*[*_]*(?:[@\[]\s*(?:m\d+|[A-Za-z0-9_]+)\s*\|\s*turn\s*\d+\s*\]\s*)+", re.I)
@@ -306,6 +311,22 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
             issues.append(f"SET_TEMPERATURE invalid numeric value: {val!r}")
             return None
 
+    elif act_type == "SET_SAMPLING":
+        raw_params = res.get("params")
+        if not isinstance(raw_params, dict):
+            raw_params = {k: v for k, v in res.items() if k != "type"}
+        cleaned_params = {}
+        for rk, rv in raw_params.items():
+            try:
+                ck, cv = normalize_sampling_param(rk, rv)
+                cleaned_params[ck] = cv
+            except ValueError as exc:
+                issues.append(f"SET_SAMPLING {exc}")
+        if not cleaned_params:
+            issues.append("SET_SAMPLING missing valid sampling parameters")
+            return None
+        res["params"] = cleaned_params
+
     return res
 
 
@@ -396,12 +417,24 @@ def _command(word: str, rest: str, lines_after: List[str], known_names: Optional
     if w == "FINISH":
         return {"type": "FINISH", "content": body or head}
 
+    if w == "END_RUN":
+        return {"type": "END_RUN", "content": body or head}
+
     if w == "PROPOSE_NEXT":
         tgt = canonicalize_agent_id(head, known_names) or head
         return {"type": "PROPOSE_NEXT", "target": tgt}
 
     if w == "SET_TEMPERATURE":
         return {"type": "SET_TEMPERATURE", "value": head}
+
+    if w == "SET_SAMPLING":
+        raw_spec = f"{head}: {body}" if sep and body else (body or head)
+        params = {}
+        for tok in re.split(r"[\s,;]+", raw_spec.strip()):
+            if "=" in tok:
+                k, _, v = tok.partition("=")
+                params[k.strip()] = v.strip().strip("*`<>[]\"'")
+        return {"type": "SET_SAMPLING", "params": params}
 
     return None
 
@@ -417,8 +450,12 @@ def _extract_commands(text: str, p: Parsed, known_names: Optional[Set[str]] = No
             key, val = c.group(1).upper(), c.group(2).strip().strip("*`<>[]\"'. ")
             if key.startswith("NEXT"):
                 p.next_speaker = p.next_speaker or canonicalize_agent_id(val, known_names) or val
-            else:
+            elif key.startswith("TEMP"):
                 p.temperature = p.temperature if p.temperature is not None else val
+            else:
+                validated = validate_action_schema({"type": "SET_SAMPLING", "params": {key: val}}, p.issues, known_names)
+                if validated:
+                    p.actions.append(validated)
             i += 1
             continue
 
@@ -522,6 +559,10 @@ def parse_reply(
         p.reply_to = obj.get("reply_to") if isinstance(obj.get("reply_to"), str) else None
         p.next_speaker = canonicalize_agent_id(obj.get("next_speaker"), known_names)
         p.temperature = obj.get("temperature_request")
+        if isinstance(obj.get("sampling_request"), dict):
+            valid_sr = validate_action_schema({"type": "SET_SAMPLING", "params": obj["sampling_request"]}, p.issues, known_names)
+            if valid_sr:
+                p.actions.append(valid_sr)
 
         acts = obj.get("actions", [])
         if not isinstance(acts, list):

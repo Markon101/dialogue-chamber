@@ -1,1 +1,1 @@
-/data/data/com.termux/files/home/projects/dialogue_chamber/run_prompt.sh
+run_prompt.sh

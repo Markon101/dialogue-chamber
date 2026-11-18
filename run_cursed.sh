@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 # ==============================================================================
 # Dialogue Chamber — Cursed Seance Experiment (Compatibility Wrapper)
 # Runs the cursed_seance preset on Gemma 4 + Hermes.
