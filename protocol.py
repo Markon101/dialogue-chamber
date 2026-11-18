@@ -63,6 +63,76 @@ class Parsed:
     truncated: bool = False
 
 
+_NO_NOMINATION_TOKENS = {"NONE", "N_A", "NA", "NOBODY", "NO_ONE", "NULL"}
+
+
+def canonicalize_claim_id(raw_target: Any) -> str:
+    """Normalize valid claim IDs like 'C1', '#c1', '[C2]' to 'c1'/'c2'; leave invalid strings intact."""
+    s = str(raw_target or "").strip()
+    cleaned = re.sub(r"^[#<\[\(\"\'`*]+|[>\]\)\"\'`*:.,!]+$", "", s).strip()
+    if re.fullmatch(r"c\d+", cleaned, re.I):
+        return cleaned.lower()
+    return s
+
+
+def _parse_sampling_spec(raw_spec: str) -> Tuple[Optional[Dict[str, str]], Optional[str]]:
+    """Parse single or compound sampling settings (key=val, key: val, pipe/semicolon/comma/space-separated).
+
+    Returns (params_dict, None) on syntactic success or (None, error_message) on ambiguous/malformed input.
+    """
+    spec = (raw_spec or "").strip()
+    if not spec:
+        return None, "SET_SAMPLING missing valid sampling parameters"
+
+    params: Dict[str, str] = {}
+    # Split on pipes or semicolons first (e.g. "TOP_P: 0.9 | TOP_K: 40 | MIN_P: 0.05")
+    segments = [seg.strip() for seg in re.split(r"[|;]+", spec) if seg.strip()]
+    if not segments:
+        return None, "SET_SAMPLING missing valid sampling parameters"
+
+    for seg in segments:
+        # Further split comma-separated pairs if present
+        sub_segs = [s.strip() for s in seg.split(",") if s.strip()]
+        for item in sub_segs:
+            # Case 1: space-separated key=val tokens (e.g. "min_p=0.05 top_k=40")
+            if "=" in item and ":" not in item:
+                tokens = [t for t in item.split() if t]
+                for tok in tokens:
+                    if "=" not in tok:
+                        return None, f"SET_SAMPLING ambiguous token {tok!r} in {item!r}"
+                    k, _, v = tok.partition("=")
+                    k_clean = k.strip().strip("*`<>[]\"'")
+                    v_clean = v.strip().strip("*`<>[]\"'")
+                    if not k_clean or not v_clean:
+                        return None, f"SET_SAMPLING malformed key=value pair {tok!r}"
+                    params[k_clean] = v_clean
+                continue
+
+            # Case 2: key: val (or key=val) pair; also support multiple "KEY: val" pairs separated by spaces
+            kv_matches = list(re.finditer(r"([A-Za-z_][A-Za-z0-9_-]*)\s*[:=]\s*([^\s:;,|]+)", item))
+            if kv_matches:
+                # Verify the matches cover the entire segment (only whitespace between pairs)
+                pos = 0
+                ok = True
+                for m in kv_matches:
+                    if item[pos:m.start()].strip():
+                        ok = False
+                        break
+                    k_clean = m.group(1).strip().strip("*`<>[]\"'")
+                    v_clean = m.group(2).strip().strip("*`<>[]\"'")
+                    params[k_clean] = v_clean
+                    pos = m.end()
+                if not ok or item[pos:].strip():
+                    return None, f"SET_SAMPLING ambiguous or malformed segment {item!r}"
+                continue
+
+            return None, f"SET_SAMPLING invalid parameter specification {item!r}"
+
+    if not params:
+        return None, "SET_SAMPLING missing valid sampling parameters"
+    return params, None
+
+
 def canonicalize_agent_id(raw_id: Any, known_names: Optional[Set[str]] = None) -> Optional[str]:
     """Cleans and canonicalizes an agent identifier (removes wrappers, punctuation, case-normalizes)."""
     if raw_id is None:
@@ -253,7 +323,7 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
             return None
 
     elif act_type in ("CHALLENGE", "RETRACT"):
-        tgt = str(res.get("target", "")).strip()
+        tgt = canonicalize_claim_id(res.get("target"))
         if not tgt:
             issues.append(f"{act_type} missing target claim ID")
             return None
@@ -263,7 +333,7 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
             return None
 
     elif act_type == "VOTE":
-        tgt = str(res.get("target", "")).strip()
+        tgt = canonicalize_claim_id(res.get("target"))
         val = str(res.get("value", "")).strip().lower()
         if not tgt or not val:
             issues.append("VOTE missing target or value")
@@ -312,19 +382,23 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
             return None
 
     elif act_type == "SET_SAMPLING":
+        if res.get("_parse_error"):
+            issues.append(str(res["_parse_error"]))
+            return None
         raw_params = res.get("params")
         if not isinstance(raw_params, dict):
             raw_params = {k: v for k, v in res.items() if k != "type"}
+        if not raw_params:
+            issues.append("SET_SAMPLING missing valid sampling parameters")
+            return None
         cleaned_params = {}
         for rk, rv in raw_params.items():
             try:
-                ck, cv = normalize_sampling_param(rk, rv)
-                cleaned_params[ck] = cv
+                ck, cv = normalize_sampling_param(rk, rv, strict=True)
             except ValueError as exc:
                 issues.append(f"SET_SAMPLING {exc}")
-        if not cleaned_params:
-            issues.append("SET_SAMPLING missing valid sampling parameters")
-            return None
+                return None
+            cleaned_params[ck] = cv
         res["params"] = cleaned_params
 
     return res
@@ -429,11 +503,9 @@ def _command(word: str, rest: str, lines_after: List[str], known_names: Optional
 
     if w == "SET_SAMPLING":
         raw_spec = f"{head}: {body}" if sep and body else (body or head)
-        params = {}
-        for tok in re.split(r"[\s,;]+", raw_spec.strip()):
-            if "=" in tok:
-                k, _, v = tok.partition("=")
-                params[k.strip()] = v.strip().strip("*`<>[]\"'")
+        params, err = _parse_sampling_spec(raw_spec)
+        if err:
+            return {"type": "SET_SAMPLING", "_parse_error": err}
         return {"type": "SET_SAMPLING", "params": params}
 
     return None
@@ -450,10 +522,12 @@ def _extract_commands(text: str, p: Parsed, known_names: Optional[Set[str]] = No
             key, val = c.group(1).upper(), c.group(2).strip().strip("*`<>[]\"'. ")
             if key.startswith("NEXT"):
                 p.next_speaker = p.next_speaker or canonicalize_agent_id(val, known_names) or val
-            elif key.startswith("TEMP"):
+            elif key.startswith("TEMP") and not re.search(r"[|;]", val):
                 p.temperature = p.temperature if p.temperature is not None else val
             else:
-                validated = validate_action_schema({"type": "SET_SAMPLING", "params": {key: val}}, p.issues, known_names)
+                params, err = _parse_sampling_spec(f"{key}: {val}")
+                act = {"type": "SET_SAMPLING", "_parse_error": err} if err else {"type": "SET_SAMPLING", "params": params}
+                validated = validate_action_schema(act, p.issues, known_names)
                 if validated:
                     p.actions.append(validated)
             i += 1
@@ -599,7 +673,9 @@ def parse_reply(
 
     if p.next_speaker is not None:
         ns = canonicalize_agent_id(p.next_speaker, known_names)
-        if ns not in known_names:
+        if ns in _NO_NOMINATION_TOKENS and ns not in known_names:
+            p.next_speaker = None
+        elif ns not in known_names:
             p.issues.append(f"unknown next speaker {str(p.next_speaker)[:20]!r}")
             p.next_speaker = None
         else:

@@ -172,6 +172,219 @@ class SamplingAndEndModeTests(unittest.TestCase):
         manifest = json.loads((self.root / "cli_run" / "manifest.json").read_text())
         self.assertEqual(manifest["max_turns"], 40)
 
+    def test_pipe_separated_and_compound_sampling_from_real_run(self):
+        """Exact pipe-separated sampling formats emitted by Gemma 4 12B parse into one atomic SET_SAMPLING."""
+        p = parse_reply(
+            "Opening verse.\n"
+            "TOP_P: 0.9 | TOP_K: 40 | MIN_P: 0.05 | XTC_PROB: 0.1 | XTC_THRESH: 0.3 | REPEAT_PENALTY: 1.5\n"
+            "NEXT: BETA",
+            me="ALPHA",
+            names=("ALPHA", "BETA"),
+        )
+        self.assertEqual(p.issues, [])
+        self.assertEqual(p.next_speaker, "BETA")
+        self.assertEqual(len(p.actions), 1)
+        self.assertEqual(p.actions[0]["type"], "SET_SAMPLING")
+        self.assertEqual(
+            p.actions[0]["params"],
+            {
+                "top_p": 0.9,
+                "top_k": 40,
+                "min_p": 0.05,
+                "xtc_probability": 0.1,
+                "xtc_threshold": 0.3,
+                "repeat_penalty": 1.5,
+            },
+        )
+
+        # Compound starting with TEMP:
+        p_temp = parse_reply(
+            "Tuning.\nTEMP: 0.85 | TOP_K: 40 | MIN_P: 0.05",
+            me="ALPHA",
+            names=("ALPHA", "BETA"),
+        )
+        self.assertEqual(p_temp.issues, [])
+        self.assertIsNone(p_temp.temperature)
+        self.assertEqual(p_temp.actions[0]["params"], {"temperature": 0.85, "top_k": 40, "min_p": 0.05})
+
+        # Colon-comma syntax inside @SET_SAMPLING
+        p_colon = parse_reply(
+            "@SET_SAMPLING min_p: 0.05, top_k: 40\nReply.",
+            me="ALPHA",
+            names=("ALPHA", "BETA"),
+        )
+        self.assertEqual(p_colon.issues, [])
+        self.assertEqual(p_colon.actions[0]["params"], {"min_p": 0.05, "top_k": 40})
+
+    def test_atomic_sampling_validation_rejects_bad_compounds_without_partial_mutation(self):
+        # 1. Protocol-level rejection: out-of-range, unknown param, ambiguous token, malformed number
+        bad_inputs = [
+            "TOP_P: 1.8 | TOP_K: 40",
+            "TOP_P: 0.9 | XTC_THRESH: 0.9",
+            "TOP_P: 0.9 | TURBO: 5",
+            "TOP_P: 0.9 | GARBAGE",
+            "@SET_SAMPLING min_p=0.05 top_k=3.5",
+            "@SET_SAMPLING min_p=abc top_k=40",
+        ]
+        for raw in bad_inputs:
+            p = parse_reply(f"Body.\n{raw}", me="A", names=("A", "B"))
+            self.assertEqual([a for a in p.actions if a["type"] == "SET_SAMPLING"], [], msg=raw)
+            self.assertEqual(len(p.issues), 1, msg=f"expected single diagnostic for {raw}: {p.issues}")
+
+        # 2. Orchestrator-level atomic rejection: temp out of agent's temp_min..temp_max or llamacpp-only on openrouter
+        cfg = {
+            "name": "atomic_sampling",
+            "topic": "Atomic",
+            "scheduler": "round_robin",
+            "limits": {"max_turns": 2, "temp_min": 0.2, "temp_max": 1.3},
+            "agents": [
+                {"name": "A", "endpoint": "local", "temperature": 0.8, "min_p": 0.05, "top_k": 40},
+                {"name": "B", "endpoint": "hermes", "temperature": 0.8, "min_p": 0.05},
+            ],
+        }
+        backend = MockBackend({
+            # A sends valid min_p=0.12 alongside temperature=1.9 (> temp_max=1.3) -> whole action rejected, min_p stays 0.05!
+            "A": ['{"message": "A", "actions": [{"type": "SET_SAMPLING", "params": {"min_p": 0.12, "temperature": 1.9}}]}'],
+            # B on openrouter sends valid top_p=0.9 alongside xtc_probability=0.3 -> whole action rejected, top_p stays None!
+            "B": ['{"message": "B", "actions": [{"type": "SET_SAMPLING", "params": {"top_p": 0.9, "xtc_probability": 0.3}}]}'],
+        })
+        ch = Chamber(cfg, run_dir=self.root / "atomic", backend=backend, quiet=True, copy_dir="").run()
+        self.assertEqual(ch.agents["A"].min_p, 0.05)
+        self.assertEqual(ch.agents["A"].temperature, 0.8)
+        self.assertIsNone(ch.agents["B"].top_p)
+        self.assertEqual(len(ch.sampling_changes), 0)
+        rej = [e for e in ch.events if e.type == "SET_SAMPLING" and e.status == "rejected"]
+        self.assertEqual(len(rej), 2)
+
+    def test_claim_id_case_normalization_and_next_none_handling(self):
+        # Claim ID normalization in protocol & chamber; prose targets stay rejected
+        p = parse_reply(
+            "Checking.\n@CHALLENGE C1: uppercase id\n@VOTE #C1 yes\n@CHALLENGE <honkytonk's: bad\nNEXT: NONE",
+            me="A",
+            names=("A", "B"),
+        )
+        self.assertEqual(p.issues, [])
+        self.assertIsNone(p.next_speaker)
+        self.assertEqual(p.actions[0]["target"], "c1")
+        self.assertEqual(p.actions[1]["target"], "c1")
+        self.assertEqual(p.actions[2]["target"], "<honkytonk's")
+
+        # Real unknown speaker still produces an issue
+        p_bad_next = parse_reply("Hi.\nNEXT: GHOST", me="A", names=("A", "B"))
+        self.assertTrue(any("unknown next speaker" in i for i in p_bad_next.issues))
+
+        cfg = {
+            "name": "claim_norm",
+            "topic": "Claims",
+            "scheduler": "round_robin",
+            "limits": {"max_turns": 2},
+            "agents": [{"name": "A", "endpoint": "local"}, {"name": "B", "endpoint": "local"}],
+        }
+        backend = MockBackend({
+            "A": ["First.\n@CLAIM: Sky is blue"],
+            "B": ["Second.\n@CHALLENGE C1: Needs evidence\n@VOTE #C1 no\n@CHALLENGE <honkytonk's: missing\nNEXT: NONE"],
+        })
+        ch = Chamber(cfg, run_dir=self.root / "claim_norm", backend=backend, quiet=True, copy_dir="").run()
+        self.assertEqual(ch.board["c1"].status, "disputed")
+        self.assertEqual(ch.board["c1"].votes["B"], "no")
+        rejected = [e for e in ch.events if e.status == "rejected"]
+        self.assertEqual(len(rejected), 1)
+        self.assertEqual(rejected[0].target, "<honkytonk's")
+
+    def test_action_budget_dedup_and_end_run_priority_respects_safety_limits(self):
+        # 1. Duplicate votes don't waste action slots; END_RUN after many VOTE lines gets prioritized inside max_actions_per_response=4
+        cfg = {
+            "name": "budget_priority",
+            "topic": "Wrap up",
+            "scheduler": "round_robin",
+            "end_mode": "agent_decided",
+            "end_policy": "majority",
+            "min_turns_before_end": 2,
+            "limits": {"max_turns": 10, "max_actions_per_response": 4},
+            "agents": [
+                {"name": "A", "endpoint": "local"},
+                {"name": "B", "endpoint": "local"},
+                {"name": "C", "endpoint": "local"},
+            ],
+        }
+        backend = MockBackend({
+            "A": ["Seed.\n@CLAIM: c1\n@CLAIM: c2\n@CLAIM: c3\n@END_RUN: too early"],
+            "B": ["Vote.\n@VOTE c1 yes\n@VOTE c2 yes\n@END_RUN: ready"],
+            # C votes on c1..c3 twice + new vote on c3 + END_RUN at the end (exceeds 4 raw actions,
+            # but duplicate c1/c2 votes are deduped and END_RUN gets prioritized into the 4-action window!)
+            "C": ["Lock.\n@VOTE c1 yes\n@VOTE c1 yes\n@VOTE c2 yes\n@VOTE c3 yes\n@CLAIM: extra\n@END_RUN: majority now"],
+        })
+        ch = Chamber(cfg, run_dir=self.root / "priority", backend=backend, quiet=True, copy_dir="").run()
+        # Turn 1: A's END_RUN rejected (turn 1 < min_turns_before_end=2)
+        self.assertTrue(any(e.turn == 1 and e.type == "END_RUN" and e.status == "rejected" for e in ch.events))
+        # Turn 2: B votes END_RUN (1/3)
+        # Turn 3: C's END_RUN succeeds -> majority (B, C) ends on turn 3!
+        self.assertEqual(len(ch.public_messages), 3)
+        self.assertIn("agents decided to end run (majority: B, C)", ch.stop_reason)
+
+        # 2. END_RUN is NOT exempt when max_actions_per_response=0
+        cfg_zero = {
+            "name": "zero_actions",
+            "topic": "Zero cap",
+            "scheduler": "round_robin",
+            "end_mode": "agent_decided",
+            "end_policy": "any",
+            "limits": {"max_turns": 2, "max_actions_per_response": 0},
+            "agents": [{"name": "A", "endpoint": "local"}],
+        }
+        ch_zero = Chamber(
+            cfg_zero,
+            run_dir=self.root / "zero_cap",
+            backend=MockBackend({"A": ["Try.\n@END_RUN: bypass?", "Turn 2."]}),
+            quiet=True,
+            copy_dir="",
+        ).run()
+        self.assertEqual(len(ch_zero.public_messages), 2)
+        self.assertEqual(ch_zero.stop_reason, "reached max_turns (2)")
+        self.assertTrue(any(e.type == "END_RUN" and "exceeded max_actions_per_response" in e.detail for e in ch_zero.events))
+
+    def test_multi_agent_sampling_and_majority_termination_integration(self):
+        """Lightweight 3-agent integration test: pipe sampling updates persist to payloads and majority END_RUN stops cleanly."""
+        cfg = {
+            "name": "integration_sampling_end",
+            "topic": "Song collaboration",
+            "scheduler": "self_directed",
+            "end_mode": "agent_decided",
+            "end_policy": "majority",
+            "min_turns_before_end": 3,
+            "artifacts": {"seed": {"lyrics": "# Song\n"}, "visible": ["lyrics"]},
+            "limits": {"max_turns": 12, "max_actions_per_response": 6},
+            "agents": [
+                {"name": "GRIME_MC", "endpoint": "local", "capabilities": "full", "min_p": 0.04, "top_k": 60},
+                {"name": "HONKYTONK", "endpoint": "local", "capabilities": "full", "min_p": 0.06, "top_k": 40},
+                {"name": "GLITCH_DIR", "endpoint": "local", "capabilities": "full", "min_p": 0.05, "top_k": 50},
+            ],
+        }
+        backend = MockBackend({
+            "GRIME_MC": [
+                "Bars one.\nTOP_P: 0.9 | TOP_K: 40 | MIN_P: 0.05 | XTC_PROB: 0.1 | REPEAT_PENALTY: 1.2\n@CLAIM: Hook is tight\n@APPEND lyrics: Verse 1\nNEXT: HONKYTONK",
+                "Bars two locked.\n@VOTE C1 yes\n@APPEND lyrics: Final Cut\n@END_RUN: locked\nNEXT: NONE",
+            ],
+            "HONKYTONK": [
+                "Verse two.\n@SET_SAMPLING min_p=0.08 repeat_penalty=1.15\n@CHALLENGE C1: Needs grit\n@APPEND lyrics: Verse 2\nNEXT: GLITCH_DIR",
+            ],
+            "GLITCH_DIR": [
+                "Bridging.\n@VOTE c1 yes\n@END_RUN: ready to wrap\nNEXT: GRIME_MC",
+            ],
+        })
+        ch = Chamber(cfg, run_dir=self.root / "integ", backend=backend, quiet=True, copy_dir="").run()
+        self.assertEqual(len(ch.public_messages), 4)
+        self.assertIn("agents decided to end run (majority: GRIME_MC, GLITCH_DIR)", ch.stop_reason)
+        rejected = [e for e in ch.events if e.status == "rejected"]
+        self.assertEqual(rejected, [], msg=f"Unexpected rejections: {rejected}")
+        # Verify GRIME_MC's 2nd API call (call index 3) received the updated sampling params from Turn 1
+        grime_call_2_payload = backend.calls[3][1]
+        self.assertEqual(grime_call_2_payload["top_p"], 0.9)
+        self.assertEqual(grime_call_2_payload["top_k"], 40)
+        self.assertEqual(grime_call_2_payload["min_p"], 0.05)
+        self.assertEqual(grime_call_2_payload["xtc_probability"], 0.1)
+        self.assertEqual(grime_call_2_payload["repeat_penalty"], 1.2)
+
 
 if __name__ == "__main__":
     unittest.main()

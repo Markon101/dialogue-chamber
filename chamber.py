@@ -53,7 +53,7 @@ from presets import (
     SAMPLING_PARAMS,
     normalize_sampling_param,
 )
-from protocol import ACTION_TYPES, ITEM_KINDS, canonicalize_agent_id, parse_reply
+from protocol import ACTION_TYPES, ITEM_KINDS, canonicalize_agent_id, canonicalize_claim_id, parse_reply
 from server_manager import LlamaServerManager, assert_single_llama_server, resolve_model
 from society import Society, SOCIAL_ACTIONS
 from communication import Communication
@@ -720,9 +720,12 @@ class Chamber:
                 f"Permitted action types for you: {', '.join(allowed)}.{extra_note}"
             )
 
-        cmds = [f"NEXT: <name> ({names})", f"TEMP: <{lo}..{hi}>"]
+        cmds = [
+            f"NEXT: <name> ({names}" + ("; omit or write NONE when ending)" if self.end_mode == "agent_decided" else ")"),
+            f"TEMP: <{lo}..{hi}>",
+        ]
         if supports_extra_samplers and "SET_SAMPLING" in caps:
-            cmds.append("Optional sampling lines: TOP_P: <0..1> | TOP_K: <int> | MIN_P: <0..1> | XTC_PROB: <0..1> | XTC_THRESH: <0..0.5> | REPEAT_PENALTY: <0.5..2>")
+            cmds.append("@SET_SAMPLING top_p=0.9 top_k=40 min_p=0.05 xtc_prob=0.1 xtc_thresh=0.1 repeat_penalty=1.1 (or one KEY: val per line)")
         if "WHISPER" in caps:
             cmds.append("@WHISPER <name>: <private message>")
         if "PUBLISH" in caps and len(self.channels) > 1:
@@ -730,18 +733,19 @@ class Chamber:
         if "CLAIM" in caps:
             cmds.append("@CLAIM hypothesis: <statement>  (or @CLAIM claim: ...)")
         if "CHALLENGE" in caps:
-            cmds.append("@CHALLENGE <id>: <objection>")
+            cmds.append("@CHALLENGE <c1|c2|...>: <objection>  (use exact board ID, e.g. c1)")
         if "RETRACT" in caps:
-            cmds.append("@RETRACT <id>: <why you withdraw your claim>")
+            cmds.append("@RETRACT <c1|c2|...>: <why you withdraw your claim>")
         if "VOTE" in caps:
-            cmds.append("@VOTE <id> yes|no")
+            cmds.append("@VOTE <c1|c2|...> yes|no  (do not re-vote unchanged votes)")
         if "UPDATE_NOTE" in caps:
             cmds.append("@NOTE: <private scratchpad note>")
         if "ARTIFACT_WRITE" in caps:
             cmds.append("@APPEND <artifact_name>: <markdown to append>  (or @READ <artifact_name> [offset])")
         if self.end_mode == "agent_decided" and ("END_RUN" in caps or "FINISH" in caps):
             cmds.append(f"@END_RUN: <reason> (vote to conclude session; policy: {self.end_policy}, cap: {self.limits['max_turns']} turns) | @FINISH: <reason>")
-        return "Write your public reply, then optionally add control lines at the end:\n" + "\n".join(cmds)
+        max_act = int(self.limits["max_actions_per_response"])
+        return f"Write your public reply, then optionally add up to {max_act} control/action lines at the end:\n" + "\n".join(cmds)
 
     # ── budget & model inference with fallback chain ──
     def _check_budgets_before_call(self, endpoint: dict) -> Optional[str]:
@@ -915,9 +919,36 @@ class Chamber:
         if parsed.next_speaker:
             self._apply_action(agent, {"type": "PROPOSE_NEXT", "target": parsed.next_speaker})
 
-        # Structured / command actions
+        # Structured / command actions: deduplicate identical/no-op actions first,
+        # and ensure an explicit END_RUN/FINISH inside an over-budget response
+        # is not starved by a flood of earlier votes/notes (still counts against max_act).
+        deduped_actions = []
+        seen_keys = set()
+        for act in parsed.actions:
+            atype = str(act.get("type") or "").upper()
+            if atype == "VOTE":
+                tgt = canonicalize_claim_id(act.get("target"))
+                val = str(act.get("value") or "").strip().lower()
+                if tgt in self.board and self.board[tgt].votes.get(agent.name) == val:
+                    continue
+            try:
+                key = json.dumps(act, sort_keys=True)
+            except TypeError:
+                key = str(act)
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            deduped_actions.append(act)
+
         max_act = int(self.limits["max_actions_per_response"])
-        for idx, act in enumerate(parsed.actions):
+        if max_act >= 1 and len(deduped_actions) > max_act:
+            term_indices = [i for i, a in enumerate(deduped_actions)
+                            if str(a.get("type") or "").upper() in ("END_RUN", "FINISH")]
+            if term_indices and term_indices[0] >= max_act:
+                term_act = deduped_actions.pop(term_indices[0])
+                deduped_actions.insert(max_act - 1, term_act)
+
+        for idx, act in enumerate(deduped_actions):
             if idx >= max_act:
                 self._record(agent.name, act.get("type", "UNKNOWN"), "rejected",
                              detail=f"exceeded max_actions_per_response ({max_act})")
@@ -961,14 +992,22 @@ class Chamber:
             if not raw_params:
                 self._record(agent.name, atype, "rejected", detail="missing sampling parameters")
                 return
-            applied = {}
+            provider = agent.endpoint.get("provider", "openai")
             t_bounds = (float(lim["temp_min"]), float(lim["temp_max"]))
+            staged = {}
             for rk, rv in raw_params.items():
                 try:
-                    ck, cv = normalize_sampling_param(rk, rv, temp_bounds=t_bounds)
+                    ck, cv = normalize_sampling_param(rk, rv, temp_bounds=t_bounds, strict=True)
                 except ValueError as exc:
                     self._record(agent.name, atype, "rejected", detail=str(exc))
                     return
+                if SAMPLING_PARAMS[ck][3] and provider != "llamacpp":
+                    self._record(agent.name, atype, "rejected",
+                                 detail=f"parameter {ck} is only supported on llamacpp endpoints")
+                    return
+                staged[ck] = cv
+            applied = {}
+            for ck, cv in staged.items():
                 old_v = getattr(agent, ck, None)
                 setattr(agent, ck, cv)
                 applied[ck] = {"old": old_v, "new": cv}
@@ -1078,7 +1117,7 @@ class Chamber:
             return
 
         if atype == "CHALLENGE":
-            tgt = str(act.get("target") or "").strip()
+            tgt = canonicalize_claim_id(act.get("target"))
             if tgt not in self.board:
                 self._record(agent.name, atype, "rejected", target=tgt, detail="target item not on board")
                 return
@@ -1093,7 +1132,7 @@ class Chamber:
             return
 
         if atype == "RETRACT":
-            tgt = str(act.get("target") or "").strip()
+            tgt = canonicalize_claim_id(act.get("target"))
             if tgt not in self.board:
                 self._record(agent.name, atype, "rejected", target=tgt, detail="target item not on board")
                 return
@@ -1109,7 +1148,7 @@ class Chamber:
             return
 
         if atype == "VOTE":
-            tgt = str(act.get("target") or "").strip()
+            tgt = canonicalize_claim_id(act.get("target"))
             if tgt not in self.board:
                 self._record(agent.name, atype, "rejected", target=tgt, detail="target item not on board")
                 return

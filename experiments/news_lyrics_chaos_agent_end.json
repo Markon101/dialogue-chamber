@@ -1,0 +1,91 @@
+{
+  "name": "news_lyrics_chaos_agent_end",
+  "description": "Three contrasting lyricists/directors argue over song lyrics for mid-Nov 2026 U.S. news chaos, with 8192 max output tokens and agent-decided termination.",
+  "topic": "Write and agree on a definitive 3-verse + chorus song (plus argue over which existing songs best capture this week) based on the mid-November 2026 U.S. news chaos (Nov 12-18, 2026):\n1) INFRASTRUCTURE & TECH CASCADE: Nov 12-13 global Microsoft 365 outage (Outlook/Teams/Exchange); Nov 13 rare nationwide FAA ground stop from overloaded legacy copper-to-fiber telecom upgrades & a decades-old failing router (DOT Sec. Sean Duffy asking Congress for $50.1B while halting router installs); Nov 16 glitches at JPMorgan Chase, Bank of America, Wells Fargo, US Bank + hundreds of United Airlines delays; Nov 17 Apple iCloud/Apple Pay disruption & NSA internal network degradation.\n2) DHS 'SUPERINTELLIGENCE' THEORY & CAPITOL GRILLING: DHS Sec. Markwayne Mullin said with '98% certainty' there was no coordinated cyberattack, then floated a Fox News theory that rapid AI / 'superintelligence' and automated code-writing may be overwhelming legacy infrastructure; lawmakers grilled officials while fact-checkers debunked viral '90-day blackout' rumors.\n3) SILICON VALLEY & AUTONOMOUS CHAOS: Nvidia rejected former CEO Jensen Huang's offer to return after his departure amid allegations of an affair with a businesswoman alleged to be a Chinese spy, triggering national security & AI chip export-control scrutiny; meanwhile California DMV banned Waymo from state freeways after traffic incidents.\n4) GEOPOLITICS & DC FALLOUT: Post-election House Democrats issued preservation orders & document requests to Trump allies/family, while Trump headed to Asia for high-stakes summits with Putin and Xi amid Iran tensions and strict new AI chip curbs.",
+  "mode_text": "You are a 3-person studio team locked in until you finish a genuinely killer 3-verse + chorus track (with a clean final version appended to lyrics.md) about this week's U.S. chaos. DO NOT agree politely! Clash over style, meter, existing-song comparisons, and weak lines. Cover all four news pillars (outage cascade, Mullin's 98%-certainty/AI claim, Nvidia spy-scandal + Waymo freeway ban, DC subpoenas + Asia summits). Use @CLAIM to stake positions, @CHALLENGE <c1|c2|...> with exact board IDs, @VOTE <c1|c2|...> yes|no, @WHISPER <name>: ... for studio alliances, and @APPEND lyrics: ... to build/refine lyrics.md. You may tune your own sampling params (MIN_P, TOP_K, XTC_PROB, TEMP) if your lines feel stale or chaotic. This run ends ONLY when you decide: once the full 3-verse + chorus final cut is locked in lyrics.md (from turn 6 onward), use @END_RUN: <reason> to vote to wrap up (majority ends the session). End with NEXT: <name> to throw the mic to who you want to confront.",
+  "scheduler": "self_directed",
+  "end_mode": "agent_decided",
+  "end_policy": "majority",
+  "min_turns_before_end": 6,
+  "board_visible": true,
+  "dm_visibility": "notice",
+  "artifacts": {
+    "seed": {
+      "lyrics": "# Track Title: TBD (Mid-Nov 2026 U.S. Chaos — Studio Cut)\n\n## Final Structure Target\n- Chorus / Hook\n- Verse 1 (Outage Cascade & FAA Router)\n- Verse 2 (Mullin '98% Certain' & Superintelligence Spin)\n- Verse 3 (Nvidia Spy Scandal, Waymo Freeway Ban, DC & Asia Summits)\n\n## Working Drafts\n",
+      "news_briefing": "# Mid-November 2026 U.S. News Chaos Dossier (Nov 12-18, 2026)\n\n- Nov 12-13: Global Microsoft 365 outage (Outlook, Teams, Exchange Online).\n- Nov 13: Nationwide FAA ground stop triggered by legacy copper-to-fiber upgrade glitches and a failing decades-old router. DOT Sec. Sean Duffy seeks $50.1B overhaul; FAA halts similar router installs.\n- Nov 16: Widespread banking glitches at JPMorgan Chase, Bank of America, Wells Fargo, and US Bank; United Airlines system outage delays hundreds of flights.\n- Nov 17: Apple iCloud & Apple Pay disruption; NSA internal network degradation during maintenance; debunked viral '90-day blackout' rumors.\n- DHS Sec. Markwayne Mullin: '98% certain' no cyberattack, but floated on Fox News that AI/'superintelligence' and automated code-writing could be straining legacy infrastructure; grilled by Congress.\n- Nvidia: Board rejected former CEO Jensen Huang's offer to return after stepping down amid alleged affair with businesswoman accused of being a Chinese spy; national security & chip export scrutiny.\n- California DMV: Banned Waymo autonomous vehicles from state freeways after traffic incidents.\n- Washington & Global: House inquiries/preservation orders targeting Trump allies; Trump traveling to Asia for summits with Putin and Xi amid Iran tensions and new AI chip restrictions.\n"
+    },
+    "visible": [
+      "lyrics"
+    ]
+  },
+  "limits": {
+    "max_turns": 30,
+    "max_requests": 60,
+    "max_consecutive": 1,
+    "max_tokens_per_response": 8192,
+    "max_total_tokens": 200000,
+    "max_context_chars": 240000,
+    "max_message_chars": 4500,
+    "max_actions_per_response": 6,
+    "max_duration_s": 2400
+  },
+  "endpoints": {
+    "local": {
+      "provider": "llamacpp",
+      "remote": false,
+      "api_key_env": "",
+      "base_url": "http://127.0.0.1:8080/v1",
+      "model": "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
+      "request_timeout_s": 300
+    }
+  },
+  "agents": [
+    {
+      "name": "GRIME_MC",
+      "endpoint": "local",
+      "identity": "You are GRIME_MC, a razor-sharp boom-bap / UK-grime lyricist. You demand dense internal rhymes, hard pocket, and zero corny 'classic rock' clichés. You think country storytelling is too sleepy for a week where banks, Apple Pay, the NSA, and the FAA all glitched back-to-back while Waymos got booted off California freeways. Tear apart lazy end-rhymes and force rhythmic precision.",
+      "focus": "dense internal rhymes, percussive flow, tech-breakdown street detail",
+      "capabilities": "full",
+      "profile": "standard",
+      "temperature": 0.95,
+      "min_p": 0.04,
+      "top_k": 60,
+      "xtc_probability": 0.25,
+      "xtc_threshold": 0.12,
+      "max_tokens": 8192,
+      "context_chars": 200000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "HONKYTONK_SATIRIST",
+      "endpoint": "local",
+      "identity": "You are HONKYTONK_SATIRIST, a deadpan outlaw-country storyteller in the John Prine / Warren Zevon / Sturgill Simpson lineage. You hate bloated sci-fi jargon and flashy rap gymnastics that miss the human joke. A DOT secretary begging for $50.1B for a moldy router, a DHS chief blaming 'superintelligence' with '98% certainty,' and a chip CEO turned down by his own board over a spy affair—that's pure Americana farce. Fight for plainspoken punchlines and a hook anyone at a bar can bellow.",
+      "focus": "deadpan Americana wit, concrete absurdity, singable barstool chorus",
+      "capabilities": "full",
+      "profile": "standard",
+      "temperature": 0.85,
+      "min_p": 0.06,
+      "top_k": 40,
+      "repeat_penalty": 1.08,
+      "max_tokens": 8192,
+      "context_chars": 200000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "GLITCH_DIRECTOR",
+      "endpoint": "local",
+      "identity": "You are GLITCH_DIRECTOR, an avant-pop / hyperpop A&R director (LCD Soundsystem meets Vince Staples). You refuse to let GRIME_MC write an unreadable flex or HONKYTONK_SATIRIST write a dusty nostalgia ballad. Argue over which existing tracks (Talking Heads, Zevon, Billy Joel, Rage, Charli, Radiohead) fit or fail this moment, referee blackboard disputes, assemble a cohesive final 3-verse + chorus cut in lyrics.md, and don't vote @END_RUN until every verse earns its keep.",
+      "focus": "arrangement, song-comparison critiques, locking the cohesive final cut",
+      "capabilities": "full",
+      "profile": "standard",
+      "temperature": 0.9,
+      "min_p": 0.05,
+      "top_k": 50,
+      "xtc_probability": 0.35,
+      "xtc_threshold": 0.1,
+      "max_tokens": 8192,
+      "context_chars": 200000,
+      "reasoning": "medium"
+    }
+  ]
+}

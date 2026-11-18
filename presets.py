@@ -3,6 +3,7 @@
 Presets are plain configuration. Edit freely. Credentials are never stored here: an endpoint only
 names the environment variable that holds its key (read at request time by inference.py).
 """
+import math
 import os
 
 from platform_adapter import IS_TERMUX
@@ -61,7 +62,7 @@ SAMPLING_PARAMS = {
     "min_p": (float, 0.0, 1.0, False),
     "typical_p": (float, 0.0, 1.0, True),
     "xtc_probability": (float, 0.0, 1.0, True),
-    "xtc_threshold": (float, 0.0, 1.0, True),
+    "xtc_threshold": (float, 0.0, 0.5, True),
     "repeat_penalty": (float, 0.5, 2.0, True),
     "presence_penalty": (float, -2.0, 2.0, False),
     "frequency_penalty": (float, -2.0, 2.0, False),
@@ -98,20 +99,34 @@ SAMPLING_ALIASES = {
 }
 
 
-def normalize_sampling_param(raw_key: str, raw_val, temp_bounds=None):
-    """Canonicalize and clamp one sampling parameter. Returns (canon_name, coerced_val) or raises ValueError."""
+def normalize_sampling_param(raw_key: str, raw_val, temp_bounds=None, strict: bool = False):
+    """Canonicalize and validate/clamp one sampling parameter.
+
+    When strict=True, out-of-range numbers raise ValueError instead of silently clamping.
+    Returns (canon_name, coerced_val) or raises ValueError.
+    """
     key = SAMPLING_ALIASES.get(str(raw_key).strip().lower().replace("-", "_"))
     if not key or key not in SAMPLING_PARAMS:
         raise ValueError(f"unknown sampling parameter {raw_key!r}")
     vtype, lo, hi, _ = SAMPLING_PARAMS[key]
     if key == "temperature" and temp_bounds is not None:
         lo, hi = temp_bounds
+    if isinstance(raw_val, bool):
+        raise ValueError(f"invalid numeric value {raw_val!r} for {key}")
     try:
-        num = int(float(raw_val)) if vtype is int else float(raw_val)
+        fnum = float(raw_val)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"invalid numeric value {raw_val!r} for {key}") from exc
-    if num != num:  # NaN guard
+    if not math.isfinite(fnum):
         raise ValueError(f"invalid numeric value {raw_val!r} for {key}")
+    if vtype is int:
+        if strict and abs(fnum - round(fnum)) > 1e-6:
+            raise ValueError(f"expected integer value for {key}, got {raw_val!r}")
+        num = int(round(fnum))
+    else:
+        num = fnum
+    if strict and (num < lo or num > hi):
+        raise ValueError(f"out-of-range value {num} for {key} (allowed: {lo}..{hi})")
     clamped = max(lo, min(hi, num))
     if vtype is int:
         clamped = int(round(clamped))
