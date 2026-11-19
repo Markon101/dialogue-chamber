@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 # ==============================================================================
 # Dialogue Chamber — Unified Launcher Interface (Python-First Orchestration)
 # ==============================================================================

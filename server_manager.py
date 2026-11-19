@@ -13,7 +13,10 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from contextlib import contextmanager
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Set, Tuple
+from urllib.parse import urlsplit
+
+from platform_adapter import IS_TERMUX
 
 CHAMBER_DIR = Path(__file__).resolve().parent
 SNAPDRAGON_DIR = Path(os.environ.get("SNAPDRAGON_DIR", Path.home() / "projects" / "llama-snapdragon"))
@@ -47,20 +50,22 @@ def process_start_ticks(pid):
 def running_llama_servers():
     """List visible llama-server processes; fail closed if process inspection fails."""
     try:
-        result = subprocess.run(["ps", "-ef"], capture_output=True, text=True, timeout=5, check=True)
+        result = subprocess.run(["ps", "-eo", "pid,args"], capture_output=True, text=True, timeout=5, check=True)
     except (OSError, subprocess.SubprocessError) as exc:
         raise RuntimeError("Cannot inspect running processes; refusing a local server operation") from exc
     servers = []
     lines = result.stdout.splitlines()
-    if not lines or "PID" not in lines[0] or "CMD" not in lines[0]:
+    header = lines[0].split() if lines else []
+    if len(header) != 2 or header[0] != "PID" or header[1] not in ("ARGS", "CMD", "COMMAND"):
         raise RuntimeError("Cannot interpret process list; refusing a local server operation")
     for line in lines[1:]:
-        fields = line.split(None, 7)
-        if len(fields) != 8 or not fields[1].isdigit():
+        fields = line.split(None, 2)
+        if not fields:
             continue
-        executable = fields[7].split(None, 1)[0]
-        if Path(executable).name.startswith("llama-server"):
-            servers.append((int(fields[1]), executable))
+        if not fields[0].isdigit():
+            raise RuntimeError("Cannot interpret process list; refusing a local server operation")
+        if len(fields) > 1 and Path(fields[1]).name.startswith("llama-server"):
+            servers.append((int(fields[0]), fields[1]))
     return servers
 
 
@@ -205,6 +210,22 @@ class LlamaServerManager:
 
         return info
 
+    def verify_external_server(self, base_url: str, requested_models: Set[str]) -> None:
+        """Check the configured desktop endpoint without changing its server."""
+        url = urlsplit(base_url)
+        if url.scheme != "http" or not url.hostname:
+            raise ValueError("Desktop llama.cpp requires an HTTP endpoint URL")
+        host, port = url.hostname, url.port or 80
+        info = self.query_server_info(host, port, timeout=2.0)
+        served_models = {model for model in (info.get("model_id"), info.get("model_name")) if model}
+        if not info.get("online") or not served_models:
+            raise RuntimeError(f"No verifiable llama-server at {host}:{port}; start the desktop server separately")
+        if not requested_models <= served_models:
+            raise RuntimeError(
+                f"Model mismatch at {host}:{port}; requested {sorted(requested_models)}, "
+                f"server reports {sorted(served_models)}. Set --model, LOCAL_MODEL or the endpoint model to match."
+            )
+
     def is_server_owned(self, port: int = 8080) -> bool:
         """Determines if the server on port was started by us and is still alive."""
         st_file = self._state_file(port)
@@ -312,6 +333,8 @@ class LlamaServerManager:
                 }
 
         # Server not running or safely stopped; launch it
+        if not IS_TERMUX and self.serve_script == DEFAULT_SERVE_SCRIPT:
+            raise RuntimeError("The Snapdragon launcher requires Termux; start the desktop server separately")
         if not self.serve_script.exists():
             raise FileNotFoundError(f"Server launch script not found: {self.serve_script}")
 

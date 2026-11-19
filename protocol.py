@@ -14,10 +14,12 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from presets import SAMPLING_ALIASES, normalize_sampling_param
+
 ACTION_TYPES = (
     "SAY", "WHISPER", "PUBLISH", "SUBSCRIBE", "CLAIM", "CHALLENGE", "RETRACT", "VOTE",
-    "PROPOSE_NEXT", "SET_TEMPERATURE", "SET_SAMPLER", "SET_STYLE", "PROPOSE_TOPIC", "ARTIFACT_WRITE",
-    "ARTIFACT_READ", "ARTIFACT_LIST", "UPDATE_NOTE", "FINISH",
+    "PROPOSE_NEXT", "SET_TEMPERATURE", "SET_SAMPLING", "SET_STYLE", "PROPOSE_TOPIC", "ARTIFACT_WRITE",
+    "ARTIFACT_READ", "ARTIFACT_LIST", "UPDATE_NOTE", "FINISH", "END_RUN",
     "CREATE_GROUP", "INVITE_GROUP", "JOIN_GROUP", "LEAVE_GROUP", "COMPEL_GROUP", "RELEASE_GROUP"
 )
 
@@ -27,33 +29,30 @@ ALIASES = {
     "READ": "ARTIFACT_READ", "LIST": "ARTIFACT_LIST", "NOTE": "UPDATE_NOTE", "NEXT": "PROPOSE_NEXT",
     "WITHDRAW": "RETRACT", "OBJECT": "CHALLENGE", "TOPIC": "PROPOSE_TOPIC", "STYLE": "SET_STYLE",
     "TEMP": "SET_TEMPERATURE", "TEMPERATURE": "SET_TEMPERATURE",
-    "SAMPLER": "SET_SAMPLER", "SET_SAMPLERS": "SET_SAMPLER",
-    "SET_XTC": "SET_SAMPLER", "XTC": "SET_SAMPLER",
-    "SET_MIN_P": "SET_SAMPLER", "MIN_P": "SET_SAMPLER",
-    "SET_TOP_P": "SET_SAMPLER", "TOP_P": "SET_SAMPLER",
-    "SET_TOP_K": "SET_SAMPLER", "TOP_K": "SET_SAMPLER",
-    "SET_REPEAT_PENALTY": "SET_SAMPLER", "REPEAT_PENALTY": "SET_SAMPLER",
-    "SET_TYPICAL_P": "SET_SAMPLER", "TYPICAL_P": "SET_SAMPLER",
+    "SAMPLING": "SET_SAMPLING", "SET_PARAMS": "SET_SAMPLING",
+    "SAMPLER": "SET_SAMPLING", "SET_SAMPLER": "SET_SAMPLING", "SET_SAMPLERS": "SET_SAMPLING",
+    "PROPOSE_END": "END_RUN", "END": "END_RUN", "DONE": "END_RUN",
 }
 
-SAMPLER_PARAM_ALIASES = {
-    "temp": "temperature", "temperature": "temperature",
-    "min_p": "min_p", "minp": "min_p",
-    "top_p": "top_p", "topp": "top_p",
-    "top_k": "top_k", "topk": "top_k",
-    "xtc_prob": "xtc_probability", "xtc_probability": "xtc_probability",
-    "xtc_thresh": "xtc_threshold", "xtc_threshold": "xtc_threshold",
-    "repeat_penalty": "repeat_penalty", "typical_p": "typical_p",
-    "presence_penalty": "presence_penalty", "frequency_penalty": "frequency_penalty",
+SAMPLING_SHORTHANDS = {
+    "XTC": ("xtc_probability", "xtc_threshold"),
+    "MIN_P": ("min_p",),
+    "TOP_P": ("top_p",),
+    "TOP_K": ("top_k",),
+    "REPEAT_PENALTY": ("repeat_penalty",),
+    "TYPICAL_P": ("typical_p",),
 }
+for shorthand in SAMPLING_SHORTHANDS:
+    ALIASES[shorthand] = ALIASES[f"SET_{shorthand}"] = "SET_SAMPLING"
 
 ITEM_KINDS = (
     "hypothesis", "claim", "question", "objection", "decision", "proposal", "task", "fact", "topic"
 )
-JSON_KEYS = {"message", "actions", "next_speaker", "temperature_request"}
+JSON_KEYS = {"message", "actions", "next_speaker", "temperature_request", "sampling_request"}
 
+_SAMPLING_CTRL_KEYS = "|".join(sorted((k.upper() for k in SAMPLING_ALIASES if k not in ("temp", "temperature")), key=len, reverse=True))
 CMD_RE = re.compile(r"^\s*[@/]([A-Za-z_]+)\b[ \t]*(.*)$")
-CTRL_RE = re.compile(r"^\W*(NEXT(?:_SPEAKER)?|TEMP(?:ERATURE)?)\W*:\s*(.*)$", re.I)
+CTRL_RE = re.compile(rf"^\W*(NEXT(?:_SPEAKER)?|TEMP(?:ERATURE)?|{_SAMPLING_CTRL_KEYS})\W*:\s*(.*)$", re.I)
 TAIL_NEXT_RE = re.compile(r"\bNEXT\s*:\s*([A-Za-z][\w]{0,15})\W*$", re.I)
 LABEL_RE = re.compile(r"^\s*[*_]*\[?([A-Za-z][A-Za-z0-9_]{0,15})\]?[*_]*\s*:[*_]*\s*")
 TRANSCRIPT_TAG_RE = re.compile(r"^\s*[*_]*(?:[@\[]\s*(?:m\d+|[A-Za-z0-9_]+)\s*\|\s*turn\s*\d+\s*\]\s*)+", re.I)
@@ -75,6 +74,60 @@ class Parsed:
     issues: List[str] = field(default_factory=list)   # protocol problems (become rejected-action events)
     flags: List[str] = field(default_factory=list)    # attribution heuristics
     truncated: bool = False
+
+    @property
+    def has_output(self) -> bool:
+        return bool(self.message or self.actions or self.next_speaker or self.temperature is not None)
+
+
+_NO_NOMINATION_TOKENS = {"NONE", "N_A", "NA", "NOBODY", "NO_ONE", "NULL"}
+
+
+def canonicalize_claim_id(raw_target: Any) -> str:
+    """Normalize valid claim IDs like 'C1', '#c1', '[C2]' to 'c1'/'c2'; leave invalid strings intact."""
+    s = str(raw_target or "").strip()
+    cleaned = re.sub(r"^[#<\[\(\"\'`*]+|[>\]\)\"\'`*:.,!]+$", "", s).strip()
+    if re.fullmatch(r"c\d+", cleaned, re.I):
+        return cleaned.lower()
+    return s
+
+
+_SAMPLING_PAIR = re.compile(r"([A-Za-z_][\w-]*)\s*[:=]\s*([^\s:;,|=]+)")
+_SAMPLING_KEY = re.compile(r"[A-Za-z_][\w-]*\s*[:=]")
+_SAMPLING_SEPARATOR = re.compile(r"[\s,;|]+")
+
+
+def parse_sampling_spec(spec: str) -> Dict[str, str]:
+    """Read every assignment or reject the specification as a whole."""
+    spec = spec.strip()
+    params = {}
+    pos = 0
+    while pos < len(spec):
+        pair = _SAMPLING_PAIR.match(spec, pos)
+        if not pair:
+            raise ValueError(f"malformed sampling specification near {spec[pos:]!r}")
+        key, value = pair.groups()
+        canonical = key.lower().replace("-", "_")
+        canonical = SAMPLING_ALIASES.get(canonical, canonical)
+        if canonical in params:
+            raise ValueError(f"duplicate sampling parameter {canonical!r}")
+        params[canonical] = value.strip("*`<>[]\"'")
+        pos = pair.end()
+        if pos < len(spec):
+            separator = _SAMPLING_SEPARATOR.match(spec, pos)
+            if not separator:
+                raise ValueError(f"malformed sampling specification near {spec[pos:]!r}")
+            pos = separator.end()
+    if not params:
+        raise ValueError("missing sampling parameters")
+    return params
+
+
+def _sampling_action(spec: str) -> Dict[str, Any]:
+    try:
+        return {"type": "SET_SAMPLING", "params": parse_sampling_spec(spec)}
+    except ValueError as exc:
+        return {"type": "SET_SAMPLING", "_parse_error": f"SET_SAMPLING {exc}"}
 
 
 def canonicalize_agent_id(raw_id: Any, known_names: Optional[Set[str]] = None) -> Optional[str]:
@@ -268,7 +321,7 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
             return None
 
     elif act_type in ("CHALLENGE", "RETRACT"):
-        tgt = str(res.get("target", "")).strip()
+        tgt = canonicalize_claim_id(res.get("target"))
         if not tgt:
             issues.append(f"{act_type} missing target claim ID")
             return None
@@ -278,7 +331,7 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
             return None
 
     elif act_type == "VOTE":
-        tgt = str(res.get("target", "")).strip()
+        tgt = canonicalize_claim_id(res.get("target"))
         val = str(res.get("value", "")).strip().lower()
         if not tgt or not val:
             issues.append("VOTE missing target or value")
@@ -313,6 +366,8 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
 
     elif act_type == "PROPOSE_NEXT":
         tgt = canonicalize_agent_id(res.get("target"), known_names)
+        if tgt in _NO_NOMINATION_TOKENS and tgt not in (known_names or ()):
+            return None
         if not tgt:
             issues.append("PROPOSE_NEXT missing target participant")
             return None
@@ -321,8 +376,10 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
     elif act_type == "SET_TEMPERATURE":
         val = res.get("value")
         try:
+            if isinstance(val, bool):
+                raise ValueError("expected a number")
             fval = float(val)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             issues.append(f"SET_TEMPERATURE invalid numeric value: {val!r}")
             return None
         if not math.isfinite(fval):
@@ -330,26 +387,28 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
             return None
         res["value"] = fval
 
-    elif act_type == "SET_SAMPLER":
-        raw_params = res.get("params")
-        if not isinstance(raw_params, dict):
-            raw_params = {k: v for k, v in res.items() if k != "type"}
-        if not raw_params:
-            issues.append("SET_SAMPLER missing sampler parameters")
+    elif act_type == "SET_SAMPLING":
+        if res.get("_parse_error"):
+            issues.append(str(res["_parse_error"]))
             return None
-        cleaned: Dict[str, float] = {}
-        for k, v in raw_params.items():
-            key = SAMPLER_PARAM_ALIASES.get(str(k).strip().lower(), str(k).strip().lower())
+        raw_params = res.get("params")
+        if "params" not in res:
+            raw_params = {k: v for k, v in res.items() if k != "type"}
+        if not isinstance(raw_params, dict) or not raw_params:
+            issues.append("SET_SAMPLING missing valid sampling parameters")
+            return None
+        cleaned_params = {}
+        for rk, rv in raw_params.items():
             try:
-                fval = float(v)
-            except (TypeError, ValueError):
-                issues.append(f"SET_SAMPLER invalid numeric value for {key}: {v!r}")
+                ck, cv = normalize_sampling_param(rk, rv, strict=True)
+            except ValueError as exc:
+                issues.append(f"SET_SAMPLING {exc}")
                 return None
-            if not math.isfinite(fval):
-                issues.append(f"SET_SAMPLER non-finite value for {key}: {v!r}")
+            if ck in cleaned_params:
+                issues.append(f"SET_SAMPLING duplicate sampling parameter {ck!r}")
                 return None
-            cleaned[key] = fval
-        res = {"type": "SET_SAMPLER", "params": cleaned}
+            cleaned_params[ck] = cv
+        res = {"type": "SET_SAMPLING", "params": cleaned_params}
 
     return res
 
@@ -441,6 +500,9 @@ def _command(word: str, rest: str, lines_after: List[str], known_names: Optional
     if w == "FINISH":
         return {"type": "FINISH", "content": body or head}
 
+    if w == "END_RUN":
+        return {"type": "END_RUN", "content": body or head}
+
     if w == "PROPOSE_NEXT":
         tgt = canonicalize_agent_id(head, known_names) or head
         return {"type": "PROPOSE_NEXT", "target": tgt}
@@ -448,40 +510,17 @@ def _command(word: str, rest: str, lines_after: List[str], known_names: Optional
     if w == "SET_TEMPERATURE":
         return {"type": "SET_TEMPERATURE", "value": head}
 
-    if w == "SET_SAMPLER":
-        return _parse_sampler_command(word, rest)
+    if w == "SET_SAMPLING":
+        spec = rest.strip().lstrip(":").strip()
+        shorthand = SAMPLING_SHORTHANDS.get(word.upper().removeprefix("SET_"))
+        if shorthand and not _SAMPLING_KEY.search(spec):
+            values = _SAMPLING_SEPARATOR.split(spec)
+            if len(values) > len(shorthand):
+                return {"type": "SET_SAMPLING", "_parse_error": "SET_SAMPLING too many shorthand values"}
+            return {"type": "SET_SAMPLING", "params": dict(zip(shorthand, values))}
+        return _sampling_action(spec)
 
     return None
-
-
-def _parse_sampler_command(word: str, rest: str) -> Dict[str, Any]:
-    """Parse @SET_SAMPLER key=val pairs or shorthand @SET_XTC / @SET_MIN_P commands."""
-    raw = rest.strip()
-    params: Dict[str, Any] = {}
-    for m in re.finditer(r"([A-Za-z_]+)\s*[:=]\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)", raw):
-        key = SAMPLER_PARAM_ALIASES.get(m.group(1).lower(), m.group(1).lower())
-        params[key] = m.group(2)
-    if params:
-        return {"type": "SET_SAMPLER", "params": params}
-
-    tokens = [t.strip(",") for t in raw.split() if t.strip(",")]
-    wu = word.upper()
-    if wu in ("SET_XTC", "XTC"):
-        if len(tokens) >= 1:
-            params["xtc_probability"] = tokens[0]
-        if len(tokens) >= 2:
-            params["xtc_threshold"] = tokens[1]
-    elif wu in ("SET_MIN_P", "MIN_P") and tokens:
-        params["min_p"] = tokens[0]
-    elif wu in ("SET_TOP_P", "TOP_P") and tokens:
-        params["top_p"] = tokens[0]
-    elif wu in ("SET_TOP_K", "TOP_K") and tokens:
-        params["top_k"] = tokens[0]
-    elif wu in ("SET_REPEAT_PENALTY", "REPEAT_PENALTY") and tokens:
-        params["repeat_penalty"] = tokens[0]
-    elif wu in ("SET_TYPICAL_P", "TYPICAL_P") and tokens:
-        params["typical_p"] = tokens[0]
-    return {"type": "SET_SAMPLER", "params": params}
 
 
 def _extract_commands(text: str, p: Parsed, known_names: Optional[Set[str]] = None) -> str:
@@ -492,11 +531,15 @@ def _extract_commands(text: str, p: Parsed, known_names: Optional[Set[str]] = No
         line = lines[i]
         c = CTRL_RE.match(line.strip())
         if c:
-            key, val = c.group(1).upper(), c.group(2).strip().strip("*`<>[]\"'. ")
+            key, val = c.group(1).upper(), c.group(2).strip()
             if key.startswith("NEXT"):
                 p.next_speaker = p.next_speaker or canonicalize_agent_id(val, known_names) or val
+            elif key.startswith("TEMP") and not _SAMPLING_KEY.search(val):
+                p.temperature = p.temperature if p.temperature is not None else val.strip("*`<>[]\"'")
             else:
-                p.temperature = p.temperature if p.temperature is not None else val
+                validated = validate_action_schema(_sampling_action(f"{key}: {val}"), p.issues, known_names)
+                if validated:
+                    p.actions.append(validated)
             i += 1
             continue
 
@@ -600,6 +643,10 @@ def parse_reply(
         p.reply_to = obj.get("reply_to") if isinstance(obj.get("reply_to"), str) else None
         p.next_speaker = canonicalize_agent_id(obj.get("next_speaker"), known_names)
         p.temperature = obj.get("temperature_request")
+        if "sampling_request" in obj:
+            valid_sr = validate_action_schema({"type": "SET_SAMPLING", "params": obj["sampling_request"]}, p.issues, known_names)
+            if valid_sr:
+                p.actions.append(valid_sr)
 
         acts = obj.get("actions", [])
         if not isinstance(acts, list):
@@ -636,7 +683,9 @@ def parse_reply(
 
     if p.next_speaker is not None:
         ns = canonicalize_agent_id(p.next_speaker, known_names)
-        if ns not in known_names:
+        if ns in _NO_NOMINATION_TOKENS and ns not in known_names:
+            p.next_speaker = None
+        elif ns not in known_names:
             p.issues.append(f"unknown next speaker {str(p.next_speaker)[:20]!r}")
             p.next_speaker = None
         else:
@@ -644,8 +693,12 @@ def parse_reply(
 
     if p.temperature is not None:
         try:
+            if isinstance(p.temperature, bool):
+                raise ValueError("expected a number")
             p.temperature = float(p.temperature)
-        except (TypeError, ValueError):
+            if not math.isfinite(p.temperature):
+                raise ValueError("expected a finite temperature")
+        except (TypeError, ValueError, OverflowError):
             p.issues.append(f"temperature request was not a number: {str(p.temperature)[:20]!r}")
             p.temperature = None
 

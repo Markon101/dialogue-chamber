@@ -12,10 +12,10 @@ import start_dory
 
 class ServerGuardTests(unittest.TestCase):
     def test_process_list_identifies_real_server_executables(self):
-        output = ("UID PID PPID C STIME TTY TIME CMD\n"
-                  "u0 101 1 0 2022 ? 00:00:00 /build-a/bin/llama-server --port 8080\n"
-                  "u0 102 1 0 2022 ? 00:00:00 /build-b/bin/llama-server --port 8081\n"
-                  "u0 103 1 0 2022 ? 00:00:00 sh -c echo llama-server\n")
+        output = ("  PID COMMAND\n"
+                  "  101 /build-a/bin/llama-server --port 8080\n"
+                  "  102 /build-b/bin/llama-server --port 8081\n"
+                  "  103 sh -c echo llama-server\n")
         with patch("server_manager.subprocess.run", return_value=subprocess.CompletedProcess([], 0, output, "")):
             self.assertEqual(server_manager.running_llama_servers(), [(101, "/build-a/bin/llama-server"),
                                                                      (102, "/build-b/bin/llama-server")])

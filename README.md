@@ -2,7 +2,7 @@
 
 A research harness for bounded multi-agent simulations, emergent institutional dynamics, adversarial collaboration, and context-aware LLM collective intelligence.
 
-Runs locally on **Android Termux** (optimized for Snapdragon 8 Elite NPU/CPU with `llama.cpp`) and connects dynamically to remote models via **OpenRouter**.
+Runs on **Android Termux** with Snapdragon 8 Elite NPU/CPU support, and on **desktop Linux** with an external `llama.cpp` server. Both can connect to **OpenRouter**.
 
 ---
 
@@ -18,6 +18,14 @@ Runs locally on **Android Termux** (optimized for Snapdragon 8 Elite NPU/CPU wit
 ---
 
 ## Quick Start
+
+### Desktop Linux
+
+Run an offline smoke test with `./run.sh --preset two_agent_baseline --mock --turns 2`.
+For live local inference, point `LOCAL_ENDPOINT` at your running llama.cpp
+server (default `http://127.0.0.1:8080/v1`) and set `LOCAL_MODEL` to its
+reported model ID or basename. The chamber checks the model before generation.
+Desktop runs leave the Android storage mirror off unless `CHAMBER_COPY_DIR` is set.
 
 ### Programmable societies and worlds
 
@@ -233,12 +241,10 @@ python3 -c 'from pathlib import Path; from server_manager import LlamaServerMana
 CHAMBER_COPY_DIR='' python3 chamber.py --config experiments/gemma4_htp_mtp_npu_society.json --context-tokens 4096 --max-output-tokens 1024 --turns 6 --requests 8
 ```
 
-The manager can reuse an existing server with the same target model without checking
-its draft model or backend. Verify the actual process and server log for HTP0 and
-`draft-mtp`; a model name by itself does not prove either. A short 4k trial completed,
-but a 16k allocation reached the memory guard after three turns. This does not
-establish near-limit reliability or performance. Stop only the verified owned server
-afterward; a chamber run that reuses it will not stop it automatically.
+The manager reuses an MTP server only when it can verify ownership, the saved mode,
+and speculative decoding reported by the server. Check the server log for HTP0 and
+`draft-mtp`. A short 4k trial completed. At 16k, the memory guard stopped the
+server after three turns. Use the guarded stop path for a server you own.
 
 ### 1. Diagnostics & Health Check
 Inspect system health, endpoints, Termux environment, and storage:
@@ -297,6 +303,20 @@ Run a zero-cost simulation (dry run) showing budgets and planning:
 ./run_batch.sh --mock
 ```
 
+### Sampling and agent-decided endings
+
+Use `--agent-sampling LOCAL=min_p=0.05,top_k=40` to override one participant,
+or `--top-k 40` to set the value for the whole roster. Agents with sampling
+permission can issue `@SET_SAMPLING top_p=0.9 top_k=40` or submit a
+`SET_SAMPLING` JSON action. Unsupported or invalid values reject the whole action.
+XTC, DRY, and other llama.cpp-only settings are filtered from remote requests.
+
+Runs use a fixed turn cap by default. Enable `--end-mode agent_decided` and choose
+`--end-policy majority`, `unanimous`, or `any`. Set `min_turns_before_end`
+in JSON to delay voting. `@END_RUN: <reason>` casts a vote and
+`@END_RUN: withdraw` removes it. Votes count among active participants at the end of
+the turn. The run also observes its existing turn, token, request, and time limits.
+
 ### Saving and continuing runs
 
 The chamber writes a self-contained, versioned `checkpoint.json` before generation,
@@ -313,8 +333,8 @@ CHAMBER_COPY_DIR='' python3 chamber.py --resume runs/YOUR_RUN \
 ```
 
 `--turns` and `--requests` are **cumulative totals**, including work already saved.
-Raise the turn limit to extend a completed run; an interrupted run can continue
-under its existing limits. Token, time, and spend budgets also carry forward.
+Raise the turn limit to extend a run that reached its cap. An interrupted run can
+continue under its existing limits. A run ended by participant vote is final. Token, time, and spend budgets also carry forward.
 The time budget counts active run time, excluding the gap between sessions.
 Saved mock runs stay offline; `--mock` can also continue a live run with demo replies.
 

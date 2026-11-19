@@ -72,7 +72,8 @@ class ReviewRegressions(unittest.TestCase):
         config_path = self.root / "config.json"
         self.config["context_tokens"] = 2048
         config_path.write_text(json.dumps(self.config))
-        with patch("chamber.assert_single_llama_server", return_value=[]), \
+        with patch("chamber.IS_TERMUX", True), \
+             patch("chamber.assert_single_llama_server", return_value=[]), \
              patch("chamber.LlamaServerManager.ensure_server", return_value={"action": "reused"}) as ensure, \
              patch("chamber.Chamber"):
             self.assertEqual(main(["--config", str(config_path), "--model", "gemma4-cpu-mtp", "--quiet"]), 0)
@@ -142,8 +143,8 @@ class ReviewRegressions(unittest.TestCase):
             names=("A", "B"),
         )
         self.assertEqual(len(parsed.actions), 2)
-        self.assertEqual(parsed.actions[0], {"type": "SET_SAMPLER", "params": {"xtc_probability": 0.6, "xtc_threshold": 0.15}})
-        self.assertEqual(parsed.actions[1], {"type": "SET_SAMPLER", "params": {"min_p": 0.08, "top_k": 40.0, "repeat_penalty": 1.15}})
+        self.assertEqual(parsed.actions[0], {"type": "SET_SAMPLING", "params": {"xtc_probability": 0.6, "xtc_threshold": 0.15}})
+        self.assertEqual(parsed.actions[1], {"type": "SET_SAMPLING", "params": {"min_p": 0.08, "top_k": 40.0, "repeat_penalty": 1.15}})
 
         config_path = self.root / "sampler_cfg.json"
         cfg = {
@@ -182,12 +183,12 @@ class ReviewRegressions(unittest.TestCase):
         self.assertNotIn("xtc_probability", rem_payload)
         self.assertNotIn("repeat_penalty", rem_payload)
 
-    def test_set_sampler_action_applies_and_clamps(self):
+    def test_legacy_sampler_commands_use_atomic_validation(self):
         cfg = {"name": "s", "agents": [{"name": "A", "endpoint": "local", "capabilities": "standard"}], "limits": {"max_turns": 1}}
-        backend = MockBackend({"A": ["Cranking XTC.\n@SET_XTC 1.8 0.9\n@SET_MIN_P 0.07"]})
+        backend = MockBackend({"A": ["Cranking XTC.\n@SET_XTC 0.8 0.9\n@SET_MIN_P 0.07"]})
         ch = Chamber(cfg, run_dir=self.root / "act", backend=backend, quiet=True, copy_dir="").run()
-        self.assertEqual(ch.agents["A"].xtc_probability, 1.0)
-        self.assertEqual(ch.agents["A"].xtc_threshold, 0.5)
+        self.assertIsNone(ch.agents["A"].xtc_probability)
+        self.assertIsNone(ch.agents["A"].xtc_threshold)
         self.assertEqual(ch.agents["A"].min_p, 0.07)
 
 

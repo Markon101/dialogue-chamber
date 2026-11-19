@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 # Chamber-owned equivalent of serve_best.sh. Never kills an existing server.
 set -euo pipefail
 SD_DIR="${SNAPDRAGON_DIR:-$HOME/projects/llama-snapdragon}"

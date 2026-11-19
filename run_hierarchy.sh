@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 # ==============================================================================
 # Dialogue Chamber — Weird Hierarchy Experiment (Compatibility Wrapper)
 # Runs the 5-agent local weird hierarchy experiment on Gemma 4.

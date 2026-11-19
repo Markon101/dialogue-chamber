@@ -16,7 +16,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from presets import SAMPLER_SPECS
+from presets import SAMPLING_PARAMS
 
 
 @dataclass
@@ -52,6 +52,7 @@ TURN_SCHEMA = {
         "reply_to": {"type": "string"},
         "next_speaker": {"type": "string"},
         "temperature_request": {"type": "number"},
+        "sampling_request": {"type": "object", "additionalProperties": {"type": "number"}},
         "actions": {"type": "array", "items": {"type": "object"}},
     },
     "required": ["message"],
@@ -80,10 +81,13 @@ def build_payload(
         "max_tokens": int(max_tokens),
     }
 
-    for k, spec in SAMPLER_SPECS.items():
-        val = agent_cfg.get(k)
-        if val is not None and (provider in spec["providers"] or provider not in ("llamacpp", "openrouter")):
-            p[k] = spec["type"](val)
+    for k, (_, _, _, llamacpp_only) in SAMPLING_PARAMS.items():
+        if k == "temperature":
+            continue
+        if llamacpp_only and provider != "llamacpp":
+            continue
+        if agent_cfg.get(k) is not None:
+            p[k] = agent_cfg[k]
 
     if stops:
         p["stop"] = list(stops) if provider == "llamacpp" else list(stops)[:4]

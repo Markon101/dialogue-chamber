@@ -12,9 +12,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from checkpoint import write_atomic
-from platform_adapter import ConcurrencyLock, WakeLockManager
-from presets import PRESETS, RUNS_DIR
-from server_manager import LlamaServerManager, resolve_model
+from platform_adapter import IS_TERMUX, ConcurrencyLock, WakeLockManager
+from presets import ENDPOINTS, PRESETS, RUNS_DIR
+from server_manager import LlamaServerManager, assert_single_llama_server
 
 BATCH_JOBS = [
     {
@@ -119,14 +119,18 @@ class BatchRunner:
         try:
             # Ensure local server is up if needed and not mock
             if not self.mock:
-                res = server_mgr.ensure_server(
-                    host="127.0.0.1",
-                    port=8080,
-                    model_mode="gemma4-htp",
-                    model_file="gemma-4-E4B-it-Q4_0.gguf",
-                )
-                if res.get("action") == "started":
-                    started_server = True
+                if IS_TERMUX:
+                    res = server_mgr.ensure_server(
+                        host="127.0.0.1",
+                        port=8080,
+                        model_mode="gemma4-htp",
+                        model_file="gemma-4-E4B-it-Q4_0.gguf",
+                    )
+                    started_server = res.get("action") == "started"
+                else:
+                    endpoint = ENDPOINTS["local"]
+                    assert_single_llama_server()
+                    server_mgr.verify_external_server(endpoint["base_url"], {endpoint["model"]})
 
             completed_count = 0
             failed_count = 0

@@ -3,11 +3,13 @@
 Presets are plain configuration. Edit freely. Credentials are never stored here: an endpoint only
 names the environment variable that holds its key (read at request time by inference.py).
 """
+import math
 import os
 
+from platform_adapter import IS_TERMUX
+
 # ─────────────────────────────── Endpoints ───────────────────────────────
-# The chamber never starts, stops or downloads models. Point these at servers you run yourself.
-# One llama.cpp server serves one model, so a second local model needs a second server/port.
+# The Termux CLI can manage its Snapdragon server. Desktop and Dory servers are started separately.
 ENDPOINTS = {
     "local": dict(provider="llamacpp", remote=False, api_key_env="",
                   base_url=os.environ.get("LOCAL_ENDPOINT", "http://127.0.0.1:8080/v1"),
@@ -29,7 +31,7 @@ ENDPOINTS = {
 
 # Where finished runs are written, and an optional mirror (e.g. phone storage). "" disables the copy.
 RUNS_DIR = os.environ.get("CHAMBER_RUNS_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs"))
-COPY_DIR = os.environ.get("CHAMBER_COPY_DIR", "/sdcard/dialogue_chamber/runs")
+COPY_DIR = os.environ.get("CHAMBER_COPY_DIR", "/sdcard/dialogue_chamber/runs" if IS_TERMUX else "")
 
 # ─────────────────────────────── Hard limits ─────────────────────────────
 # Enforced in Python. Agents can never raise any of these.
@@ -38,7 +40,7 @@ LIMITS = dict(
     max_requests=30,              # every API call (retries and moderator calls included)
     max_tokens_per_response=4096,  # cap on any agent's max_tokens
     max_total_tokens=80000,       # generated tokens across the run (estimated if a provider omits usage)
-    max_context_chars=32000,      # cap on any agent's context budget
+    max_context_chars=32000,     # cap on any agent's context budget
     max_duration_s=2500,          # wall-clock limit
     max_spend_usd=0.25,           # only enforceable with provider-reported cost; fails closed otherwise. None = off
     max_retries_per_call=1, max_retries_total=6,
@@ -51,29 +53,99 @@ LIMITS = dict(
     temp_min=0.2, temp_max=1.5, max_empty_streak=3,
 )
 
-SAMPLER_SPECS = {
-    "top_p":             {"type": float, "min": 0.0,  "max": 1.0,  "providers": ("llamacpp", "openrouter")},
-    "top_k":             {"type": int,   "min": 0,    "max": 200,  "providers": ("llamacpp", "openrouter")},
-    "min_p":             {"type": float, "min": 0.0,  "max": 1.0,  "providers": ("llamacpp", "openrouter")},
-    "xtc_probability":   {"type": float, "min": 0.0,  "max": 1.0,  "providers": ("llamacpp",)},
-    "xtc_threshold":     {"type": float, "min": 0.0,  "max": 0.5,  "providers": ("llamacpp",)},
-    "repeat_penalty":    {"type": float, "min": 0.5,  "max": 2.0,  "providers": ("llamacpp",)},
-    "typical_p":         {"type": float, "min": 0.0,  "max": 1.0,  "providers": ("llamacpp",)},
-    "presence_penalty":  {"type": float, "min": -2.0, "max": 2.0,  "providers": ("llamacpp", "openrouter")},
-    "frequency_penalty": {"type": float, "min": -2.0, "max": 2.0,  "providers": ("llamacpp", "openrouter")},
+# Supported per-agent sampling parameters: name -> (value_type, min_val, max_val, llamacpp_only)
+SAMPLING_PARAMS = {
+    "temperature": (float, 0.0, 2.0, False),
+    "top_p": (float, 0.0, 1.0, False),
+    "top_k": (int, 0, 1000, False),
+    "min_p": (float, 0.0, 1.0, False),
+    "typical_p": (float, 0.0, 1.0, True),
+    "xtc_probability": (float, 0.0, 1.0, True),
+    "xtc_threshold": (float, 0.0, 0.5, True),
+    "repeat_penalty": (float, 0.5, 2.0, True),
+    "presence_penalty": (float, -2.0, 2.0, False),
+    "frequency_penalty": (float, -2.0, 2.0, False),
+    "dry_multiplier": (float, 0.0, 5.0, True),
+    "dynatemp_range": (float, 0.0, 2.0, True),
 }
+
+SAMPLING_ALIASES = {
+    "temp": "temperature",
+    "temperature": "temperature",
+    "top_p": "top_p",
+    "topp": "top_p",
+    "top_k": "top_k",
+    "topk": "top_k",
+    "min_p": "min_p",
+    "minp": "min_p",
+    "typical_p": "typical_p",
+    "typicalp": "typical_p",
+    "xtc_prob": "xtc_probability",
+    "xtc_probability": "xtc_probability",
+    "xtc_thresh": "xtc_threshold",
+    "xtc_threshold": "xtc_threshold",
+    "repeat_penalty": "repeat_penalty",
+    "rep_pen": "repeat_penalty",
+    "presence_penalty": "presence_penalty",
+    "pres_pen": "presence_penalty",
+    "frequency_penalty": "frequency_penalty",
+    "freq_pen": "frequency_penalty",
+    "dry_multiplier": "dry_multiplier",
+    "dry_mult": "dry_multiplier",
+    "dry": "dry_multiplier",
+    "dynatemp_range": "dynatemp_range",
+    "dynatemp": "dynatemp_range",
+}
+
+
+def normalize_sampling_param(raw_key: str, raw_val, temp_bounds=None, strict: bool = False):
+    """Canonicalize and validate/clamp one sampling parameter.
+
+    When strict=True, out-of-range numbers raise ValueError instead of silently clamping.
+    Returns (canon_name, coerced_val) or raises ValueError.
+    """
+    key = SAMPLING_ALIASES.get(str(raw_key).strip().lower().replace("-", "_"))
+    if not key or key not in SAMPLING_PARAMS:
+        raise ValueError(f"unknown sampling parameter {raw_key!r}")
+    vtype, lo, hi, _ = SAMPLING_PARAMS[key]
+    if key == "temperature" and temp_bounds is not None:
+        lo, hi = temp_bounds
+    if isinstance(raw_val, bool):
+        raise ValueError(f"invalid numeric value {raw_val!r} for {key}")
+    try:
+        fnum = float(raw_val)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"invalid numeric value {raw_val!r} for {key}") from exc
+    if not math.isfinite(fnum):
+        raise ValueError(f"invalid numeric value {raw_val!r} for {key}")
+    if vtype is int:
+        if strict and abs(fnum - round(fnum)) > 1e-6:
+            raise ValueError(f"expected integer value for {key}, got {raw_val!r}")
+        num = int(round(fnum))
+    else:
+        num = fnum
+    if strict and (num < lo or num > hi):
+        raise ValueError(f"out-of-range value {num} for {key} (allowed: {lo}..{hi})")
+    clamped = max(lo, min(hi, num))
+    if vtype is int:
+        clamped = int(round(clamped))
+    else:
+        clamped = round(float(clamped), 4)
+    return key, clamped
+
 
 DEFAULT_AGENT = dict(
     identity="", focus="", knowledge="", temperature=0.8, top_p=None, top_k=None, min_p=None,
-    xtc_probability=None, xtc_threshold=None, repeat_penalty=None, typical_p=None,
-    presence_penalty=None, frequency_penalty=None,
+    typical_p=None, xtc_probability=None, xtc_threshold=None,
+    repeat_penalty=None, presence_penalty=None, frequency_penalty=None,
+    dry_multiplier=None, dynatemp_range=None,
     max_tokens=4096, context_chars=16384, reasoning="medium",   # None = endpoint default; "off"/"low"/"medium"/"high"
     weight=1.0, priority=0, profile="standard",          # "minimal" | "standard" (line commands) | "rich" (JSON)
     capabilities="standard", subscriptions=[], structured=False,
 )
 
-BASELINE = {"SAY", "PROPOSE_NEXT", "SET_TEMPERATURE", "SET_SAMPLER"}
-MINIMAL = BASELINE | {"WHISPER", "CLAIM", "CHALLENGE", "RETRACT", "FINISH"}
+BASELINE = {"SAY", "PROPOSE_NEXT", "SET_TEMPERATURE", "SET_SAMPLING"}
+MINIMAL = BASELINE | {"WHISPER", "CLAIM", "CHALLENGE", "RETRACT", "FINISH", "END_RUN"}
 STANDARD = MINIMAL | {"PUBLISH", "SUBSCRIBE", "VOTE", "UPDATE_NOTE", "SET_STYLE", "PROPOSE_TOPIC",
                       "ARTIFACT_READ", "ARTIFACT_LIST"}
 CAPABILITY_SETS = {"baseline": BASELINE, "minimal": MINIMAL, "standard": STANDARD,
