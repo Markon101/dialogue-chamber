@@ -31,7 +31,17 @@ MODEL_ALIASES: Dict[str, Tuple[str, str, int]] = {
     "llama1b": ("llama1b-htp", "Llama-3.2-1B-Instruct-Q4_0.gguf", 131072),
     "llama-1b": ("llama1b-htp", "Llama-3.2-1B-Instruct-Q4_0.gguf", 131072),
     "llama1b-htp": ("llama1b-htp", "Llama-3.2-1B-Instruct-Q4_0.gguf", 131072),
+    "llama1b-htp-q8": ("llama1b-htp-q8", "Llama-3.2-1B-Instruct-Q4_0.gguf", 8192),
+    "gemma4-htp-q8": ("gemma4-htp-q8", "gemma-4-E4B-it-Q4_0.gguf", 8192),
+    "gemma4-htp-mtp": ("gemma4-htp-mtp", "gemma-4-E4B-it-Q4_0.gguf", 4096),
 }
+
+
+def process_start_ticks(pid):
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[19]
+    except (OSError, IndexError):
+        return None
 
 
 def running_llama_servers():
@@ -208,16 +218,17 @@ class LlamaServerManager:
                 return False
 
             os.kill(pid, 0)
+            if not data.get("start_ticks") or data["start_ticks"] != process_start_ticks(pid):
+                return False
 
             # Validate that /proc/<pid>/cmdline matches our expected processes
             cmdline_path = Path(f"/proc/{pid}/cmdline")
             if cmdline_path.exists():
                 cmd = cmdline_path.read_text(encoding="utf-8", errors="ignore").replace("\0", " ")
-                if any(x in cmd for x in ("llama", "guard", "serve_best")):
+                if any(Path(part).name in ("llama-server", "guard.sh", "guarded_serve_best.sh") for part in cmd.split()):
                     return True
             else:
-                # If /proc not accessible (e.g. some restricted environments), PID alive is acceptable
-                return True
+                return False
         except (OSError, ValueError):
             pass
 
@@ -250,7 +261,7 @@ class LlamaServerManager:
 
     def _ensure_server(self, host, port, model_mode, model_file, log_file, allow_switch, ctx_size):
         """Ensures the requested model is running on host:port, refusing mismatches unless switch authorized."""
-        log_path = log_file or (SNAPDRAGON_DIR / "logs" / "gemma4_server.log")
+        log_path = log_file or (CHAMBER_DIR / "runs" / "local_server.log")
         log_path.parent.mkdir(parents=True, exist_ok=True)
 
         req_base = Path(model_file).name
@@ -262,6 +273,16 @@ class LlamaServerManager:
         if healthy:
             info = self.query_server_info(host, port, timeout=2.0)
             loaded = info.get("model_name") or info.get("model_id")
+            if not loaded:
+                raise RuntimeError("Cannot verify the running server's model identity")
+            if self.is_server_owned(port):
+                saved = json.loads(self._state_file(port).read_text())
+                if saved.get("mode") != model_mode:
+                    raise RuntimeError("Running server mode differs; stop the owned server before changing backend or MTP mode")
+            elif "mtp" in model_mode:
+                raise RuntimeError("Cannot verify ownership and mode of the requested MTP server")
+            if "mtp" in model_mode and not any(slot.get("speculative") for slot in (info.get("slots") or [])):
+                raise RuntimeError("Requested MTP server does not report speculative decoding")
 
             if loaded and Path(loaded).name != req_base:
                 if allow_switch:
@@ -319,6 +340,7 @@ class LlamaServerManager:
             json.dumps(
                 {
                     "pid": proc.pid,
+                    "start_ticks": process_start_ticks(proc.pid),
                     "pgid": proc.pid,
                     "port": port,
                     "host": host,
@@ -381,6 +403,8 @@ class LlamaServerManager:
 
     def stop_owned_server(self, port: int = 8080) -> bool:
         """Safely terminates an owned server on port. Returns False if unowned or already stopped."""
+        if not self.is_server_owned(port):
+            return False
         st_file = self._state_file(port)
         if not st_file.exists():
             return False
@@ -424,6 +448,8 @@ class LlamaServerManager:
                 break
         else:
             # Force kill if still lingering
+            if not self.is_server_owned(port):
+                return False
             try:
                 if hasattr(os, "killpg"):
                     os.killpg(pid, signal.SIGKILL)

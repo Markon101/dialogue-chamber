@@ -50,6 +50,7 @@ from presets import (
     LIMITS,
     PRESETS,
     RUNS_DIR,
+    SAMPLER_SPECS,
 )
 from protocol import ACTION_TYPES, ITEM_KINDS, canonicalize_agent_id, parse_reply
 from server_manager import LlamaServerManager, assert_single_llama_server, resolve_model
@@ -82,6 +83,12 @@ class AgentState:
     top_p: Optional[float] = None
     top_k: Optional[int] = None
     min_p: Optional[float] = None
+    xtc_probability: Optional[float] = None
+    xtc_threshold: Optional[float] = None
+    repeat_penalty: Optional[float] = None
+    typical_p: Optional[float] = None
+    presence_penalty: Optional[float] = None
+    frequency_penalty: Optional[float] = None
     max_tokens: int = 1200
     context_chars: int = 10000
     effective_context_tokens: int = 32768
@@ -166,10 +173,24 @@ SAVED_RUNTIME_FIELDS = (
     "solved_turn", "verified_synthesis_turn", "token_accounting_history",
 )
 SAVED_AGENT_FIELDS = (
-    "temperature", "note", "style", "pending_reads", "active", "finished_reason",
+    "temperature", "top_p", "top_k", "min_p", "xtc_probability", "xtc_threshold",
+    "repeat_penalty", "typical_p", "presence_penalty", "frequency_penalty",
+    "note", "style", "pending_reads", "active", "finished_reason",
     "turns_taken", "consecutive_turns", "last_turn", "failures", "empty_count",
     "total_prompt_tokens", "total_completion_tokens", "subscriptions",
 )
+
+
+def _clamp_sampler_value(key: str, raw_val: Any):
+    """Clamp and cast a configured sampler parameter using SAMPLER_SPECS."""
+    if raw_val is None:
+        return None
+    spec = SAMPLER_SPECS[key]
+    val = float(raw_val)
+    if not math.isfinite(val):
+        raise ValueError(f"non-finite value for {key}")
+    clamped = max(float(spec["min"]), min(float(spec["max"]), val))
+    return int(round(clamped)) if spec["type"] is int else round(clamped, 4)
 
 
 def preview_artifact(name: str, content: str, limit: int = 1200) -> str:
@@ -224,6 +245,8 @@ class Chamber:
         preset_name = re.sub(r"[^a-zA-Z0-9_-]", "_", str(self.cfg.get("name") or "experiment"))
         self.run_id = str(self.cfg.get("run_id") or f"{preset_name}_{ts}")
         self.run_dir = Path(run_dir or os.path.join(RUNS_DIR, self.run_id)).resolve()
+        if any((self.run_dir / filename).exists() for filename in ("manifest.json", "checkpoint.json", "events.jsonl")):
+            raise ValueError("run directory already contains a run; continue into a new directory")
         self.run_dir.mkdir(parents=True, exist_ok=True)
         self.artifacts = ArtifactManager(
             self.run_dir / "artifacts",
@@ -270,7 +293,7 @@ class Chamber:
         )
         local_server_info = server_mgr.query_server_info("127.0.0.1", 8080, timeout=0.8) if needs_local_info else {}
         if local_server_info.get("online"):
-            server_reported_local_ctx = local_server_info.get("context_window")
+            server_reported_local_ctx = local_server_info.get("allocated_context") or local_server_info.get("context_window")
 
         for raw in raw_agents:
             merged = {**DEFAULT_AGENT, **raw}
@@ -355,6 +378,13 @@ class Chamber:
                         merged[key] = value
 
             fallbacks = list(merged.get("fallback_models") or [])
+            sampler_vals = {}
+            for s_key in SAMPLER_SPECS:
+                if merged.get(s_key) is not None:
+                    sampler_vals[s_key] = _clamp_sampler_value(s_key, merged[s_key])
+                    merged[s_key] = sampler_vals[s_key]
+                else:
+                    sampler_vals[s_key] = None
 
             ag = AgentState(
                 name=name,
@@ -365,9 +395,7 @@ class Chamber:
                 focus=str(merged.get("focus") or ""),
                 knowledge=str(merged.get("knowledge") or ""),
                 temperature=temp,
-                top_p=merged.get("top_p"),
-                top_k=merged.get("top_k"),
-                min_p=merged.get("min_p"),
+                **sampler_vals,
                 max_tokens=max_tok,
                 context_chars=ctx_chars,
                 effective_context_tokens=eff_ctx,
@@ -680,6 +708,11 @@ class Chamber:
             )
 
         cmds = [f"NEXT: <name> ({names})", f"TEMP: <{lo}..{hi}>"]
+        if "SET_SAMPLER" in caps:
+            sampler_hint = "@SET_SAMPLER min_p=<0..1> top_p=<0..1> top_k=<0..200>"
+            if agent.endpoint.get("provider") == "llamacpp":
+                sampler_hint += " xtc_probability=<0..1> xtc_threshold=<0..0.5> repeat_penalty=<0.5..2>"
+            cmds.append(sampler_hint)
         if "WHISPER" in caps:
             cmds.append("@WHISPER <name>: <private message>")
         if "PUBLISH" in caps and len(self.channels) > 1:
@@ -707,7 +740,7 @@ class Chamber:
         if self.tracked_tokens >= int(self.limits["max_total_tokens"]):
             return f"total token budget reached ({self.limits['max_total_tokens']})"
         max_spend = self.limits.get("max_spend_usd")
-        if max_spend is not None and endpoint.get("remote"):
+        if max_spend is not None and (endpoint.get("remote") or endpoint.get("provider") == "openrouter"):
             if self.remote_cost_blocked(float(max_spend)):
                 return f"remote spend limit or unpriced remote usage ({max_spend} USD)"
         return None
@@ -733,7 +766,7 @@ class Chamber:
 
         mtok = min(int(self.limits["max_tokens_per_response"]), int(max_tokens or agent.max_tokens))
         rem_tok = int(self.limits["max_total_tokens"]) - self.tracked_tokens
-        mtok = max(16, min(mtok, rem_tok))
+        mtok = max(1, min(mtok, rem_tok))
 
         # Model routing & fallback candidate list
         candidates = [(agent.endpoint_name, agent.endpoint)]
@@ -783,6 +816,9 @@ class Chamber:
             backoff_s = 1.0
 
             while True:
+                budget_err = self._check_budgets_before_call(cand_ep)
+                if budget_err:
+                    raise InferenceError(budget_err, transient=False)
                 attempts += 1
                 self.requests_used += 1
                 try:
@@ -809,7 +845,7 @@ class Chamber:
                     if res.visible_tokens:
                         self.visible_tokens_total += res.visible_tokens
 
-                    if cand_ep.get("remote"):
+                    if cand_ep.get("remote") or cand_ep.get("provider") == "openrouter":
                         if res.cost is not None:
                             self.remote_cost_usd += float(res.cost)
                         else:
@@ -909,6 +945,40 @@ class Chamber:
             clamped = " (clamped)" if abs(new_t - req_t) > 1e-6 else ""
             self._record(agent.name, atype, "accepted", detail=f"{old_t:.2f} -> {new_t:.2f}{clamped}")
             self._emit(f"  ⚙ temp {agent.name}: {old_t:.2f} → {new_t:.2f}{clamped}")
+            return
+
+        if atype == "SET_SAMPLER":
+            params = act.get("params") if isinstance(act.get("params"), dict) else {
+                k: v for k, v in act.items() if k != "type"
+            }
+            if not params:
+                self._record(agent.name, atype, "rejected", detail="missing sampler parameters")
+                return
+            provider = agent.endpoint.get("provider", "openai")
+            changes = []
+            for key, raw_val in params.items():
+                if key == "temperature":
+                    self._apply_action(agent, {"type": "SET_TEMPERATURE", "value": raw_val})
+                    continue
+                if key not in SAMPLER_SPECS:
+                    self._record(agent.name, atype, "rejected", target=key, detail=f"unknown sampler parameter {key!r}")
+                    return
+                spec = SAMPLER_SPECS[key]
+                if provider in ("llamacpp", "openrouter") and provider not in spec["providers"]:
+                    self._record(agent.name, atype, "rejected", target=key, detail=f"{key} unsupported on {provider}")
+                    return
+                try:
+                    new_val = _clamp_sampler_value(key, raw_val)
+                except (TypeError, ValueError):
+                    self._record(agent.name, atype, "rejected", target=key, detail=f"invalid value for {key}: {raw_val!r}")
+                    return
+                old_val = getattr(agent, key)
+                setattr(agent, key, new_val)
+                changes.append(f"{key}={old_val}->{new_val}")
+            if changes:
+                detail = ", ".join(changes)
+                self._record(agent.name, atype, "accepted", detail=detail)
+                self._emit(f"  ⚙ sampler {agent.name}: {detail}")
             return
 
         if atype == "PROPOSE_NEXT":
@@ -1191,6 +1261,7 @@ class Chamber:
 
         max_consec = int(self.limits["max_consecutive"])
         eligible = [n for n in active if self.agents[n].consecutive_turns < max_consec] or active
+        self.reactive_queue = [name for name in self.reactive_queue if name in eligible]
 
         def fair_fallback():
             cand = list(eligible)
@@ -1285,7 +1356,8 @@ class Chamber:
             self.society.authorities = set(state["authorities"])
         for name, saved in state["agents"].items():
             for attribute in SAVED_AGENT_FIELDS:
-                setattr(self.agents[name], attribute, copy.deepcopy(saved[attribute]))
+                if attribute in saved:
+                    setattr(self.agents[name], attribute, copy.deepcopy(saved[attribute]))
         for attribute in SAVED_RUNTIME_FIELDS:
             setattr(self, attribute, copy.deepcopy(state["runtime"][attribute]))
         self.seed = state["seed"]
@@ -1356,7 +1428,7 @@ class Chamber:
                 stops = [f"\n{n}:" for n in self.agent_order if n != speaker] + ["\n--- Public Conversation"]
 
                 try:
-                    if ag.endpoint.get("enforce_context_budget") and (
+                    if (isinstance(self.backend, HttpBackend) or ag.endpoint.get("enforce_context_budget")) and (
                         not accounting.fits_in_context or
                         accounting.total_prompt + accounting.reserved_output + accounting.safety_margin > accounting.effective_usable_context
                     ):
@@ -1529,7 +1601,7 @@ class Chamber:
         tok_per_s = round((self.prompt_tokens + self.completion_tokens) / self.elapsed_s, 2) if self.elapsed_s > 0 else 0.0
 
         return dict(
-            turns_completed=len(self.public_messages),
+            turns_completed=sum(turns_by_agent.values()),
             requests_used=self.requests_used,
             retries_used=self.retries_used,
             prompt_tokens=self.prompt_tokens,
@@ -1773,6 +1845,11 @@ def main(argv=None) -> int:
     ap.add_argument("--max-output-tokens", type=int, default=None, help="Max output tokens per response")
     ap.add_argument("--reasoning", default=None, help="Reasoning mode ('on', 'off', 'low', 'medium', 'high')")
     ap.add_argument("--temperature", type=float, default=None, help="Temperature override")
+    for s_key in SAMPLER_SPECS:
+        ap.add_argument(f"--{s_key.replace('_', '-')}", dest=f"sampler_{s_key}", type=float, default=None,
+                        help=f"Override {s_key} sampler for all agents")
+    ap.add_argument("--agent-sampler", action="append", default=[],
+                    help="Per-agent sampler override: AGENT=key=val[,key2=val2]")
     ap.add_argument("--seed", type=int, default=None, help="Random seed (default: 42, or the saved seed on continuation)")
     ap.add_argument("--run-id", default=None, help="Custom run identifier")
     ap.add_argument("--run-dir", "--output-dir", dest="run_dir", default=None, help="Output directory for this run")
@@ -1908,6 +1985,21 @@ def main(argv=None) -> int:
 
     if args.seed is None:
         args.seed = 42
+    if args.temperature is not None and not math.isfinite(args.temperature):
+        ap.error("--temperature must be finite")
+    cli_samplers = {}
+    for s_key in SAMPLER_SPECS:
+        s_val = getattr(args, f"sampler_{s_key}", None)
+        if s_val is not None:
+            if not math.isfinite(s_val):
+                ap.error(f"--{s_key.replace('_', '-')} must be finite")
+            cli_samplers[s_key] = _clamp_sampler_value(s_key, s_val)
+    for agent_config in preset_cfg.get("agents", []):
+        if args.reasoning is not None:
+            agent_config["reasoning"] = args.reasoning
+        if args.temperature is not None:
+            agent_config["temperature"] = args.temperature
+        agent_config.update(cli_samplers)
 
     # Handle custom roster override (--roster AGENT1,AGENT2,...)
     if args.roster:
@@ -1931,6 +2023,9 @@ def main(argv=None) -> int:
     if args.model:
         mode, mfile, default_ctx = resolve_model(args.model)
         endpoints_map["local"]["model"] = mfile
+        for agent_config in preset_cfg.get("agents", []):
+            if agent_config.get("endpoint", "local") == "local":
+                agent_config["model"] = mfile
 
     for override in args.agent_endpoint:
         if "=" not in override:
@@ -1993,6 +2088,38 @@ def main(argv=None) -> int:
                 for a in preset_cfg.get("agents", []):
                     if canonicalize_agent_id(a.get("name")) == ag_name:
                         a["focus"] = text.strip()
+
+    # Handle per-agent sampler overrides (--agent-sampler AGENT=key=val,key2=val2)
+    for override in args.agent_sampler:
+        if "=" not in override:
+            ap.error(f"--agent-sampler expects AGENT=key=val, got {override!r}")
+        ag_name, spec_str = override.split("=", 1)
+        ag_name = canonicalize_agent_id(ag_name)
+        matches = [a for a in preset_cfg.get("agents", []) if canonicalize_agent_id(a.get("name")) == ag_name]
+        if not matches:
+            ap.error(f"unknown agent in --agent-sampler: {ag_name!r}")
+        for pair in re.split(r"[,;\s]+", spec_str.strip()):
+            if not pair:
+                continue
+            if "=" not in pair:
+                ap.error(f"invalid sampler pair in --agent-sampler: {pair!r}")
+            k, v = pair.split("=", 1)
+            k = k.strip().lower()
+            if k == "temperature" or k == "temp":
+                val = float(v)
+                if not math.isfinite(val):
+                    ap.error("--agent-sampler temperature must be finite")
+                for a in matches:
+                    a["temperature"] = val
+            elif k in SAMPLER_SPECS:
+                try:
+                    val = _clamp_sampler_value(k, v)
+                except (TypeError, ValueError) as exc:
+                    ap.error(f"invalid sampler value in --agent-sampler {pair!r}: {exc}")
+                for a in matches:
+                    a[k] = val
+            else:
+                ap.error(f"unknown sampler key in --agent-sampler: {k!r}")
 
     # Diagnostics execution
     if args.doctor:
@@ -2090,13 +2217,15 @@ def main(argv=None) -> int:
         if needs_local and not args.mock:
             loc_model = endpoints_map["local"]["model"]
             mode, mfile, def_ctx = resolve_model(loc_model)
+            mode = resolve_model(args.model)[0] if args.model else preset_cfg.get("local_server_mode", mode)
+            selected_context = args.context_tokens or preset_cfg.get("context_tokens")
             res = server_mgr.ensure_server(
                 host="127.0.0.1",
                 port=8080,
                 model_mode=mode,
                 model_file=mfile,
                 allow_switch=args.allow_server_switch,
-                ctx_size=int(args.context_tokens) if (args.context_tokens and args.context_tokens != "auto") else None,
+                ctx_size=int(selected_context) if selected_context and selected_context != "auto" else None,
             )
             if res.get("action") == "started":
                 started_server = True
@@ -2149,7 +2278,16 @@ def main(argv=None) -> int:
             print(f"Error restoring saved run: {error}. The source run has not been modified.", file=sys.stderr)
             return 1
 
+        if args.topic:
+            chamber.topic = args.topic
+        if args.temperature is not None:
+            for agent in chamber.agents.values():
+                agent.temperature = max(float(chamber.limits["temp_min"]),
+                                        min(float(chamber.limits["temp_max"]), args.temperature))
+        initial_event_count = len(chamber.events)
         chamber.run()
+        if any(event.type == "ERROR" for event in chamber.events[initial_event_count:]):
+            return 1
     finally:
         if args.stop and started_server:
             server_mgr.stop_owned_server(8080)

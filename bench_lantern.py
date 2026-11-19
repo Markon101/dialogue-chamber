@@ -72,7 +72,7 @@ def main():
                                  quiet=True, copy_dir="")
                     ch.run()
                     m = ch.compute_metrics()
-                    row = dict(trial=trial, scheduler=sched, ok=True,
+                    row = dict(trial=trial, scheduler=sched, ok=not any(event.type == "ERROR" for event in ch.events),
                                solved_turn=m["solved_turn"],
                                verified_synthesis_turn=m.get("verified_synthesis_turn"),
                                turns=m["turns_completed"], completion_tokens=m["completion_tokens"],
@@ -100,7 +100,7 @@ def main():
         med_synth = statistics.median(synth) if synth else None
         print(f"  {sched:14s} runs={len(rows)} regex_solved={len(solved)}/{len(rows)} (med={med}) verified_synth={len(synth)}/{len(rows)} (med={med_synth})")
     print(f"results: {out / 'results.json'}")
-    return 0
+    return 0 if all(row["ok"] for row in results) else 1
 
 
 if __name__ == "__main__":

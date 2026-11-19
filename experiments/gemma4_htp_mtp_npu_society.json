@@ -1,0 +1,38 @@
+{
+  "name": "gemma4_htp_mtp_npu_society",
+  "description": "Three local agents share one Gemma 4 E4B target on HTP0 with an MTP draft model.",
+  "topic": "A small settlement's bridge has moved overnight. Decide what to investigate, what to record, and whether any group should coordinate the work. Disagreement is allowed.",
+  "mode_text": "Treat the world ledger as a working record of claims and decisions. Check action outcomes before relying on them.",
+  "scheduler": "round_robin",
+  "local_server_mode": "gemma4-htp-mtp",
+  "endpoints": {
+    "local": {
+      "provider": "llamacpp",
+      "remote": false,
+      "api_key_env": "",
+      "base_url": "http://127.0.0.1:8080/v1",
+      "model": "gemma-4-E4B-it-Q4_0.gguf",
+      "request_timeout_s": 600,
+      "max_retries_per_call": 0
+    }
+  },
+  "society": {"authorities": [], "max_groups": 4},
+  "artifacts": {
+    "seed": {"world": "# Settlement ledger\n\nThe bridge appears to have moved. Causes and consequences remain uncertain.\n"},
+    "visible": ["world"]
+  },
+  "context_tokens": 16284,
+  "limits": {
+    "max_turns": 3,
+    "max_requests": 4,
+    "max_tokens_per_response": 1024,
+    "max_total_tokens": 12000,
+    "max_duration_s": 1800,
+    "max_actions_per_response": 4
+  },
+  "agents": [
+    {"name": "SURVEYOR", "endpoint": "local", "model": "gemma-4-E4B-it-Q4_0.gguf", "capabilities": "full", "max_tokens": 1024, "context_chars": 20000, "reasoning": "off", "identity": "You investigate what changed around the bridge."},
+    {"name": "ARCHIVIST", "endpoint": "local", "model": "gemma-4-E4B-it-Q4_0.gguf", "capabilities": "full", "max_tokens": 1024, "context_chars": 20000, "reasoning": "off", "identity": "You keep a record of conflicting accounts."},
+    {"name": "BUILDER", "endpoint": "local", "model": "gemma-4-E4B-it-Q4_0.gguf", "capabilities": "full", "max_tokens": 1024, "context_chars": 20000, "reasoning": "off", "identity": "You care about whether the bridge can still be used."}
+  ]
+}

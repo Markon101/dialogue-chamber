@@ -86,6 +86,16 @@ class SocietyTests(unittest.TestCase):
         self.assertEqual(parsed.message, "The council should investigate.")
         self.assertEqual(parsed.actions[0]["content"], "The river moved.")
 
+    def test_action_only_turn_counts_as_completed(self):
+        self.cfg["limits"]["max_turns"] = 1
+        backend = MockBackend({"A": ["@CREATE_GROUP map"]})
+        ch = self.chamber(backend=backend).run()
+        self.assertEqual(len(ch.public_messages), 0)
+        self.assertIn("map", ch.society.groups)
+        self.assertEqual(ch.agents["A"].turns_taken, 1)
+        self.assertEqual(ch.compute_metrics()["turns_completed"], 1)
+        self.assertIn("**Turns**: 1/1", (ch.run_dir / "transcript.md").read_text())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -270,7 +270,7 @@ class ContextIntelligence:
             char_overflow = (used_chars + len(line) + 2 > pub_char_budget)
             token_overflow = (used_tokens + line_tok > transcript_token_budget)
 
-            if (char_overflow or token_overflow) and kept_lines:
+            if char_overflow or token_overflow:
                 omitted += 1
             else:
                 kept_lines.append(line)
@@ -284,7 +284,7 @@ class ContextIntelligence:
         if kept_lines:
             transcript_block = "\n\n".join(notice + kept_lines)
         else:
-            transcript_block = "(No public messages yet — you are opening the conversation.)"
+            transcript_block = "\n".join(notice) if omitted else "(No public messages yet — you are opening the conversation.)"
 
         tr_tokens, tr_method = self.tokenizer.count_tokens(transcript_block, endpoint)
         if tr_method != "exact":
@@ -298,12 +298,14 @@ class ContextIntelligence:
             {"role": "user", "content": user_content},
         ]
 
-        total_prompt_tokens = sys_tokens + fixed_tokens + tr_tokens
+        total_prompt_tokens, assembled_method = self.tokenizer.count_tokens(system_content + "\n\n" + user_content, endpoint)
+        total_prompt_tokens += 40
+        all_exact = all_exact and assembled_method == "exact"
         accounting.total_prompt = total_prompt_tokens
         accounting.remaining_context = max(0, effective_context - (total_prompt_tokens + actual_reserved + margin))
         accounting.counting_method = "exact" if all_exact else "estimated"
 
-        if (total_prompt_tokens + actual_reserved) > effective_context:
+        if (total_prompt_tokens + actual_reserved + margin) > effective_context:
             accounting.fits_in_context = False
             accounting.diagnostics.append(
                 f"Oversized prompt: Total prompt ({total_prompt_tokens} tokens) + "

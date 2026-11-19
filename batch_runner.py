@@ -144,7 +144,7 @@ class BatchRunner:
                 print(f" Topic: {job['topic'][:100]}...")
                 print("----------------------------------------------------------")
 
-                job_run_dir = self.batch_dir / jid
+                job_run_dir = Path(job_state.get("run_dir", self.batch_dir / jid))
                 job_run_dir.mkdir(parents=True, exist_ok=True)
 
                 # Update status to running
@@ -160,6 +160,18 @@ class BatchRunner:
 
                 job_exit = 0
                 try:
+                    checkpoint_data = None
+                    checkpoint_path = job_run_dir / "checkpoint.json"
+                    if checkpoint_path.exists():
+                        checkpoint_data = json.loads(checkpoint_path.read_text())
+                        if checkpoint_data.get("schema_version") != 2:
+                            raise ValueError("batch checkpoint predates complete run saving")
+                        cfg = copy.deepcopy(checkpoint_data["state"]["config"])
+                        cfg.setdefault("limits", {})["max_turns"] = job["turns"]
+                        job_state["resume_from"] = str(checkpoint_path)
+                        job_run_dir = self.batch_dir / f"{jid}_continued_{time.monotonic_ns()}"
+                        job_state["run_dir"] = str(job_run_dir)
+                        write_atomic(self.manifest_file, json.dumps(manifest, indent=2))
                     ch = Chamber(
                         cfg,
                         run_dir=job_run_dir,
@@ -167,8 +179,12 @@ class BatchRunner:
                         seed=42,
                         quiet=True,
                         copy_dir="",
+                        checkpoint_data=checkpoint_data,
                     )
+                    initial_event_count = len(ch.events)
                     ch.run()
+                    if any(event.type == "ERROR" for event in ch.events[initial_event_count:]):
+                        job_exit = 1
                 except Exception as e:
                     print(f"Error running job {jid}: {e}", file=sys.stderr)
                     job_exit = 1

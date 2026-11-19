@@ -16,6 +16,8 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from presets import SAMPLER_SPECS
+
 
 @dataclass
 class Result:
@@ -78,9 +80,10 @@ def build_payload(
         "max_tokens": int(max_tokens),
     }
 
-    for k in ("top_p", "top_k", "min_p"):
-        if agent_cfg.get(k) is not None:
-            p[k] = agent_cfg[k]
+    for k, spec in SAMPLER_SPECS.items():
+        val = agent_cfg.get(k)
+        if val is not None and (provider in spec["providers"] or provider not in ("llamacpp", "openrouter")):
+            p[k] = spec["type"](val)
 
     if stops:
         p["stop"] = list(stops) if provider == "llamacpp" else list(stops)[:4]

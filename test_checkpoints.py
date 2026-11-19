@@ -87,7 +87,7 @@ class TestCheckpointsAndRecovery(unittest.TestCase):
             "ALPHA": ["Alpha turn 3 speech"],
             "BETA": ["Beta turn 4 speech"],
         })
-        ch2 = Chamber(cfg, run_dir=run_dir, backend=backend2, quiet=True, copy_dir="")
+        ch2 = Chamber(cfg, run_dir=self.temp_dir / "continued_run", backend=backend2, quiet=True, copy_dir="")
         # Load saved checkpoint
         chk_data = json.loads((run_dir / "checkpoint.json").read_text(encoding="utf-8"))
         ch2.resume_from_checkpoint(chk_data)

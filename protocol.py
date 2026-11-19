@@ -9,13 +9,14 @@ Accepted formats:
 Nothing here executes anything. The orchestrator validates every proposed action.
 """
 import json
+import math
 import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 ACTION_TYPES = (
     "SAY", "WHISPER", "PUBLISH", "SUBSCRIBE", "CLAIM", "CHALLENGE", "RETRACT", "VOTE",
-    "PROPOSE_NEXT", "SET_TEMPERATURE", "SET_STYLE", "PROPOSE_TOPIC", "ARTIFACT_WRITE",
+    "PROPOSE_NEXT", "SET_TEMPERATURE", "SET_SAMPLER", "SET_STYLE", "PROPOSE_TOPIC", "ARTIFACT_WRITE",
     "ARTIFACT_READ", "ARTIFACT_LIST", "UPDATE_NOTE", "FINISH",
     "CREATE_GROUP", "INVITE_GROUP", "JOIN_GROUP", "LEAVE_GROUP", "COMPEL_GROUP", "RELEASE_GROUP"
 )
@@ -25,7 +26,25 @@ ALIASES = {
     "APPEND": "ARTIFACT_WRITE", "REPLACE": "ARTIFACT_WRITE", "CREATE": "ARTIFACT_WRITE", "WORLD": "ARTIFACT_WRITE",
     "READ": "ARTIFACT_READ", "LIST": "ARTIFACT_LIST", "NOTE": "UPDATE_NOTE", "NEXT": "PROPOSE_NEXT",
     "WITHDRAW": "RETRACT", "OBJECT": "CHALLENGE", "TOPIC": "PROPOSE_TOPIC", "STYLE": "SET_STYLE",
-    "TEMP": "SET_TEMPERATURE", "TEMPERATURE": "SET_TEMPERATURE"
+    "TEMP": "SET_TEMPERATURE", "TEMPERATURE": "SET_TEMPERATURE",
+    "SAMPLER": "SET_SAMPLER", "SET_SAMPLERS": "SET_SAMPLER",
+    "SET_XTC": "SET_SAMPLER", "XTC": "SET_SAMPLER",
+    "SET_MIN_P": "SET_SAMPLER", "MIN_P": "SET_SAMPLER",
+    "SET_TOP_P": "SET_SAMPLER", "TOP_P": "SET_SAMPLER",
+    "SET_TOP_K": "SET_SAMPLER", "TOP_K": "SET_SAMPLER",
+    "SET_REPEAT_PENALTY": "SET_SAMPLER", "REPEAT_PENALTY": "SET_SAMPLER",
+    "SET_TYPICAL_P": "SET_SAMPLER", "TYPICAL_P": "SET_SAMPLER",
+}
+
+SAMPLER_PARAM_ALIASES = {
+    "temp": "temperature", "temperature": "temperature",
+    "min_p": "min_p", "minp": "min_p",
+    "top_p": "top_p", "topp": "top_p",
+    "top_k": "top_k", "topk": "top_k",
+    "xtc_prob": "xtc_probability", "xtc_probability": "xtc_probability",
+    "xtc_thresh": "xtc_threshold", "xtc_threshold": "xtc_threshold",
+    "repeat_penalty": "repeat_penalty", "typical_p": "typical_p",
+    "presence_penalty": "presence_penalty", "frequency_penalty": "frequency_penalty",
 }
 
 ITEM_KINDS = (
@@ -115,10 +134,11 @@ def repair_unambiguous_json(text: str) -> str:
     else:
         cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
         cleaned = re.sub(r"\s*```$", "", cleaned)
-        cleaned = cleaned.replace("```", "").strip()
+        cleaned = cleaned.strip()
 
     # Remove trailing commas before closing braces or brackets: , } -> } and , ] -> ]
-    cleaned = re.sub(r",\s*([\]}])", r"\1", cleaned)
+    cleaned = re.sub(r'"(?:[^"\\]|\\.)*"|,\s*(?=[\]}])',
+                     lambda match: match.group(0) if match.group(0).startswith('"') else "", cleaned)
 
     # Use stack to close open delimiters in LIFO order
     stack = []
@@ -301,10 +321,35 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
     elif act_type == "SET_TEMPERATURE":
         val = res.get("value")
         try:
-            res["value"] = float(val)
+            fval = float(val)
         except (TypeError, ValueError):
             issues.append(f"SET_TEMPERATURE invalid numeric value: {val!r}")
             return None
+        if not math.isfinite(fval):
+            issues.append(f"SET_TEMPERATURE non-finite value: {val!r}")
+            return None
+        res["value"] = fval
+
+    elif act_type == "SET_SAMPLER":
+        raw_params = res.get("params")
+        if not isinstance(raw_params, dict):
+            raw_params = {k: v for k, v in res.items() if k != "type"}
+        if not raw_params:
+            issues.append("SET_SAMPLER missing sampler parameters")
+            return None
+        cleaned: Dict[str, float] = {}
+        for k, v in raw_params.items():
+            key = SAMPLER_PARAM_ALIASES.get(str(k).strip().lower(), str(k).strip().lower())
+            try:
+                fval = float(v)
+            except (TypeError, ValueError):
+                issues.append(f"SET_SAMPLER invalid numeric value for {key}: {v!r}")
+                return None
+            if not math.isfinite(fval):
+                issues.append(f"SET_SAMPLER non-finite value for {key}: {v!r}")
+                return None
+            cleaned[key] = fval
+        res = {"type": "SET_SAMPLER", "params": cleaned}
 
     return res
 
@@ -403,7 +448,40 @@ def _command(word: str, rest: str, lines_after: List[str], known_names: Optional
     if w == "SET_TEMPERATURE":
         return {"type": "SET_TEMPERATURE", "value": head}
 
+    if w == "SET_SAMPLER":
+        return _parse_sampler_command(word, rest)
+
     return None
+
+
+def _parse_sampler_command(word: str, rest: str) -> Dict[str, Any]:
+    """Parse @SET_SAMPLER key=val pairs or shorthand @SET_XTC / @SET_MIN_P commands."""
+    raw = rest.strip()
+    params: Dict[str, Any] = {}
+    for m in re.finditer(r"([A-Za-z_]+)\s*[:=]\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)", raw):
+        key = SAMPLER_PARAM_ALIASES.get(m.group(1).lower(), m.group(1).lower())
+        params[key] = m.group(2)
+    if params:
+        return {"type": "SET_SAMPLER", "params": params}
+
+    tokens = [t.strip(",") for t in raw.split() if t.strip(",")]
+    wu = word.upper()
+    if wu in ("SET_XTC", "XTC"):
+        if len(tokens) >= 1:
+            params["xtc_probability"] = tokens[0]
+        if len(tokens) >= 2:
+            params["xtc_threshold"] = tokens[1]
+    elif wu in ("SET_MIN_P", "MIN_P") and tokens:
+        params["min_p"] = tokens[0]
+    elif wu in ("SET_TOP_P", "TOP_P") and tokens:
+        params["top_p"] = tokens[0]
+    elif wu in ("SET_TOP_K", "TOP_K") and tokens:
+        params["top_k"] = tokens[0]
+    elif wu in ("SET_REPEAT_PENALTY", "REPEAT_PENALTY") and tokens:
+        params["repeat_penalty"] = tokens[0]
+    elif wu in ("SET_TYPICAL_P", "TYPICAL_P") and tokens:
+        params["typical_p"] = tokens[0]
+    return {"type": "SET_SAMPLER", "params": params}
 
 
 def _extract_commands(text: str, p: Parsed, known_names: Optional[Set[str]] = None) -> str:

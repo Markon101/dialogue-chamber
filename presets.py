@@ -51,14 +51,28 @@ LIMITS = dict(
     temp_min=0.2, temp_max=1.5, max_empty_streak=3,
 )
 
+SAMPLER_SPECS = {
+    "top_p":             {"type": float, "min": 0.0,  "max": 1.0,  "providers": ("llamacpp", "openrouter")},
+    "top_k":             {"type": int,   "min": 0,    "max": 200,  "providers": ("llamacpp", "openrouter")},
+    "min_p":             {"type": float, "min": 0.0,  "max": 1.0,  "providers": ("llamacpp", "openrouter")},
+    "xtc_probability":   {"type": float, "min": 0.0,  "max": 1.0,  "providers": ("llamacpp",)},
+    "xtc_threshold":     {"type": float, "min": 0.0,  "max": 0.5,  "providers": ("llamacpp",)},
+    "repeat_penalty":    {"type": float, "min": 0.5,  "max": 2.0,  "providers": ("llamacpp",)},
+    "typical_p":         {"type": float, "min": 0.0,  "max": 1.0,  "providers": ("llamacpp",)},
+    "presence_penalty":  {"type": float, "min": -2.0, "max": 2.0,  "providers": ("llamacpp", "openrouter")},
+    "frequency_penalty": {"type": float, "min": -2.0, "max": 2.0,  "providers": ("llamacpp", "openrouter")},
+}
+
 DEFAULT_AGENT = dict(
     identity="", focus="", knowledge="", temperature=0.8, top_p=None, top_k=None, min_p=None,
+    xtc_probability=None, xtc_threshold=None, repeat_penalty=None, typical_p=None,
+    presence_penalty=None, frequency_penalty=None,
     max_tokens=4096, context_chars=16384, reasoning="medium",   # None = endpoint default; "off"/"low"/"medium"/"high"
     weight=1.0, priority=0, profile="standard",          # "minimal" | "standard" (line commands) | "rich" (JSON)
     capabilities="standard", subscriptions=[], structured=False,
 )
 
-BASELINE = {"SAY", "PROPOSE_NEXT", "SET_TEMPERATURE"}
+BASELINE = {"SAY", "PROPOSE_NEXT", "SET_TEMPERATURE", "SET_SAMPLER"}
 MINIMAL = BASELINE | {"WHISPER", "CLAIM", "CHALLENGE", "RETRACT", "FINISH"}
 STANDARD = MINIMAL | {"PUBLISH", "SUBSCRIBE", "VOTE", "UPDATE_NOTE", "SET_STYLE", "PROPOSE_TOPIC",
                       "ARTIFACT_READ", "ARTIFACT_LIST"}

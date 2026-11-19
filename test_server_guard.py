@@ -71,6 +71,43 @@ class ServerGuardTests(unittest.TestCase):
             self.assertIn("8899", args)
             self.assertIn("HTP0", args)
 
+    def test_experimental_mtp_mode_keeps_memory_and_speculation_guards(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "env.sh").write_text(":\n")
+            guard = root / "guard.sh"
+            guard.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$GUARD_CAPTURE"\n')
+            guard.chmod(0o700)
+            capture = root / "args.txt"
+            env = dict(os.environ, SNAPDRAGON_DIR=tmp, GUARD_CAPTURE=str(capture), CTX_SIZE="4096")
+            env.pop("MIN_MB", None)
+            wrapper = Path(server_manager.__file__).parent / "guarded_serve_best.sh"
+            subprocess.run(["bash", str(wrapper), "gemma4-htp-mtp", "8899"], env=env, check=True)
+            args = capture.read_text().splitlines()
+            self.assertEqual(args[args.index("-m") + 1], "1200")
+            self.assertEqual(args[args.index("--device") + 1], "HTP0")
+            self.assertEqual(args[args.index("--spec-type") + 1], "draft-mtp")
+            self.assertEqual(args[args.index("--ctx-checkpoints") + 1], "0")
+            self.assertEqual(args[args.index("--ctx-size") + 1], "4096")
+
+    def test_q8_kv_modes_pass_quantized_kv_flags(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "env.sh").write_text(":\n")
+            guard = root / "guard.sh"
+            guard.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$GUARD_CAPTURE"\n')
+            guard.chmod(0o700)
+            capture = root / "args.txt"
+            env = dict(os.environ, SNAPDRAGON_DIR=tmp, GUARD_CAPTURE=str(capture), CTX_SIZE="8192", MIN_MB="250")
+            wrapper = Path(server_manager.__file__).parent / "guarded_serve_best.sh"
+            subprocess.run(["bash", str(wrapper), "gemma4-htp-q8", "8899"], env=env, check=True)
+            args = capture.read_text().splitlines()
+            self.assertEqual(args[args.index("-m") + 1], "250")
+            self.assertEqual(args[args.index("-ctk") + 1], "q8_0")
+            self.assertEqual(args[args.index("-ctv") + 1], "q8_0")
+            self.assertEqual(args[args.index("--flash-attn") + 1], "on")
+            self.assertEqual(args[args.index("--ctx-size") + 1], "8192")
+
 
 if __name__ == "__main__":
     unittest.main()

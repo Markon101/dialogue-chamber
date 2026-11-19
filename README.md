@@ -210,6 +210,36 @@ can bypass the lock, and process visibility is limited by the operating system;
 do not start another server separately while one is running. `DORY_ENDPOINT` may
 point to a different port if the single Dory server is configured to listen there.
 
+For a three-loop Dory server with a smaller 4,096-token allocation, use the guarded
+starter with the included launcher:
+
+```bash
+DORY_LAUNCHER="$PWD/launch_dory_3loop_small.sh" python3 start_dory.py
+```
+
+### Experimental Gemma 4 E4B with MTP on HTP0
+
+`guarded_serve_best.sh` includes an experimental `gemma4-htp-mtp` mode combining the
+local Gemma 4 E4B target and its MTP draft model on Snapdragon HTP0. It requires the
+existing `~/projects/llama-snapdragon` build and models in `~/models`. It uses Q8
+KV, one slot, a default 1,200 MB available-memory guard, and disabled context
+checkpoints. The target's large embedding/output tensors remain on CPU.
+
+With no other `llama-server` running, a guarded 4,096-token server can be started
+through the chamber's server manager:
+
+```bash
+python3 -c 'from pathlib import Path; from server_manager import LlamaServerManager; print(LlamaServerManager(timeout_s=120).ensure_server(model_mode="gemma4-htp-mtp", model_file="gemma-4-E4B-it-Q4_0.gguf", ctx_size=4096, log_file=Path("runs/gemma4_htp_mtp_server.log")))'
+CHAMBER_COPY_DIR='' python3 chamber.py --config experiments/gemma4_htp_mtp_npu_society.json --context-tokens 4096 --max-output-tokens 1024 --turns 6 --requests 8
+```
+
+The manager can reuse an existing server with the same target model without checking
+its draft model or backend. Verify the actual process and server log for HTP0 and
+`draft-mtp`; a model name by itself does not prove either. A short 4k trial completed,
+but a 16k allocation reached the memory guard after three turns. This does not
+establish near-limit reliability or performance. Stop only the verified owned server
+afterward; a chamber run that reuses it will not stop it automatically.
+
 ### 1. Diagnostics & Health Check
 Inspect system health, endpoints, Termux environment, and storage:
 ```bash
