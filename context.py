@@ -173,6 +173,7 @@ class ContextIntelligence:
         max_context_chars: int = 32000,
         agent_context_chars: int = 16384,
         hidden_public_count: int = 0,
+        edited_public_count: int = 0,
     ) -> Tuple[List[Dict[str, str]], TokenAccounting]:
         """Assembles prompt messages while enforcing tokenizer-aware context budget.
 
@@ -278,12 +279,14 @@ class ContextIntelligence:
                 used_chars += len(line) + 2
                 used_tokens += line_tok
 
-        accounting.omitted_messages_count = omitted + hidden_public_count
+        accounting.omitted_messages_count = omitted + hidden_public_count + edited_public_count
         kept_lines.reverse()
 
         notice = [f"[{omitted} earlier public message(s) omitted due to context limit]"] if omitted > 0 else []
         if hidden_public_count:
             notice.append(f"[{hidden_public_count} earlier public message(s) omitted by your history setting]")
+        if edited_public_count:
+            notice.append(f"[{edited_public_count} earlier public message(s) filtered by your context edits]")
         if kept_lines:
             transcript_block = "\n\n".join(notice + kept_lines)
         else:

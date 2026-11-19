@@ -114,6 +114,26 @@ class SamplingAndEndModeTests(unittest.TestCase):
         self.assertEqual(backend.calls[2][1]["top_k"], 45)
         self.assertEqual(len(ch.sampling_changes), 3)
 
+    def test_participants_see_current_turn_remaining_slots_and_end_vote_timing(self):
+        cfg = {
+            "name": "turn_awareness",
+            "end_mode": "agent_decided",
+            "end_policy": "unanimous",
+            "min_turns_before_end": 2,
+            "limits": {"max_turns": 3},
+            "agents": [{"name": "A", "endpoint": "local"}],
+        }
+        backend = MockBackend(default="Continue.")
+        Chamber(cfg, run_dir=self.root / "turn_budget", backend=backend, quiet=True, copy_dir="").run()
+        prompts = [payload["messages"][0]["content"] for _, payload in backend.calls]
+        self.assertEqual(len(prompts), 3)
+        for turn, prompt in enumerate(prompts, start=1):
+            self.assertIn(f"Turn {turn} of 3.", prompt)
+            self.assertIn(f"Scheduled turns remaining after this reply: {3 - turn}.", prompt)
+        self.assertIn("End voting opens on turn 2 (unanimous).", prompts[0])
+        self.assertIn("End voting is open (unanimous).", prompts[1])
+        self.assertIn("Submit any final actions in this reply.", prompts[2])
+
     def test_agent_decided_end_majority_and_withdraw(self):
         cfg = {
             "name": "agent_end_test",

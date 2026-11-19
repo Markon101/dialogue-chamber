@@ -62,6 +62,7 @@ from server_manager import LlamaServerManager, assert_single_llama_server, resol
 from society import Society, SOCIAL_ACTIONS
 from autonomy import validate_policy, validate_settings
 from communication import Communication
+from context_edits import render_context_view, update_context_edits, validate_context_edits
 
 STOP_WORDS = {
     "the", "and", "for", "that", "this", "with", "from", "have", "are", "was", "were", "been",
@@ -107,6 +108,7 @@ class AgentState:
     profile: str = "standard"
     autonomy: dict = field(default_factory=dict)
     self_settings: dict = field(default_factory=dict)
+    context_edits: dict = field(default_factory=dict)
     capabilities: set = field(default_factory=set)
     subscriptions: list = field(default_factory=list)
     structured: bool = False
@@ -184,7 +186,7 @@ SAVED_RUNTIME_FIELDS = (
     "solved_turn", "verified_synthesis_turn", "token_accounting_history",
 )
 SAVED_AGENT_FIELDS = (
-    *SAMPLING_PARAMS, "self_settings",
+    *SAMPLING_PARAMS, "self_settings", "context_edits",
     "note", "style", "pending_reads", "active", "finished_reason",
     "turns_taken", "consecutive_turns", "last_turn", "failures", "empty_count",
     "total_prompt_tokens", "total_completion_tokens", "subscriptions",
@@ -383,8 +385,10 @@ class Chamber:
 
             autonomy = merged.get("autonomy", {})
             validate_policy(autonomy, max_tok)
-            if autonomy:
+            if autonomy.keys() - {"context_edit"}:
                 caps.add("CONFIGURE_SELF")
+            if "context_edit" in autonomy:
+                caps.add("EDIT_CONTEXT")
 
             ag = AgentState(
                 name=name,
@@ -536,14 +540,43 @@ class Chamber:
         return ev
 
     # ── context construction with intelligence ──
+    def _visible_context_records(self, agent, source):
+        if source == "public":
+            return [m for m in self.public_messages if m.speaker == agent.name or
+                    self.communication.allows("public", m.speaker, agent.name)]
+        if source == "whispers":
+            return [m for m in self.dms if m.sender == agent.name or m.recipient == agent.name][-8:]
+        if isinstance(source, str) and source.startswith("#"):
+            channel = source[1:]
+            if channel not in agent.subscriptions or not self.communication.channel_allows(channel, agent.name, "readers"):
+                return None
+            if self.society and channel in self.society.groups and agent.name not in self.society.groups[channel]["members"]:
+                return None
+            return self.channels.get(channel, [])[-6:]
+        return None
+
     def build_context(self, agent: AgentState) -> Tuple[List[Dict[str, str]], TokenAccounting]:
         others = [n for n in self.agent_order if n != agent.name]
         all_names = ", ".join(self.agent_order)
         other_names = ", ".join(others) if others else agent.name
+        turn = max(1, self.turn)
+        turn_limit = int(self.limits["max_turns"])
+        remaining = max(0, turn_limit - turn)
+        turn_budget = f"Turn {turn} of {turn_limit}. Scheduled turns remaining after this reply: {remaining}."
+        if remaining == 0:
+            turn_budget += " Submit any final actions in this reply."
+        if self.end_mode == "agent_decided" and "END_RUN" in agent.capabilities:
+            if turn >= self.min_turns_before_end:
+                turn_budget += f" End voting is open ({self.end_policy}). Use @END_RUN: <reason> to vote."
+            elif self.min_turns_before_end <= turn_limit:
+                turn_budget += f" End voting opens on turn {self.min_turns_before_end} ({self.end_policy})."
+            else:
+                turn_budget += " The turn cap arrives before end voting opens."
 
         sys_sections = {
             "preamble": f"You are {agent.name}, participating in an open-ended multi-agent experiment.\n"
                         f"Participants: {all_names}. Other participants: {other_names}.",
+            "turn_budget": turn_budget,
             "identity": agent.identity.strip() if agent.identity else "",
             "role": f"Your current angle or role: {agent.focus.strip()}." if agent.focus else "",
             "style": f"Your chosen speaking style: {agent.style.strip()}." if agent.style else "",
@@ -559,8 +592,9 @@ class Chamber:
             "knowledge": f"--- Your Private Initial Knowledge (visible only to {agent.name}) ---\n{agent.knowledge}" if agent.knowledge else "",
             "scratchpad": f"--- Your Private Scratchpad (visible only to {agent.name}) ---\n{agent.note}" if agent.note else "",
         }
-        if agent.autonomy:
-            policy = json.dumps(agent.autonomy, ensure_ascii=False)
+        self_policy = {key: value for key, value in agent.autonomy.items() if key != "context_edit"}
+        if self_policy:
+            policy = json.dumps(self_policy, ensure_ascii=False)
             sys_sections["protocol"] += (
                 "\nUse @CONFIGURE_SELF followed by a one-line JSON object, or a CONFIGURE_SELF action "
                 "with a settings object. Change any permitted subset for your next turns. "
@@ -576,6 +610,20 @@ class Chamber:
             last = next((e for e in reversed(self.events) if e.actor == agent.name and e.type == "CONFIGURE_SELF"), None)
             if last:
                 fixed_sections["self_result"] = f"Last self-configuration: {last.status}. {last.detail}"
+        if "EDIT_CONTEXT" in agent.capabilities:
+            edit_policy = agent.autonomy.get("context_edit", {})
+            sys_sections["protocol"] += (
+                '\nUse @EDIT_CONTEXT {"source":"public","op":"hide","target":"m1"} '
+                'or a JSON action with type EDIT_CONTEXT and an edit object. '
+                'Edits affect your own context. Use the message IDs already shown to you. '
+                '"replace" takes a target and text, "summarize" takes text for all visible prior messages '
+                'in the source, and "restore" takes a target or restores the whole source. '
+                f"Your source permissions: {json.dumps(edit_policy)}."
+            )
+            last = next((e for e in reversed(self.events) if e.actor == agent.name and e.type == "EDIT_CONTEXT"), None)
+            if last:
+                fixed_sections["context_edit_result"] = f"Last private context edit: {last.status}. {last.detail}"
+
         if "communication" in self.cfg:
             fixed_sections["communication"] = self.communication.describe(agent.name)
         if self.society:
@@ -627,34 +675,41 @@ class Chamber:
                     b_lines.append(f"    ↳ challenge by {ch['author']} (turn {ch['turn']}): {ch['content']}")
             fixed_sections["blackboard"] = "--- Shared Blackboard ---\n" + "\n".join(b_lines)
 
-        # Subscribed channels
-        if agent.subscriptions:
-            ch_lines = []
-            for cname in agent.subscriptions:
-                if not self.communication.channel_allows(cname, agent.name, "readers"):
-                    continue
-                for m in self.channels.get(cname, [])[-6:]:
-                    ch_lines.append(f"[#{cname} | {m.id} | turn {m.turn}] {m.speaker}: {m.content}")
-            if ch_lines:
-                fixed_sections["channels"] = "--- Subscribed Channels ---\n" + "\n".join(ch_lines)
+        # Apply private views only after resolving the current visibility of each source.
+        summaries = []
 
-        # Whispers
-        my_dms = [d for d in self.dms if d.sender == agent.name or d.recipient == agent.name][-8:]
-        if my_dms:
+        def viewed(source):
+            records = self._visible_context_records(agent, source)
+            if records is None:
+                return [], 0
+            messages, summary = render_context_view(records, agent.context_edits.get(source))
+            if summary:
+                summaries.append(f"[Your summary of {source} through turn {summary['through_turn']}] {summary['text']}")
+            return messages, len(records) - len(messages)
+
+        ch_lines = []
+        for cname in agent.subscriptions:
+            messages, _ = viewed(f"#{cname}")
+            for m in messages:
+                ch_lines.append(f"[#{cname} | {m.id} | turn {m.turn}] {m.speaker}: {m.content}")
+        if ch_lines:
+            fixed_sections["channels"] = "--- Subscribed Channels ---\n" + "\n".join(ch_lines)
+
+        whispers, _ = viewed("whispers")
+        if whispers:
             dm_lines = [
                 f"[PRIVATE WHISPER {d.id} | turn {d.turn} | {d.sender} → {d.recipient}]: {d.content}"
-                for d in my_dms
+                for d in whispers
             ]
             fixed_sections["whispers"] = "--- Private Messages (visible only to sender & recipient) ---\n" + "\n".join(dm_lines)
 
-        # Public messages
+        public, edited_count = viewed("public")
+        if summaries:
+            fixed_sections["context_summaries"] = "--- Your Private Context Summaries ---\n" + "\n".join(summaries)
+        history_count = agent.self_settings.get("history_messages", len(public))
+        hidden_count = max(0, len(public) - history_count)
         pub_msgs = [{"id": m.id, "turn": m.turn, "speaker": m.speaker, "content": m.content, "reply_to": m.reply_to}
-                    for m in self.public_messages if m.speaker == agent.name or
-                    self.communication.allows("public", m.speaker, agent.name)]
-        history_count = agent.self_settings.get("history_messages", len(pub_msgs))
-        hidden_count = max(0, len(pub_msgs) - history_count)
-        if hidden_count:
-            pub_msgs = pub_msgs[hidden_count:]
+                    for m in public[hidden_count:]]
         if self.dm_visibility == "notice":
             for d in self.dms[-6:]:
                 if d.sender != agent.name and d.recipient != agent.name:
@@ -670,6 +725,7 @@ class Chamber:
             context_source=agent.context_source,
             reserved_output=agent.self_settings.get("reply_tokens", agent.max_tokens),
             hidden_public_count=hidden_count,
+            edited_public_count=edited_count,
             safety_margin=int(agent.endpoint.get("safety_margin", self.safety_margin)),
             context_mode=self.context_mode,
             max_context_chars=int(self.limits["max_context_chars"]),
@@ -1004,6 +1060,22 @@ class Chamber:
                 return
             agent.self_settings.update(settings)
             self._record(agent.name, atype, "accepted", detail=", ".join(settings), settings=dict(settings))
+            return
+
+        if atype == "EDIT_CONTEXT":
+            edit = act.get("edit")
+            source = edit.get("source") if isinstance(edit, dict) else None
+            try:
+                if set(act) - {"type", "edit"}:
+                    raise ValueError("EDIT_CONTEXT accepts only an edit for the acting participant")
+                policy = agent.autonomy.get("context_edit", {})
+                records = self._visible_context_records(agent, source) if isinstance(source, str) and source in policy else None
+                agent.context_edits = update_context_edits(agent.context_edits, policy, edit, records, self.turn)
+            except ValueError as exc:
+                self._record(agent.name, atype, "rejected", detail=str(exc))
+                return
+            self._record(agent.name, atype, "accepted", target=edit.get("target") or source,
+                         detail=f"{edit['op']} in {source}", edit=edit)
             return
 
         if atype in SOCIAL_ACTIONS:
@@ -1474,6 +1546,7 @@ class Chamber:
             self.society.groups = copy.deepcopy(state["society"])
             self.society.authorities = set(state["authorities"])
         for name, saved in state["agents"].items():
+            validate_context_edits(saved.get("context_edits", {}), self.agents[name].autonomy.get("context_edit", {}), self.turn)
             for attribute in SAVED_AGENT_FIELDS:
                 if attribute == "self_settings" and attribute in saved and saved[attribute] != {}:
                     validate_settings(self.agents[name].autonomy, saved[attribute])

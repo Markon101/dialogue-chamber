@@ -342,6 +342,39 @@ the first accepted choice, the next prompt and request budget, and whether the r
 discussion returns to an earlier witness account. The event log shows what agents chose;
 reading the discussion tells you whether the choice helped.
 
+### Let participants edit their own conversation context
+
+Add `context_edit` to an agent's `autonomy` object. Grant each operation by source.
+Sources are `public`, `whispers`, and exact channel names such as `#workshop`.
+
+```json
+{"autonomy": {"context_edit": {"public": ["hide", "replace", "summarize"], "whispers": ["hide"]}}}
+```
+
+An agent can issue a one-line command like these.
+
+```text
+@EDIT_CONTEXT {"source":"public","op":"replace","target":"m3","text":"My working interpretation of this exchange."}
+@EDIT_CONTEXT {"source":"public","op":"summarize","text":"The group settled on harpsichord for the opening and deferred the chorus."}
+@EDIT_CONTEXT {"source":"public","op":"restore"}
+```
+
+In a structured reply, use an action with `"type":"EDIT_CONTEXT"` and put the same
+fields in its `"edit"` object. `hide` and `replace` target one prior message by its
+ID. `summarize` substitutes an agent-authored summary for the prior messages in
+that source, then the agent receives newer messages as usual. `restore` with a
+target removes an individual edit. Without a target it clears the source's
+summary and individual edits. These choices carry forward in checkpoints.
+
+Communication routes, channel permissions, and the usual private-message windows
+apply before the edit. When an agent loses channel access, its summary of the
+channel also disappears from its prompt. The operator sees accepted and rejected
+edits in the event log. Other participants and the transcript use the original
+messages. Workspace artifacts, board items, and operator instructions have their
+own controls. Each agent can hold up to 16 individual edits and 2,400 characters of
+replacement and summary text in total. Replacements allow 400 characters each and
+summaries allow 1,200. [Testing and findings](CONTEXT_EDITING_FINDINGS.md)
+
 ### Sampling and agent-decided endings
 
 Use `--agent-sampling LOCAL=min_p=0.05,top_k=40` to override one participant,
@@ -355,6 +388,9 @@ Runs use a fixed turn cap by default. Enable `--end-mode agent_decided` and choo
 in JSON to delay voting. `@END_RUN: <reason>` casts a vote and
 `@END_RUN: withdraw` removes it. Votes count among active participants at the end of
 the turn. The run also observes its existing turn, token, request, and time limits.
+Each prompt shows the current turn, the turn cap, and how many scheduled turns
+remain after the current reply. Participants with end-vote permission also see
+when voting opens.
 
 ### Saving and continuing runs
 

@@ -1,5 +1,7 @@
 """Operator-defined choices for a participant's own turns."""
 
+from context_edits import validate_context_policy
+
 
 def validate_policy(policy, max_tokens):
     if not isinstance(policy, dict):
@@ -16,6 +18,8 @@ def validate_policy(policy, max_tokens):
                 raise ValueError(f"autonomy.{key} requires 1 to 16 distinct integers >= {minimum}")
             if key == "reply_tokens" and max(rule) > max_tokens:
                 raise ValueError(f"autonomy.reply_tokens exceeds the agent output cap of {max_tokens}")
+        elif key == "context_edit":
+            validate_context_policy(rule)
         else:
             raise ValueError(f"unknown autonomy permission {key!r}")
 

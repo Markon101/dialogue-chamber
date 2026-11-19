@@ -19,7 +19,7 @@ from presets import SAMPLING_ALIASES, normalize_sampling_param
 ACTION_TYPES = (
     "SAY", "WHISPER", "PUBLISH", "SUBSCRIBE", "CLAIM", "CHALLENGE", "RETRACT", "VOTE",
     "PROPOSE_NEXT", "SET_TEMPERATURE", "SET_SAMPLING", "SET_STYLE", "PROPOSE_TOPIC", "ARTIFACT_WRITE",
-    "ARTIFACT_READ", "ARTIFACT_LIST", "UPDATE_NOTE", "FINISH", "END_RUN", "CONFIGURE_SELF",
+    "ARTIFACT_READ", "ARTIFACT_LIST", "UPDATE_NOTE", "FINISH", "END_RUN", "CONFIGURE_SELF", "EDIT_CONTEXT",
     "CREATE_GROUP", "INVITE_GROUP", "JOIN_GROUP", "LEAVE_GROUP", "COMPEL_GROUP", "RELEASE_GROUP"
 )
 
@@ -429,12 +429,13 @@ def _command(word: str, rest: str, lines_after: List[str], known_names: Optional
         h, _, b = head.partition(" ")
         return h.strip(), (body or b.strip())
 
-    if w == "CONFIGURE_SELF":
+    if w in ("CONFIGURE_SELF", "EDIT_CONTEXT"):
+        field_name = "settings" if w == "CONFIGURE_SELF" else "edit"
         try:
-            settings = json.loads(rest.lstrip(":").strip())
+            argument = json.loads(rest.lstrip(":").strip())
         except ValueError:
-            settings = None
-        return {"type": w, "settings": settings}
+            argument = None
+        return {"type": w, field_name: argument}
 
     if w == "WHISPER":
         to, text = split_head()
@@ -635,9 +636,9 @@ def parse_reply(
         p.format = "empty"
         return p
 
-    # A JSON object on a CONFIGURE_SELF command line is its argument, even
+    # A JSON object on a private configuration command line is its argument, even
     # when it contains an invalid key such as "actions" or "message".
-    config_command = re.search(r"^[ \t]*[@/]CONFIGURE_SELF\b", visible, re.I | re.M)
+    config_command = re.search(r"^[ \t]*[@/](?:CONFIGURE_SELF|EDIT_CONTEXT)\b", visible, re.I | re.M)
     found = None if config_command else _find_json(visible)
     if found:
         obj, start, end = found
