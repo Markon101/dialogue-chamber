@@ -303,6 +303,45 @@ Run a zero-cost simulation (dry run) showing budgets and planning:
 ./run_batch.sh --mock
 ```
 
+### Let participants configure their own turns
+
+In [the archive workshop](examples/self_directed_workshop.json), WITNESS can change its working focus,
+the number of recent public messages it sees, and its reply length. EDITOR can choose a focus and
+reply length. READER has the ordinary discussion tools. Each participant decides when to use its
+permissions. Run the example offline with:
+
+```sh
+./run.sh --config examples/self_directed_workshop.json --mock --turns 4
+```
+
+Give each agent an optional `autonomy` object. Its keys grant independent permissions.
+
+| JSON field | What the agent controls |
+| --- | --- |
+| `focus_chars` | Maximum length of a private, self-authored working focus (1–400 characters). An empty focus clears it. The operator-defined identity and role still appear in the prompt. |
+| `history_messages` | Allowed counts of recent public messages the agent can revisit. Zero hides all public transcript entries. Communication routes apply first. Shared artifacts, the board, and delivered private messages have their own visibility rules. |
+| `reply_tokens` | Allowed output-token ceilings for the agent's requests. Each choice must fit the agent, endpoint, and run output caps. Choosing a shorter reply also reduces the output reservation in its next prompt. |
+
+Until the agent makes a choice, it gets its ordinary transcript and configured reply budget.
+For example, WITNESS can send this command on a line by itself:
+
+```text
+@CONFIGURE_SELF {"focus":"Whose account would disappear first?","history_messages":4,"reply_tokens":96}
+```
+
+Structured replies accept `{"type":"CONFIGURE_SELF","settings":{"history_messages":1}}` in
+the actions array. One update uses one action slot and takes effect on subsequent turns.
+An invalid field rejects the entire update. The operator can inspect decisions in
+`events.jsonl`; the participant sees its latest result and current settings in its own prompt.
+Checkpoints preserve each participant's choices. The mock backend exercises the harness
+with demo replies. Scripted regression tests exercise deliberate reconfiguration.
+
+One experiment is to run the workshop with the same roster, seed, model and budgets under
+three conditions: ordinary turns, focus changes alone, and all three permissions. Inspect
+the first accepted choice, the next prompt and request budget, and whether the resulting
+discussion returns to an earlier witness account. The event log shows what agents chose;
+reading the discussion tells you whether the choice helped.
+
 ### Sampling and agent-decided endings
 
 Use `--agent-sampling LOCAL=min_p=0.05,top_k=40` to override one participant,

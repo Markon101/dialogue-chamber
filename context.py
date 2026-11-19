@@ -172,6 +172,7 @@ class ContextIntelligence:
         context_mode: str = "tokens",
         max_context_chars: int = 32000,
         agent_context_chars: int = 16384,
+        hidden_public_count: int = 0,
     ) -> Tuple[List[Dict[str, str]], TokenAccounting]:
         """Assembles prompt messages while enforcing tokenizer-aware context budget.
 
@@ -277,14 +278,16 @@ class ContextIntelligence:
                 used_chars += len(line) + 2
                 used_tokens += line_tok
 
-        accounting.omitted_messages_count = omitted
+        accounting.omitted_messages_count = omitted + hidden_public_count
         kept_lines.reverse()
 
         notice = [f"[{omitted} earlier public message(s) omitted due to context limit]"] if omitted > 0 else []
+        if hidden_public_count:
+            notice.append(f"[{hidden_public_count} earlier public message(s) omitted by your history setting]")
         if kept_lines:
             transcript_block = "\n\n".join(notice + kept_lines)
         else:
-            transcript_block = "\n".join(notice) if omitted else "(No public messages yet — you are opening the conversation.)"
+            transcript_block = "\n".join(notice) if notice else "(No public messages yet — you are opening the conversation.)"
 
         tr_tokens, tr_method = self.tokenizer.count_tokens(transcript_block, endpoint)
         if tr_method != "exact":

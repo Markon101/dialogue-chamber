@@ -60,6 +60,7 @@ from protocol import (
 )
 from server_manager import LlamaServerManager, assert_single_llama_server, resolve_model
 from society import Society, SOCIAL_ACTIONS
+from autonomy import validate_policy, validate_settings
 from communication import Communication
 
 STOP_WORDS = {
@@ -104,6 +105,8 @@ class AgentState:
     weight: float = 1.0
     priority: int = 0
     profile: str = "standard"
+    autonomy: dict = field(default_factory=dict)
+    self_settings: dict = field(default_factory=dict)
     capabilities: set = field(default_factory=set)
     subscriptions: list = field(default_factory=list)
     structured: bool = False
@@ -181,7 +184,7 @@ SAVED_RUNTIME_FIELDS = (
     "solved_turn", "verified_synthesis_turn", "token_accounting_history",
 )
 SAVED_AGENT_FIELDS = (
-    *SAMPLING_PARAMS,
+    *SAMPLING_PARAMS, "self_settings",
     "note", "style", "pending_reads", "active", "finished_reason",
     "turns_taken", "consecutive_turns", "last_turn", "failures", "empty_count",
     "total_prompt_tokens", "total_completion_tokens", "subscriptions",
@@ -378,6 +381,11 @@ class Chamber:
                     _, sampling_kwargs[sk] = normalize_sampling_param(sk, merged[sk])
                     merged[sk] = sampling_kwargs[sk]
 
+            autonomy = merged.get("autonomy", {})
+            validate_policy(autonomy, max_tok)
+            if autonomy:
+                caps.add("CONFIGURE_SELF")
+
             ag = AgentState(
                 name=name,
                 endpoint_name=ep_name,
@@ -397,6 +405,7 @@ class Chamber:
                 priority=int(merged.get("priority", 0)),
                 profile=str(merged.get("profile") or "standard").lower(),
                 capabilities=caps,
+                autonomy=autonomy,
                 subscriptions=subs,
                 structured=bool(merged.get("structured", False)),
                 fallback_models=fallbacks,
@@ -550,6 +559,23 @@ class Chamber:
             "knowledge": f"--- Your Private Initial Knowledge (visible only to {agent.name}) ---\n{agent.knowledge}" if agent.knowledge else "",
             "scratchpad": f"--- Your Private Scratchpad (visible only to {agent.name}) ---\n{agent.note}" if agent.note else "",
         }
+        if agent.autonomy:
+            policy = json.dumps(agent.autonomy, ensure_ascii=False)
+            sys_sections["protocol"] += (
+                "\nUse @CONFIGURE_SELF followed by a one-line JSON object, or a CONFIGURE_SELF action "
+                "with a settings object. Change any permitted subset for your next turns. "
+                f"Your permissions: {policy}. focus_chars allows a private focus string up to that length. "
+                "history_messages selects the latest visible public messages. reply_tokens caps your reply."
+            )
+            current = {
+                "focus": agent.self_settings.get("focus", ""),
+                "reply_tokens": agent.self_settings.get("reply_tokens", agent.max_tokens),
+                "history_messages": agent.self_settings.get("history_messages", "all that fit"),
+            }
+            fixed_sections["self_settings"] = "Your working focus and turn settings: " + json.dumps(current, ensure_ascii=False)
+            last = next((e for e in reversed(self.events) if e.actor == agent.name and e.type == "CONFIGURE_SELF"), None)
+            if last:
+                fixed_sections["self_result"] = f"Last self-configuration: {last.status}. {last.detail}"
         if "communication" in self.cfg:
             fixed_sections["communication"] = self.communication.describe(agent.name)
         if self.society:
@@ -625,6 +651,10 @@ class Chamber:
         pub_msgs = [{"id": m.id, "turn": m.turn, "speaker": m.speaker, "content": m.content, "reply_to": m.reply_to}
                     for m in self.public_messages if m.speaker == agent.name or
                     self.communication.allows("public", m.speaker, agent.name)]
+        history_count = agent.self_settings.get("history_messages", len(pub_msgs))
+        hidden_count = max(0, len(pub_msgs) - history_count)
+        if hidden_count:
+            pub_msgs = pub_msgs[hidden_count:]
         if self.dm_visibility == "notice":
             for d in self.dms[-6:]:
                 if d.sender != agent.name and d.recipient != agent.name:
@@ -638,7 +668,8 @@ class Chamber:
             public_messages=pub_msgs,
             effective_context=agent.effective_context_tokens,
             context_source=agent.context_source,
-            reserved_output=agent.max_tokens,
+            reserved_output=agent.self_settings.get("reply_tokens", agent.max_tokens),
+            hidden_public_count=hidden_count,
             safety_margin=int(agent.endpoint.get("safety_margin", self.safety_margin)),
             context_mode=self.context_mode,
             max_context_chars=int(self.limits["max_context_chars"]),
@@ -783,6 +814,7 @@ class Chamber:
             raise InferenceError(budget_err, transient=False)
 
         mtok = min(int(self.limits["max_tokens_per_response"]), int(max_tokens or agent.max_tokens))
+        mtok = min(mtok, agent.self_settings.get("reply_tokens", mtok))
         rem_tok = int(self.limits["max_total_tokens"]) - self.tracked_tokens
         mtok = max(1, min(mtok, rem_tok))
 
@@ -959,6 +991,19 @@ class Chamber:
             return
         if atype not in agent.capabilities:
             self._record(agent.name, atype, "rejected", detail=f"capability {atype} not enabled for {agent.name}")
+            return
+
+        if atype == "CONFIGURE_SELF":
+            settings = act.get("settings")
+            try:
+                if set(act) - {"type", "settings"}:
+                    raise ValueError("CONFIGURE_SELF accepts only settings for the acting participant")
+                validate_settings(agent.autonomy, settings)
+            except ValueError as exc:
+                self._record(agent.name, atype, "rejected", detail=str(exc))
+                return
+            agent.self_settings.update(settings)
+            self._record(agent.name, atype, "accepted", detail=", ".join(settings), settings=dict(settings))
             return
 
         if atype in SOCIAL_ACTIONS:
@@ -1430,6 +1475,8 @@ class Chamber:
             self.society.authorities = set(state["authorities"])
         for name, saved in state["agents"].items():
             for attribute in SAVED_AGENT_FIELDS:
+                if attribute == "self_settings" and attribute in saved and saved[attribute] != {}:
+                    validate_settings(self.agents[name].autonomy, saved[attribute])
                 if attribute in saved:
                     setattr(self.agents[name], attribute, copy.deepcopy(saved[attribute]))
         for attribute in SAVED_RUNTIME_FIELDS:
@@ -1516,7 +1563,8 @@ class Chamber:
                         accounting.total_prompt + accounting.reserved_output + accounting.safety_margin > accounting.effective_usable_context
                     ):
                         raise InferenceError("prompt plus output and safety margin exceeds endpoint context cap", transient=False)
-                    res = self._call_model(ag, ctx, stops=stops)
+                    reply_cap = accounting.reserved_output if "reply_tokens" in ag.self_settings else None
+                    res = self._call_model(ag, ctx, max_tokens=reply_cap, stops=stops)
                 except InferenceError as e:
                     ag.failures += 1
                     self._record(speaker, "ERROR", "rejected", detail=str(e))
@@ -1551,7 +1599,7 @@ class Chamber:
                                                  max_chars=int(self.limits["max_message_chars"]))
                     if not parsed.has_output and not parsed.issues and not self._check_budgets_before_call(ag.endpoint):
                         try:
-                            res = self._call_model(ag, ctx, stops=stops, reasoning="off")
+                            res = self._call_model(ag, ctx, max_tokens=reply_cap, stops=stops, reasoning="off")
                             parsed = parse_result(res)
                         except InferenceError:
                             pass

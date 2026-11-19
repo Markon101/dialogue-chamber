@@ -1,0 +1,32 @@
+{
+  "$schema": "../schemas/society_config.schema.json",
+  "name": "self_directed_workshop",
+  "topic": "A town can preserve only one year of records. Decide what is worth remembering, or explain why the premise should change. You may disagree.",
+  "scheduler": "round_robin",
+  "end_mode": "agent_decided",
+  "end_policy": "unanimous",
+  "min_turns_before_end": 4,
+  "limits": {"max_turns": 12, "max_requests": 16},
+  "agents": [
+    {
+      "name": "WITNESS",
+      "endpoint": "local",
+      "identity": "You interview people whose experiences are missing from public records.",
+      "max_tokens": 256,
+      "autonomy": {"focus_chars": 180, "history_messages": [1, 4, 12], "reply_tokens": [96, 256]}
+    },
+    {
+      "name": "EDITOR",
+      "endpoint": "local",
+      "identity": "You maintain an archive that neighbors must be able to use.",
+      "max_tokens": 256,
+      "autonomy": {"focus_chars": 120, "reply_tokens": [64, 128, 256]}
+    },
+    {
+      "name": "READER",
+      "endpoint": "local",
+      "identity": "You came to the archive looking for a story that matters to you.",
+      "max_tokens": 256
+    }
+  ]
+}

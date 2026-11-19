@@ -19,7 +19,7 @@ from presets import SAMPLING_ALIASES, normalize_sampling_param
 ACTION_TYPES = (
     "SAY", "WHISPER", "PUBLISH", "SUBSCRIBE", "CLAIM", "CHALLENGE", "RETRACT", "VOTE",
     "PROPOSE_NEXT", "SET_TEMPERATURE", "SET_SAMPLING", "SET_STYLE", "PROPOSE_TOPIC", "ARTIFACT_WRITE",
-    "ARTIFACT_READ", "ARTIFACT_LIST", "UPDATE_NOTE", "FINISH", "END_RUN",
+    "ARTIFACT_READ", "ARTIFACT_LIST", "UPDATE_NOTE", "FINISH", "END_RUN", "CONFIGURE_SELF",
     "CREATE_GROUP", "INVITE_GROUP", "JOIN_GROUP", "LEAVE_GROUP", "COMPEL_GROUP", "RELEASE_GROUP"
 )
 
@@ -429,6 +429,13 @@ def _command(word: str, rest: str, lines_after: List[str], known_names: Optional
         h, _, b = head.partition(" ")
         return h.strip(), (body or b.strip())
 
+    if w == "CONFIGURE_SELF":
+        try:
+            settings = json.loads(rest.lstrip(":").strip())
+        except ValueError:
+            settings = None
+        return {"type": w, "settings": settings}
+
     if w == "WHISPER":
         to, text = split_head()
         to_clean = canonicalize_agent_id(to, known_names) or to
@@ -628,7 +635,10 @@ def parse_reply(
         p.format = "empty"
         return p
 
-    found = _find_json(visible)
+    # A JSON object on a CONFIGURE_SELF command line is its argument, even
+    # when it contains an invalid key such as "actions" or "message".
+    config_command = re.search(r"^[ \t]*[@/]CONFIGURE_SELF\b", visible, re.I | re.M)
+    found = None if config_command else _find_json(visible)
     if found:
         obj, start, end = found
         p.format = "json"
@@ -663,7 +673,7 @@ def parse_reply(
         if p.issues:
             p.format = "partial_json"
 
-    elif visible.lstrip().startswith("{") or '"message"' in visible:
+    elif not config_command and (visible.lstrip().startswith("{") or '"message"' in visible):
         salvaged = _salvage_json(visible)
         p.format = "partial_json"
         p.issues.append("invalid or truncated JSON; salvaged what was readable")
