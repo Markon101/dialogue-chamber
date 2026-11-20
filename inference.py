@@ -35,6 +35,9 @@ class Result:
     backend: str = "llamacpp"
     token_accounting: str = "exact"           # "exact" | "estimated"
     reasoning_mode: str = "none"              # "boolean_thinking:on" | "effort:low" | "none"
+    cached_tokens: Optional[int] = None       # Only set when backend explicitly reports prompt cache hits
+    cache_source: Optional[str] = None
+    backend_timings: Optional[Dict[str, Any]] = None
 
 
 class InferenceError(Exception):
@@ -217,6 +220,17 @@ class HttpBackend:
 
         actual_model = data.get("model") or model_id
 
+        prompt_details = usage.get("prompt_tokens_details") or {}
+        timings = data.get("timings") if isinstance(data.get("timings"), dict) else None
+        cached_tokens = None
+        cache_source = None
+        if isinstance(prompt_details.get("cached_tokens"), int):
+            cached_tokens = prompt_details["cached_tokens"]
+            cache_source = "usage.prompt_tokens_details.cached_tokens"
+        elif timings is not None and isinstance(timings.get("cache_n"), int):
+            cached_tokens = timings["cache_n"]
+            cache_source = "timings.cache_n"
+
         return Result(
             content=raw_content,
             reasoning=raw_reasoning,
@@ -231,6 +245,9 @@ class HttpBackend:
             backend=provider,
             token_accounting="exact" if (p_tok is not None and c_tok is not None) else "estimated",
             reasoning_mode=reasoning_mode_label,
+            cached_tokens=cached_tokens,
+            cache_source=cache_source,
+            backend_timings=timings,
         )
 
 

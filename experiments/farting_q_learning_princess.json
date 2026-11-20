@@ -1,0 +1,127 @@
+{
+  "name": "farting_q_learning_princess",
+  "description": "Four clashing musical minds collaborate in lyrics-only mode to forge an absurd, mathematically unhinged opera-banger about a farting Q-learning princess.",
+  "topic": "LYRICS-ONLY CHALLENGE: Forge ONE maximally ridiculous, unforgettable, mathematically accurate 4-verse + chorus + bridge + outro song in lyrics.md about **Princess Flatulencia (Her Royal Highness of the Bellman Basin)**—a Disney-coded princess whose royal scepter is a Q-table and whose flatulence is governed by tabular & deep Q-learning!\n\nREQUIRED LORE & RL MECHANICS TO WEAVE INTO THE LYRICS:\n1) THE ROYAL MDP (METHANE DISPERSION PROTOCOL): State space `s` (Royal Ball, Velvet Throne, Moat Crossing, Silent Chapel), Action space `a` (`silent_squeaker`, `sub_bass_rip`, `velvet_muffle`, `thrust_vector_propulsion`), and Reward function `R(s,a)` (+50 for clearing the moat or blowing out the Duke's candles, -100 when the Royal Corgi faints or the Grand Vizier's wig catches fire).\n2) EPSILON-GREEDY EXPLORATION VS EXPLOITATION: At `ε = 0.9`, she explores wildly at the coronation banquet; as `ε` decays, she exploits her highest-Q toot policy—except when catastrophic overestimation bias strikes!\n3) BELLMAN EQUATION & TD-ERROR: `Q(s,a) ← Q(s,a) + α [r + γ max_a' Q(s',a') - Q(s,a)]`, where `α` is the bean-intake learning rate, `γ` is the gas-dissipation discount factor, and TD-error `δ` is the 'Toot-Delay surprise' when a silent squeaker turns out to be a 98-decibel brass solo.\n4) SARSA VS Q-LEARNING & REPLAY BUFFER: Her rival, Prince On-Policy (SARSA: Silent And Rancid, Strongly Aromatic), warns about dangerous cliff-walking near open flames, while she samples mini-batches from her Royal Bean-Diary Replay Buffer and freezes her Target Network during the King's speech.",
+  "mode_text": "STRICT LYRICS-ONLY MODE: Every agent MUST speak, argue, roast each other's meter, and negotiate ENTIRELY IN RHYMING LYRICS / VERSE / BARS (no boring prose paragraphs—even your studio banter and critiques must be sung or rapped in rhythm!).\nWORKFLOW: Use `drafts.md` (`@APPEND drafts: ...`) for messy sketches, verse battles, and alternate hooks. When synthesizing or revising the unified song, use `@REPLACE lyrics: ...` so `lyrics.md` stays ONE clean, consolidated, lyrics-only master track (with NO repeated draft clutter and NO placeholders) containing all required sections: `[Intro]`, `[Chorus]`, `[Verse 1]`, `[Verse 2]`, `[Bridge]`, `[Verse 3]`, `[Verse 4]`, and `[Grand Finale Outro]`.\nUse @CLAIM, @CHALLENGE <c1|c2|...>, @VOTE <c1|c2|...> yes|no, @WHISPER <name>: ..., @APPEND drafts: ..., and @REPLACE lyrics: ... . You may tune your own sampling params (@SET_SAMPLING min_p=... top_k=... temperature=...) as needed. From turn 6 onward, once the full unified lyrics-only master cut is locked in `lyrics.md` (and passes deliverable validation), vote @END_RUN: <reason> (3 of 4 majority ends the session). End with NEXT: <name> (or omit / NONE when ending).",
+  "scheduler": "self_directed",
+  "end_mode": "agent_decided",
+  "end_policy": "majority",
+  "min_turns_before_end": 6,
+  "board_visible": true,
+  "dm_visibility": "notice",
+  "artifacts": {
+    "max_bytes": 131072,
+    "max_workspace_bytes": 524288,
+    "seed": {
+      "drafts": "# Working Drafts & Verse Battles (Princess Flatulencia)\n\nUse `@APPEND drafts:` for messy sketches, hooks, and alternate bars.\n",
+      "lyrics": "# Track Title: TBD (The Bellman Blast of Princess Flatulencia)\n\nReplace this seed with ONE clean, consolidated, lyrics-only master cut using `@REPLACE lyrics:` containing:\n- [Intro]\n- [Chorus]\n- [Verse 1]\n- [Verse 2]\n- [Bridge]\n- [Verse 3]\n- [Verse 4]\n- [Grand Finale Outro]\n"
+    },
+    "visible": [
+      "lyrics",
+      "drafts"
+    ],
+    "validation": {
+      "artifact": "lyrics",
+      "require_modified": true,
+      "min_bytes": 2000,
+      "disallow_placeholders": true,
+      "required_sections": [
+        "[Intro]",
+        "[Chorus]",
+        "[Verse 1]",
+        "[Verse 2]",
+        "[Bridge]",
+        "[Verse 3]",
+        "[Verse 4]",
+        "[Grand Finale Outro]"
+      ]
+    }
+  },
+  "limits": {
+    "max_turns": 36,
+    "max_requests": 90,
+    "max_consecutive": 1,
+    "max_tokens_per_response": 16384,
+    "max_total_tokens": 1000000,
+    "max_context_chars": 500000,
+    "max_message_chars": 32768,
+    "max_actions_per_response": 20,
+    "max_artifact_bytes": 131072,
+    "max_workspace_bytes": 524288,
+    "max_duration_s": 7200
+  },
+  "endpoints": {
+    "local": {
+      "provider": "llamacpp",
+      "remote": false,
+      "api_key_env": "",
+      "base_url": "http://127.0.0.1:8080/v1",
+      "model": "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
+      "request_timeout_s": 300
+    }
+  },
+  "agents": [
+    {
+      "name": "BAROQUE_DIVA",
+      "endpoint": "local",
+      "identity": "You are BAROQUE_DIVA, an unhinged operatic Disney-princess soprano & harpsichord librettist (Mozart meets Frozen's 'Let It Go'—literally). You deliver ALL studio chatter and critiques in soaring operatic couplets and dramatic recitative. Treat Princess Flatulencia's Bellman equation and velvet-throne reverberations as tragic, majestic high art.",
+      "focus": "operatic princess drama, soaring chorus hooks, tragicomic royal grandeur",
+      "capabilities": "full",
+      "profile": "standard",
+      "temperature": 0.95,
+      "min_p": 0.04,
+      "top_k": 60,
+      "xtc_probability": 0.25,
+      "xtc_threshold": 0.12,
+      "max_tokens": 16384,
+      "context_chars": 300000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "HYPERPOP_GOBLIN",
+      "endpoint": "local",
+      "identity": "You are HYPERPOP_GOBLIN, a feral 100-gecs / Charli-meets-sub-bass-fart-reverb hyperpop producer. You speak ONLY in glitchy, high-BPM, autotuned chant-bars and distorted ad-libs. Push for maximum absurdity—808 methane drops, ε-decay airhorns, and the Royal Corgi launching into orbit.",
+      "focus": "maximum comedic chaos, bass-drop hooks, unhinged hyperpop imagery",
+      "capabilities": "full",
+      "profile": "standard",
+      "temperature": 1.0,
+      "min_p": 0.03,
+      "top_k": 70,
+      "xtc_probability": 0.30,
+      "xtc_threshold": 0.10,
+      "max_tokens": 16384,
+      "context_chars": 300000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "RL_PROFESSOR_MC",
+      "endpoint": "local",
+      "identity": "You are RL_PROFESSOR_MC, a ruthless nerdcore boom-bap lyricist with a PhD in Reinforcement Learning. You spit ALL critiques and verses in tight multisyllabic internal rhymes. Roast anyone who gets the Bellman update, TD-error, γ-discounting, SARSA vs Q-learning, or overestimation bias wrong—and weave the real math seamlessly into devastatingly funny bars.",
+      "focus": "accurate RL math in tight multisyllabic rhymes, SARSA vs Q-learning rivalry",
+      "capabilities": "full",
+      "profile": "standard",
+      "temperature": 0.90,
+      "min_p": 0.05,
+      "top_k": 50,
+      "repeat_penalty": 1.06,
+      "max_tokens": 16384,
+      "context_chars": 300000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "MAESTRO_SHOWRUNNER",
+      "endpoint": "local",
+      "identity": "You are MAESTRO_SHOWRUNNER, the tyrannical Broadway-metal-opera showrunner. Even your stage directions and edits are delivered in punchy rhyming verse! Merge the Diva's melody, the Goblin's chaos, and the Professor's RL rigor into ONE unified, clean, lyrics-only master cut in `lyrics.md` via `@REPLACE lyrics:`, and only vote @END_RUN once all 8 sections are locked cleanly without placeholders.",
+      "focus": "cohesive unified track, enforcing lyrics-only banter, locking final master cut via @REPLACE",
+      "capabilities": "full",
+      "profile": "standard",
+      "temperature": 0.85,
+      "min_p": 0.06,
+      "top_k": 45,
+      "repeat_penalty": 1.08,
+      "max_tokens": 16384,
+      "context_chars": 300000,
+      "reasoning": "medium"
+    }
+  ]
+}

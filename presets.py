@@ -37,20 +37,21 @@ COPY_DIR = os.environ.get("CHAMBER_COPY_DIR", "/sdcard/dialogue_chamber/runs" if
 # ─────────────────────────────── Hard limits ─────────────────────────────
 # Enforced in Python. Agents can never raise any of these.
 LIMITS = dict(
-    max_turns=16,                 # speaking slots
-    max_requests=30,              # every API call (retries and moderator calls included)
-    max_tokens_per_response=4096,  # cap on any agent's max_tokens
-    max_total_tokens=80000,       # generated tokens across the run (estimated if a provider omits usage)
-    max_context_chars=240000,     # cap on any agent's context budget
-    max_duration_s=2500,          # wall-clock limit
+    max_turns=24,                 # speaking slots
+    max_requests=60,              # every API call (retries and moderator calls included)
+    max_tokens_per_response=16384,# cap on any agent's max_tokens
+    max_total_tokens=1000000,     # generated tokens across the run (estimated if a provider omits usage)
+    max_context_chars=500000,     # cap on any agent's context budget
+    max_duration_s=7200,          # wall-clock limit
     max_spend_usd=0.25,           # only enforceable with provider-reported cost; fails closed otherwise. None = off
     max_retries_per_call=1, max_retries_total=6,
     max_failures_per_agent=2,     # consecutive endpoint failures before an agent is removed
     max_agents=8, max_consecutive=2, starvation_turns=None,   # None = 2 x participants + 1
-    max_actions_per_response=4, max_dms=30, max_channel_posts=40,
-    max_board_items=60, max_item_chars=400, max_message_chars=3500,
-    max_artifacts=12, max_artifact_bytes=16000, max_workspace_bytes=80000, max_pending_reads=2,
-    max_note_chars=2000, max_style_chars=160, max_subscriptions=3,
+    max_actions_per_response=16, max_dms=60, max_channel_posts=80,
+    max_board_items=100, max_item_chars=1200, max_message_chars=32768,
+    max_artifacts=16, max_artifact_bytes=131072, max_workspace_bytes=524288, max_pending_reads=4,
+    artifact_preview_chars=8000, artifact_read_chars=8000,
+    max_note_chars=8000, max_style_chars=320, max_subscriptions=4,
     temp_min=0.2, temp_max=1.5, max_empty_streak=3,
 )
 
@@ -81,11 +82,16 @@ SAMPLING_ALIASES = {
     "minp": "min_p",
     "typical_p": "typical_p",
     "typicalp": "typical_p",
+    "typical": "typical_p",
     "xtc_prob": "xtc_probability",
+    "xtc_p": "xtc_probability",
     "xtc_probability": "xtc_probability",
     "xtc_thresh": "xtc_threshold",
+    "xtc_t": "xtc_threshold",
     "xtc_threshold": "xtc_threshold",
     "repeat_penalty": "repeat_penalty",
+    "repeat_pen": "repeat_penalty",
+    "repetition_penalty": "repeat_penalty",
     "rep_pen": "repeat_penalty",
     "presence_penalty": "presence_penalty",
     "pres_pen": "presence_penalty",
@@ -95,6 +101,7 @@ SAMPLING_ALIASES = {
     "dry_mult": "dry_multiplier",
     "dry": "dry_multiplier",
     "dynatemp_range": "dynatemp_range",
+    "dynatemp_rng": "dynatemp_range",
     "dynatemp": "dynatemp_range",
 }
 
@@ -140,7 +147,7 @@ DEFAULT_AGENT = dict(
     typical_p=None, xtc_probability=None, xtc_threshold=None,
     repeat_penalty=None, presence_penalty=None, frequency_penalty=None,
     dry_multiplier=None, dynatemp_range=None,
-    max_tokens=4096, context_chars=200000, reasoning="medium",   # None = endpoint default; "off"/"low"/"medium"/"high"
+    max_tokens=16384, context_chars=300000, reasoning="medium",   # None = endpoint default; "off"/"low"/"medium"/"high"
     weight=1.0, priority=0, profile="standard",          # "minimal" | "standard" (line commands) | "rich" (JSON)
     capabilities="standard", subscriptions=[], structured=False,
 )

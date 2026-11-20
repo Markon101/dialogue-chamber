@@ -30,7 +30,7 @@ class ArtifactContextTests(unittest.TestCase):
 
     def test_long_visible_ledger_keeps_intro_and_latest_change(self):
         chamber = self.chamber()
-        chamber.artifacts.write("A", "world", "append", "x" * 700 + "MIDDLE_MARKER " + "m" * 1700)
+        chamber.artifacts.write("A", "world", "append", "x" * 3000 + "MIDDLE_MARKER " + "m" * 9000)
         chamber.artifacts.write("A", "world", "append", "LATEST_MARKER changes the bridge")
         prompt = self.context(chamber, "B")
         self.assertIn("# World", prompt)

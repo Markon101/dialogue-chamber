@@ -134,7 +134,7 @@ class ContextIntelligence:
         server_reported_ctx: Optional[int],
         user_configured_ctx: Optional[Any],
         model_default_ctx: int = 32768,
-        hard_limit: int = 131072,
+        hard_limit: int = 1048576,
     ) -> Tuple[int, str, str]:
         """Negotiates usable context limit.
 
@@ -170,8 +170,8 @@ class ContextIntelligence:
         reserved_output: int = 4096,
         safety_margin: Optional[int] = None,
         context_mode: str = "tokens",
-        max_context_chars: int = 32000,
-        agent_context_chars: int = 16384,
+        max_context_chars: int = 500000,
+        agent_context_chars: int = 300000,
     ) -> Tuple[List[Dict[str, str]], TokenAccounting]:
         """Assembles prompt messages while enforcing tokenizer-aware context budget.
 

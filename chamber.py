@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 from urllib.parse import urlsplit
 
-from artifacts import ArtifactError, ArtifactManager
+from artifacts import ArtifactError, ArtifactManager, validate_artifact
 from checkpoint import CheckpointManager, RunManifest, write_atomic
 from context import ContextIntelligence, TokenAccounting, TokenizerEngine
 from diagnostics import (
@@ -92,8 +92,8 @@ class AgentState:
     frequency_penalty: Optional[float] = None
     dry_multiplier: Optional[float] = None
     dynatemp_range: Optional[float] = None
-    max_tokens: int = 1200
-    context_chars: int = 10000
+    max_tokens: int = 16384
+    context_chars: int = 300000
     effective_context_tokens: int = 32768
     context_source: str = "config"
     reasoning: Optional[str] = None
@@ -172,9 +172,10 @@ SAVED_RUNTIME_FIELDS = (
     "requests_used", "retries_used", "prompt_tokens", "completion_tokens",
     "reasoning_tokens_total", "visible_tokens_total", "tracked_tokens", "remote_cost_usd",
     "remote_calls_without_cost", "empty_streak", "format_counts", "attribution_flags",
-    "temp_changes", "sampling_changes", "end_votes", "end_requested",
+    "temp_changes", "sampling_changes", "end_votes", "end_votes_attempted", "end_requested",
+    "deliverable_verified", "deliverable_issues", "pending_validation_feedback",
     "speaker_transitions", "resurrection_events", "fallbacks_triggered",
-    "solved_turn", "verified_synthesis_turn", "token_accounting_history",
+    "solved_turn", "verified_synthesis_turn", "token_accounting_history", "inference_history",
 )
 SAVED_AGENT_FIELDS = (
     "temperature", "top_p", "top_k", "min_p", "typical_p", "xtc_probability", "xtc_threshold",
@@ -185,11 +186,11 @@ SAVED_AGENT_FIELDS = (
 )
 
 
-def preview_artifact(name: str, content: str, limit: int = 1200) -> str:
+def preview_artifact(name: str, content: str, limit: int = 8000) -> str:
     if len(content) <= limit:
         return content
     marker = f"\n[Middle omitted; use @READ {name.removesuffix('.md')} OFFSET to inspect it.]\n"
-    prefix = min(400, (limit - len(marker)) // 2)
+    prefix = min(2000, (limit - len(marker)) // 2)
     suffix = limit - len(marker) - prefix
     return content[:prefix] + marker + content[-suffix:]
 
@@ -245,13 +246,20 @@ class Chamber:
         self.run_id = str(self.cfg.get("run_id") or f"{preset_name}_{ts}")
         self.run_dir = Path(run_dir or os.path.join(RUNS_DIR, self.run_id)).resolve()
         self.run_dir.mkdir(parents=True, exist_ok=True)
+        art_cfg_init = self.cfg.get("artifacts") or {}
+        art_max_bytes = int(art_cfg_init.get("max_bytes", self.limits["max_artifact_bytes"]))
+        art_max_total = int(art_cfg_init.get("max_workspace_bytes", self.limits["max_workspace_bytes"]))
+        art_max_count = int(art_cfg_init.get("max_count", self.limits["max_artifacts"]))
+        per_art_limits = art_cfg_init.get("per_artifact_max_bytes")
         self.artifacts = ArtifactManager(
             self.run_dir / "artifacts",
-            max_count=int(self.limits["max_artifacts"]),
-            max_bytes=int(self.limits["max_artifact_bytes"]),
-            max_total_bytes=int(self.limits["max_workspace_bytes"]),
+            max_count=art_max_count,
+            max_bytes=art_max_bytes,
+            max_total_bytes=art_max_total,
+            per_artifact_max_bytes=per_art_limits,
         )
         self.visible_artifacts: List[str] = []
+        self.deliverable_validation = art_cfg_init.get("validation") or self.cfg.get("deliverable_validation")
 
         # Checkpointing & Context Intelligence
         self.checkpoints = CheckpointManager(self.run_dir)
@@ -461,7 +469,11 @@ class Chamber:
         self.temp_changes: List[Tuple[int, str, float, float]] = []
         self.sampling_changes: List[Tuple[int, str, dict]] = []
         self.end_votes: Dict[str, str] = {}
+        self.end_votes_attempted: bool = False
         self.end_requested: bool = False
+        self.deliverable_verified: Optional[bool] = None
+        self.deliverable_issues: List[str] = []
+        self.pending_validation_feedback: List[str] = []
         self.speaker_transitions: List[Tuple[int, str, str]] = []
         self.resurrection_events: List[dict] = []
         self.fallbacks_triggered: List[dict] = []
@@ -469,6 +481,11 @@ class Chamber:
         self.verified_synthesis_turn: Optional[int] = None
         self.start_memory_mb = get_available_memory_mb()
         self.token_accounting_history: List[Dict[str, Any]] = []
+        self.inference_history: List[Dict[str, Any]] = []
+        self.initial_sampling_config: Dict[str, Dict[str, Any]] = {
+            n: {k: getattr(a, k) for k in SAMPLING_PARAMS if getattr(a, k, None) is not None}
+            for n, a in self.agents.items()
+        }
 
         if checkpoint_data is not None:
             self.resume_from_checkpoint(checkpoint_data)
@@ -514,7 +531,7 @@ class Chamber:
             type=etype,
             status=status,
             target=str(target)[:80],
-            detail=str(detail)[:240],
+            detail=str(detail)[:1000],
             data=data,
         )
         self.events.append(ev)
@@ -564,10 +581,26 @@ class Chamber:
             if my_events:
                 fixed_sections["society_results"] = "--- Results of your recent actions ---\n" + "\n".join(
                     f"{e.type} {e.target}: {e.status}" + (f" ({e.detail})" if e.detail else "") for e in my_events)
+        else:
+            recent_rejections = [
+                e for e in self.events
+                if e.status == "rejected" and e.actor == agent.name and e.turn >= max(0, self.turn - 3)
+            ][-5:]
+            feedback_lines = [
+                f"{e.type}" + (f" [{e.target}]" if e.target else "") + f": REJECTED ({e.detail})"
+                for e in recent_rejections
+            ]
+            if self.pending_validation_feedback:
+                feedback_lines.append("END_RUN BLOCKED — Deliverable validation failed:")
+                feedback_lines.extend(f"  - {issue}" for issue in self.pending_validation_feedback)
+            if feedback_lines:
+                fixed_sections["action_feedback"] = "--- Action & Deliverable Feedback ---\n" + "\n".join(feedback_lines)
 
         # Artifacts
         art_blocks = []
         shown_files = set()
+        read_limit = int(self.limits.get("artifact_read_chars", 8000))
+        preview_limit = int(self.limits.get("artifact_preview_chars", 8000))
         for saved_read in agent.pending_reads:
             fname, ver, text = saved_read[:3]
             shown_files.add(fname)
@@ -576,12 +609,12 @@ class Chamber:
                 label = f"[Artifact {fname} (v{ver}, requested read, chars {offset}-{offset + len(text)} of {total})]"
             else:
                 label = f"[Artifact {fname} (v{ver}, requested read)]"
-            art_blocks.append(f"{label}\n{text[:1500]}")
+            art_blocks.append(f"{label}\n{text[:read_limit]}")
         for fname in self.visible_artifacts:
             if fname in self.artifacts.versions and fname not in shown_files:
                 try:
                     _, ver, text = self.artifacts.read(agent.name, fname, turn=self.turn)
-                    art_blocks.append(f"[Shared Artifact {fname} (v{ver})]\n{preview_artifact(fname, text)}")
+                    art_blocks.append(f"[Shared Artifact {fname} (v{ver})]\n{preview_artifact(fname, text, limit=preview_limit)}")
                 except ArtifactError:
                     pass
         if "ARTIFACT_WRITE" in agent.capabilities or "ARTIFACT_READ" in agent.capabilities:
@@ -741,7 +774,7 @@ class Chamber:
         if "UPDATE_NOTE" in caps:
             cmds.append("@NOTE: <private scratchpad note>")
         if "ARTIFACT_WRITE" in caps:
-            cmds.append("@APPEND <artifact_name>: <markdown to append>  (or @READ <artifact_name> [offset])")
+            cmds.append("@APPEND <artifact_name>: <markdown to append>  |  @REPLACE <artifact_name>: <full consolidated markdown>  (or @READ <artifact_name> [offset])")
         if self.end_mode == "agent_decided" and ("END_RUN" in caps or "FINISH" in caps):
             cmds.append(f"@END_RUN: <reason> (vote to conclude session; policy: {self.end_policy}, cap: {self.limits['max_turns']} turns) | @FINISH: <reason>")
         max_act = int(self.limits["max_actions_per_response"])
@@ -775,6 +808,7 @@ class Chamber:
         max_tokens: Optional[int] = None,
         stops=None,
         reasoning=None,
+        accounting: Optional[TokenAccounting] = None,
     ):
         budget_err = self._check_budgets_before_call(agent.endpoint)
         if budget_err:
@@ -863,6 +897,54 @@ class Chamber:
                             self.remote_cost_usd += float(res.cost)
                         else:
                             self.remote_calls_without_cost += 1
+
+                    # Record per-inference telemetry (distinguishing configured, transmitted, and backend-confirmed values)
+                    transmitted_sampling = {
+                        k: payload[k] for k in SAMPLING_PARAMS if k in payload
+                    }
+                    comp_tok_s = (
+                        round(ctok / res.latency, 2)
+                        if res.latency and res.latency > 0 and ctok is not None
+                        else None
+                    )
+                    ctx_budget_info = None
+                    if accounting is not None:
+                        ctx_budget_info = {
+                            "total_prompt": accounting.total_prompt,
+                            "available_prompt_budget": accounting.available_prompt_budget,
+                            "reserved_output": accounting.reserved_output,
+                            "safety_margin": accounting.safety_margin,
+                            "remaining_context": accounting.remaining_context,
+                            "omitted_messages_count": accounting.omitted_messages_count,
+                            "fits_in_context": accounting.fits_in_context,
+                            "counting_method": accounting.counting_method,
+                        }
+                    self.inference_history.append({
+                        "turn": self.turn,
+                        "agent": agent.name,
+                        "endpoint": cand_name,
+                        "requested_model": cand_ep.get("model", agent.model),
+                        "actual_model": res.actual_model or cand_ep.get("model", agent.model),
+                        "effective_context_window": agent.effective_context_tokens,
+                        "context_source": agent.context_source,
+                        "configured_sampling": copy.deepcopy(self.initial_sampling_config.get(agent.name, {})),
+                        "transmitted_sampling": transmitted_sampling,
+                        "max_tokens_requested": payload.get("max_tokens"),
+                        "prompt_tokens": ptok,
+                        "completion_tokens": ctok,
+                        "reasoning_tokens": res.reasoning_tokens,
+                        "visible_tokens": res.visible_tokens,
+                        "token_accounting": res.token_accounting,
+                        "cached_tokens": res.cached_tokens,
+                        "cache_source": res.cache_source,
+                        "latency_s": round(res.latency, 3) if res.latency else 0.0,
+                        "completion_tok_per_s": comp_tok_s,
+                        "finish_reason": res.finish_reason,
+                        "truncated": res.finish_reason == "length",
+                        "context_budget": ctx_budget_info,
+                        "sampling_requests": [],
+                        "rejected_actions": [],
+                    })
                     return res
 
                 except InferenceError as e:
@@ -951,7 +1033,7 @@ class Chamber:
         for idx, act in enumerate(deduped_actions):
             if idx >= max_act:
                 self._record(agent.name, act.get("type", "UNKNOWN"), "rejected",
-                             detail=f"exceeded max_actions_per_response ({max_act})")
+                             detail=f"exceeded max_actions_per_response ({max_act}); keep <= {max_act} actions per turn")
                 continue
             self._apply_action(agent, act)
 
@@ -1119,7 +1201,9 @@ class Chamber:
         if atype == "CHALLENGE":
             tgt = canonicalize_claim_id(act.get("target"))
             if tgt not in self.board:
-                self._record(agent.name, atype, "rejected", target=tgt, detail="target item not on board")
+                active_ids = ", ".join(list(self.board.keys())[-10:]) or "none"
+                self._record(agent.name, atype, "rejected", target=tgt,
+                             detail=f"target item {tgt!r} not on board (existing IDs: {active_ids})")
                 return
             item = self.board[tgt]
             content = str(act.get("content") or "").strip()[: int(lim["max_item_chars"])]
@@ -1134,7 +1218,9 @@ class Chamber:
         if atype == "RETRACT":
             tgt = canonicalize_claim_id(act.get("target"))
             if tgt not in self.board:
-                self._record(agent.name, atype, "rejected", target=tgt, detail="target item not on board")
+                active_ids = ", ".join(list(self.board.keys())[-10:]) or "none"
+                self._record(agent.name, atype, "rejected", target=tgt,
+                             detail=f"target item {tgt!r} not on board (existing IDs: {active_ids})")
                 return
             item = self.board[tgt]
             if item.author != agent.name:
@@ -1150,7 +1236,9 @@ class Chamber:
         if atype == "VOTE":
             tgt = canonicalize_claim_id(act.get("target"))
             if tgt not in self.board:
-                self._record(agent.name, atype, "rejected", target=tgt, detail="target item not on board")
+                active_ids = ", ".join(list(self.board.keys())[-10:]) or "none"
+                self._record(agent.name, atype, "rejected", target=tgt,
+                             detail=f"target item {tgt!r} not on board (existing IDs: {active_ids})")
                 return
             val = str(act.get("value") or "").strip().lower()
             self.board[tgt].votes[agent.name] = val
@@ -1169,7 +1257,7 @@ class Chamber:
             return
 
         if atype == "PROPOSE_TOPIC":
-            new_top = str(act.get("content") or "").strip()[:300]
+            new_top = str(act.get("content") or "").strip()[:2000]
             if new_top:
                 self.topic = new_top
                 self._record(agent.name, atype, "accepted", detail=new_top)
@@ -1201,7 +1289,8 @@ class Chamber:
             if offset >= len(text):
                 self._record(agent.name, atype, "rejected", target=fname, detail=f"offset {offset} is outside v{ver} ({len(text)} chars)")
                 return
-            excerpt = text[offset:offset + 1500]
+            read_limit = int(lim.get("artifact_read_chars", 8000))
+            excerpt = text[offset:offset + read_limit]
             self.artifacts.seen[(agent.name, fname)] = ver
             agent.pending_reads.append((fname, ver, excerpt, offset, len(text)))
             self._record(agent.name, atype, "accepted", target=fname,
@@ -1224,6 +1313,11 @@ class Chamber:
             self._check_answer_key(content)
             self._record(agent.name, atype, "accepted", target=fname, detail=f"{mode} -> v{ver}")
             self._emit(f"  📝 artifact {fname} ({mode} by {agent.name} → v{ver})")
+            if self.deliverable_validation and self.pending_validation_feedback:
+                ok, issues, _ = validate_artifact(self.artifacts, self.deliverable_validation)
+                self.deliverable_verified = ok
+                self.deliverable_issues = issues
+                self.pending_validation_feedback = [] if ok else issues
             return
 
         if atype == "FINISH":
@@ -1270,10 +1364,31 @@ class Chamber:
             reached = True
         else:
             reached = False
-        if reached:
-            self.end_requested = True
-            self.stop_reason = f"agents decided to end run ({self.end_policy}: {', '.join(voted)})"
-            self._record("SYSTEM", "END_RUN", "system", target=",".join(voted), detail=self.stop_reason)
+        if not reached:
+            return
+
+        self.end_votes_attempted = True
+        if self.deliverable_validation:
+            ok, issues, details = validate_artifact(self.artifacts, self.deliverable_validation)
+            self.deliverable_verified = ok
+            self.deliverable_issues = issues
+            if not ok:
+                self.pending_validation_feedback = list(issues)
+                art_name = details.get("artifact", str(self.deliverable_validation.get("artifact", "")))
+                msg = f"Deliverable validation failed for {art_name}: {'; '.join(issues)}"
+                self._record("SYSTEM", "END_RUN", "rejected", target=art_name, detail=msg)
+                self._emit(f"  ⚠ END_RUN blocked — {msg}")
+                return
+            self.pending_validation_feedback = []
+            art_name = details.get("artifact", "")
+            self._record(
+                "SYSTEM", "DELIVERABLE_VERIFIED", "system", target=art_name,
+                detail=f"{art_name} v{details.get('version')} ({details.get('size_bytes')}B) verified",
+            )
+
+        self.end_requested = True
+        self.stop_reason = f"agents decided to end run ({self.end_policy}: {', '.join(voted)})"
+        self._record("SYSTEM", "END_RUN", "system", target=",".join(voted), detail=self.stop_reason)
 
     def _queue_reactive(self, target: str):
         if target in self.agents and self.agents[target].active and target not in self.reactive_queue:
@@ -1513,7 +1628,7 @@ class Chamber:
                         accounting.total_prompt + accounting.reserved_output + accounting.safety_margin > accounting.effective_usable_context
                     ):
                         raise InferenceError("prompt plus output and safety margin exceeds endpoint context cap", transient=False)
-                    res = self._call_model(ag, ctx, stops=stops)
+                    res = self._call_model(ag, ctx, stops=stops, accounting=accounting)
                 except InferenceError as e:
                     ag.failures += 1
                     self._record(speaker, "ERROR", "rejected", detail=str(e))
@@ -1541,7 +1656,7 @@ class Chamber:
                                                  max_chars=int(self.limits["max_message_chars"]))
                     if not parsed.message and not parsed.actions and self._check_budgets_before_call(ag.endpoint) is None:
                         try:
-                            res2 = self._call_model(ag, ctx, stops=stops, reasoning="off")
+                            res2 = self._call_model(ag, ctx, stops=stops, reasoning="off", accounting=accounting)
                             parsed = parse_reply(res2.content, res2.reasoning or res.reasoning, me=speaker,
                                                  names=tuple(self.agent_order), max_chars=int(self.limits["max_message_chars"]))
                             if parsed.message or parsed.actions:
@@ -1577,6 +1692,18 @@ class Chamber:
                 if parsed.message:
                     self._emit(f"{parsed.message}\n")
                 self._dispatch_actions(ag, parsed)
+                if self.inference_history and self.inference_history[-1]["turn"] == t and self.inference_history[-1]["agent"] == speaker:
+                    turn_evs = [e for e in self.events if e.turn == t and e.actor == speaker]
+                    self.inference_history[-1]["sampling_requests"] = [
+                        {"type": e.type, "status": e.status, "detail": e.detail}
+                        for e in turn_evs
+                        if e.type in ("SET_SAMPLING", "SET_TEMPERATURE") or (e.type == "PROTOCOL" and "SAMPLING" in e.detail.upper())
+                    ]
+                    self.inference_history[-1]["rejected_actions"] = [
+                        {"type": e.type, "target": e.target, "detail": e.detail}
+                        for e in turn_evs
+                        if e.status == "rejected"
+                    ]
 
                 if not any(a.active for a in self.agents.values()):
                     self.next_speaker = None
@@ -1609,6 +1736,10 @@ class Chamber:
             self.elapsed_s = time.monotonic() - self.start_time
             if self.stop_reason == "not started":
                 self.stop_reason = "completed"
+            if self.deliverable_validation and self.deliverable_verified is None:
+                ok, issues, _ = validate_artifact(self.artifacts, self.deliverable_validation)
+                self.deliverable_verified = ok
+                self.deliverable_issues = issues
             if not failed:
                 self._save_turn_checkpoint(self.turn)
                 self.checkpoints.mark_completed(self.stop_reason, "interrupted" if interrupted else "completed")
@@ -1704,7 +1835,15 @@ class Chamber:
             end_mode=self.end_mode,
             end_policy=self.end_policy,
             end_votes=dict(self.end_votes),
+            agents_voted_to_stop=bool(self.end_votes),
+            end_votes_attempted=self.end_votes_attempted,
+            end_requested_by_agents=self.end_requested,
+            run_ended=self.stop_reason != "not started",
+            deliverable_required=bool(self.deliverable_validation),
+            deliverable_verified=self.deliverable_verified,
+            deliverable_issues=list(self.deliverable_issues),
             sampling_changes=list(self.sampling_changes),
+            inference_history=list(self.inference_history),
             stop_reason=self.stop_reason,
             turns_by_agent=turns_by_agent,
             participation_share=shares,
@@ -1872,10 +2011,39 @@ class Chamber:
             f"- **Truncated generations (`finish_reason=length`)**: {metrics['truncated_generations']}",
         ])
 
+        if self.deliverable_validation:
+            ver_label = "VERIFIED" if metrics["deliverable_verified"] else "FAILED"
+            m_lines.extend([
+                "",
+                "### Deliverable Verification",
+                f"- **Agents voted to stop**: {metrics['agents_voted_to_stop']} (`end_requested_by_agents={metrics['end_requested_by_agents']}`)",
+                f"- **Deliverable verified**: **{ver_label}**",
+            ])
+            if metrics["deliverable_issues"]:
+                for iss in metrics["deliverable_issues"]:
+                    m_lines.append(f"  - Issue: {iss}")
+
         if self.sampling_changes:
             m_lines.extend(["", "### Sampling Parameter Changes"])
             for turn_no, ag_name, changed in self.sampling_changes:
                 m_lines.append(f"- Turn {turn_no} (`{ag_name}`): {', '.join(f'{k}={v}' for k, v in changed.items())}")
+
+        if self.inference_history:
+            m_lines.extend([
+                "",
+                "### Per-Inference Sampling & Context Telemetry",
+                "| Turn | Agent | Model | Ctx | Prompt/Comp | Lat(s) | Tok/s | Stop | Transmitted Sampling |",
+                "|---:|---|---|---:|---|---:|---:|---|---|",
+            ])
+            for rec in self.inference_history:
+                samp_str = ", ".join(f"{k}={v}" for k, v in (rec.get("transmitted_sampling") or {}).items())
+                cache_note = f" (cached={rec['cached_tokens']})" if rec.get("cached_tokens") is not None else ""
+                m_lines.append(
+                    f"| {rec['turn']} | `{rec['agent']}` | `{rec['actual_model']}` | {rec['effective_context_window']//1024}K | "
+                    f"{rec['prompt_tokens']}/{rec['completion_tokens']}{cache_note} | {rec['latency_s']} | "
+                    f"{rec['completion_tok_per_s'] if rec['completion_tok_per_s'] is not None else 'N/A'} | "
+                    f"{rec['finish_reason']} | `{samp_str}` |"
+                )
 
         if self.end_votes:
             m_lines.extend(["", "### End-Run Votes"])

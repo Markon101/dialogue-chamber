@@ -75,12 +75,26 @@ def canonicalize_claim_id(raw_target: Any) -> str:
     return s
 
 
+def _strip_trailing_sampling_commentary(raw_spec: str) -> str:
+    """Strip harmless trailing parenthetical or inline comment after sampling pairs.
+
+    E.g. 'min_p=0.05 top_k=40 (Maxing the fuzz!)' -> 'min_p=0.05 top_k=40'.
+    Leaves leading or mid-expression invalid tokens intact so strict validation catches them.
+    """
+    spec = (raw_spec or "").strip()
+    # Strip trailing '(...)' or '# ...' or '// ...' only when preceded by whitespace and a digit/quote
+    m = re.match(r"^(.*?\S)\s+(?:\([^()]*\)|#.*|//.*)$", spec)
+    if m and ("=" in m.group(1) or ":" in m.group(1)):
+        return m.group(1).strip()
+    return spec
+
+
 def _parse_sampling_spec(raw_spec: str) -> Tuple[Optional[Dict[str, str]], Optional[str]]:
     """Parse single or compound sampling settings (key=val, key: val, pipe/semicolon/comma/space-separated).
 
     Returns (params_dict, None) on syntactic success or (None, error_message) on ambiguous/malformed input.
     """
-    spec = (raw_spec or "").strip()
+    spec = _strip_trailing_sampling_commentary(raw_spec)
     if not spec:
         return None, "SET_SAMPLING missing valid sampling parameters"
 
@@ -396,7 +410,8 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
             try:
                 ck, cv = normalize_sampling_param(rk, rv, strict=True)
             except ValueError as exc:
-                issues.append(f"SET_SAMPLING {exc}")
+                valid_keys = ", ".join(sorted(SAMPLING_PARAMS.keys()))
+                issues.append(f"SET_SAMPLING {exc} (valid parameters: {valid_keys})")
                 return None
             cleaned_params[ck] = cv
         res["params"] = cleaned_params
@@ -463,7 +478,13 @@ def _command(word: str, rest: str, lines_after: List[str], known_names: Optional
 
     if w == "VOTE":
         parts = (head + " " + body).split()
-        return {"type": "VOTE", "target": parts[0] if parts else "", "value": parts[1] if len(parts) > 1 else ""}
+        raw_tgt = parts[0] if parts else ""
+        val = parts[1] if len(parts) > 1 else ""
+        if raw_tgt and re.search(r"[,|]", raw_tgt):
+            sub_targets = [t.strip() for t in re.split(r"[,|]+", raw_tgt) if t.strip()]
+            if sub_targets and all(re.fullmatch(r"[#<\[\(\"\'`*]*c\d+[>\]\)\"\'`*:.,!]*", t, re.I) for t in sub_targets):
+                return [{"type": "VOTE", "target": t, "value": val} for t in sub_targets]
+        return {"type": "VOTE", "target": raw_tgt, "value": val}
 
     if w == "UPDATE_NOTE":
         return {"type": "UPDATE_NOTE", "content": body or head}
@@ -547,9 +568,11 @@ def _extract_commands(text: str, p: Parsed, known_names: Optional[Set[str]] = No
                 i += 1
             a = _command(word, rest, after, known_names)
             if a:
-                validated = validate_action_schema(a, p.issues, known_names)
-                if validated:
-                    p.actions.append(validated)
+                items = a if isinstance(a, list) else [a]
+                for item in items:
+                    validated = validate_action_schema(item, p.issues, known_names)
+                    if validated:
+                        p.actions.append(validated)
             continue
 
         t = TAIL_NEXT_RE.search(line)
@@ -608,7 +631,7 @@ def parse_reply(
     api_reasoning: str = "",
     me: str = "",
     names: Tuple[str, ...] = (),
-    max_chars: int = 3500,
+    max_chars: int = 32768,
 ) -> Parsed:
     """Parses a model output string into visible speech and validated actions."""
     p = Parsed()

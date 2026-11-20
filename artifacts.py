@@ -19,16 +19,23 @@ class ArtifactError(Exception):
 
 
 class ArtifactManager:
-    def __init__(self, root, max_count=10, max_bytes=12000, max_total_bytes=80000):
+    def __init__(self, root, max_count=16, max_bytes=131072, max_total_bytes=524288, per_artifact_max_bytes=None):
         root = Path(root)
         if root.is_symlink():
             raise ArtifactError("workspace root must not be a symlink")
         root.mkdir(parents=True, exist_ok=True)
         self.root = root.resolve()
         self.max_count, self.max_bytes, self.max_total = max_count, max_bytes, max_total_bytes
+        self.per_artifact_max_bytes = {}
+        if per_artifact_max_bytes:
+            for k, v in per_artifact_max_bytes.items():
+                self.per_artifact_max_bytes[self.normalize(k)] = int(v)
         self.versions = {}   # file name -> version (only artifacts created through this manager exist)
         self.seen = {}       # (agent, file name) -> last version that agent read or wrote
         self.log = []        # dicts: turn, agent, op, name, version, ok, detail
+
+    def limit_for(self, fname):
+        return int(self.per_artifact_max_bytes.get(fname, self.max_bytes))
 
     # ── validation ──
     def normalize(self, name):
@@ -80,10 +87,11 @@ class ArtifactManager:
                 pass
             raise
 
-    def _read_file(self, path):
+    def _read_file(self, path, max_bytes=None):
+        cap = max_bytes if max_bytes is not None else max([self.max_bytes, *self.per_artifact_max_bytes.values()])
         fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
         with os.fdopen(fd, "rb") as f:
-            return f.read(self.max_bytes + 1).decode("utf-8", "replace")
+            return f.read(cap + 1).decode("utf-8", "replace")
 
     # ── public operations ──
     def names(self):
@@ -117,7 +125,7 @@ class ArtifactManager:
                 raise ArtifactError(f"saved artifact checksum mismatch: {name}")
             if not isinstance(saved["version"], int) or saved["version"] < 1:
                 raise ArtifactError("invalid saved artifact version")
-            if len(encoded) > self.max_bytes:
+            if len(encoded) > self.limit_for(name):
                 raise ArtifactError("saved artifact exceeds size limit")
             total_bytes += len(encoded)
         if total_bytes > self.max_total:
@@ -180,18 +188,119 @@ class ArtifactManager:
                 raise ArtifactError(f"{fname} is at v{current}, not v{expected_version}; read it again")
         if mode == "replace" and exists and expected_version is None and self.seen.get((agent, fname)) != current:
             raise ArtifactError(f"{fname} changed since you last saw it (now v{current}); read it before replacing")
+        current_size = os.lstat(path).st_size if exists else 0
+        req_size = len(content.encode("utf-8"))
+        art_limit = self.limit_for(fname)
+        short_name = fname.removesuffix(".md")
         if mode == "append" and exists:
-            old = self._read_file(path)
+            old = self._read_file(path, max_bytes=art_limit)
             note = f"\n\n— *{agent}, turn {turn}*" if attribution else ""
             new = old.rstrip("\n") + "\n\n" + content.strip() + note + "\n"
         else:
             new = content.strip() + "\n"
         size = len(new.encode("utf-8"))
-        if size > self.max_bytes:
-            raise ArtifactError(f"{fname} would be {size} bytes (limit {self.max_bytes})")
-        if self._total_bytes(exclude=fname) + size > self.max_total:
-            raise ArtifactError(f"workspace size limit reached ({self.max_total} bytes)")
+        if size > art_limit:
+            raise ArtifactError(
+                f"{fname} write rejected: current={current_size}B, update={req_size}B, "
+                f"resulting={size}B exceeds limit={art_limit}B. "
+                f"Use @REPLACE {short_name}: <consolidated content> to overwrite/trim, "
+                f"or save working drafts in a separate artifact."
+            )
+        other_bytes = self._total_bytes(exclude=fname)
+        if other_bytes + size > self.max_total:
+            raise ArtifactError(
+                f"workspace size limit reached: other_artifacts={other_bytes}B + {fname}={size}B "
+                f"({other_bytes + size}B) exceeds max_workspace_bytes={self.max_total}B. "
+                f"Use @REPLACE {short_name}: <consolidated content> to trim."
+            )
         self._atomic_write(path, new)
         self.versions[fname] = current + 1
         self.seen[(agent, fname)] = current + 1
         return fname, current + 1
+
+
+DEFAULT_PLACEHOLDER_PATTERNS = (
+    r"\.\.\.\s*\(full\s+(?:lyrics|text|content|track|draft)\b",
+    r"\[\s*(?:TBD|TODO|PLACEHOLDER|INSERT\b[^\]]*)\s*\]",
+    r"(?m)^\s*(?:TBD|TODO)\s*[:\-]?\s*$",
+    r"Track Title:\s*TBD\b",
+)
+
+
+def validate_artifact(manager: ArtifactManager, spec: dict):
+    """Validate a deliverable artifact against configurable completeness rules.
+
+    Returns (ok: bool, issues: list[str], details: dict).
+    """
+    if not isinstance(spec, dict) or not spec.get("artifact"):
+        return True, [], {}
+
+    raw_name = str(spec["artifact"])
+    try:
+        fname = manager.normalize(raw_name)
+    except ArtifactError as exc:
+        return False, [str(exc)], {"artifact": raw_name}
+
+    issues = []
+    if fname not in manager.versions:
+        return False, [f"Required deliverable {fname} does not exist yet."], {"artifact": fname, "exists": False}
+
+    version = manager.versions[fname]
+    if spec.get("require_modified", True) and version <= 1:
+        issues.append(f"{fname} is still at v{version} (unmodified seed); write the actual deliverable before ending.")
+
+    path = manager._path(fname)
+    text = manager._read_file(path, max_bytes=manager.limit_for(fname))
+    size_bytes = len(text.encode("utf-8"))
+    max_allowed = int(spec.get("max_bytes") or manager.limit_for(fname))
+    if size_bytes > max_allowed:
+        issues.append(f"{fname} is {size_bytes}B, exceeding configured deliverable limit {max_allowed}B.")
+
+    min_bytes = int(spec.get("min_bytes") or 0)
+    if min_bytes and size_bytes < min_bytes:
+        issues.append(f"{fname} is too short ({size_bytes}B < required {min_bytes}B).")
+
+    # Placeholder checks
+    disallow = spec.get("disallow_placeholders", True)
+    patterns = list(DEFAULT_PLACEHOLDER_PATTERNS) if disallow is True else (list(disallow) if isinstance(disallow, (list, tuple)) else [])
+    for pat in patterns:
+        m = re.search(pat, text, re.I)
+        if m:
+            issues.append(f"{fname} contains unfinished placeholder text matching {m.group(0)!r}; replace with full content.")
+
+    # Required sections check (case-insensitive header/marker match with non-empty body)
+    req_sections = [str(s) for s in (spec.get("required_sections") or []) if str(s).strip()]
+    missing_sections = []
+    empty_sections = []
+    if req_sections:
+        positions = []
+        for sec in req_sections:
+            # Match either literal "[Intro]" or markdown heading "## Intro" / "Intro"
+            core = sec.strip().strip("[]").strip()
+            pat = re.compile(rf"(?im)^(?:#+[ \t]*)?(?:\[\s*{re.escape(core)}\s*\]|{re.escape(sec)})(?:[ \t]*[:\-].*|[ \t]+.*)?$")
+            m = pat.search(text)
+            if not m:
+                missing_sections.append(sec)
+            else:
+                positions.append((m.start(), m.end(), sec))
+        positions.sort()
+        for idx, (_, end_pos, sec) in enumerate(positions):
+            next_start = positions[idx + 1][0] if idx + 1 < len(positions) else len(text)
+            body = text[end_pos:next_start].strip()
+            # Ignore pure stage-direction/metadata-only 1-liners < 20 chars
+            if len(body) < 20:
+                empty_sections.append(sec)
+
+    if missing_sections:
+        issues.append(f"{fname} is missing required section(s): {', '.join(missing_sections)}.")
+    if empty_sections:
+        issues.append(f"{fname} has empty/stub section(s): {', '.join(empty_sections)}.")
+
+    details = {
+        "artifact": fname,
+        "version": version,
+        "size_bytes": size_bytes,
+        "missing_sections": missing_sections,
+        "empty_sections": empty_sections,
+    }
+    return (len(issues) == 0), issues, details
