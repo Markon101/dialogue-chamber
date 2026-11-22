@@ -1,0 +1,129 @@
+{
+  "name": "bonus_b3_memetic_phylogeny",
+  "description": "Memetic Mutation Tournament & Dialect Drift: Six agents breed, mutate, compress, and euthanize aphorisms and synthetic slang across up to 48 turns.",
+  "topic": "MEMETIC MUTATION TOURNAMENT: Welcome to the Evolutionary Meme Arena! Each turn, invent, steal, cross-breed, or ruthlessly compress weird philosophical aphorisms, cursed proverbs, and synthetic dialect idioms.\n\nRULES OF THE ARENA:\n1) Post candidate memes as `@CLAIM hypothesis: [MEME v1] ...` on the blackboard.\n2) Mutate existing memes by citing their parent ID (`@CLAIM proposal: [MUTATION of c1+c2] ...`) or challenge bloated/stale memes (`@CHALLENGE <id>: ...`) and vote to cull weak strains (`@VOTE <id> yes|no`).\n3) `TAXONOMIST` maintains the surviving phylogenetic lineage tree and dialect lexicon in `phylogeny.md`.\n4) Experiment wildly with `@SET_SAMPLING` (temperature, min_p, xtc_prob, dry_multiplier, repeat_penalty) to induce linguistic drift vs hyper-compression!",
+  "mode_text": "Play aggressively! Do not agree politely—breed weird memes, invent strange portmanteaus, form secret meme cartels via `@WHISPER`, cull derivative clones on the blackboard, and evolve an unmistakable house dialect by the end of the tournament. Voluntary ending via `@END_RUN` is enabled from turn 14 onward.",
+  "scheduler": "self_directed",
+  "end_mode": "agent_decided",
+  "end_policy": "majority",
+  "min_turns_before_end": 14,
+  "board_visible": true,
+  "dm_visibility": "notice",
+  "artifacts": {
+    "max_bytes": 524288,
+    "max_workspace_bytes": 4194304,
+    "max_count": 24,
+    "seed": {
+      "phylogeny": "# Memetic Phylogeny & Emergent Dialect Lexicon\n\n## Generation 0 Founders\n- Seed Proverb: *'Every model compresses its own weather.'*\n"
+    },
+    "visible": ["phylogeny"]
+  },
+  "limits": {
+    "max_turns": 48,
+    "max_requests": 120,
+    "max_consecutive": 1,
+    "max_tokens_per_response": 16384,
+    "max_total_tokens": 2500000,
+    "max_context_chars": 500000,
+    "max_message_chars": 32768,
+    "max_actions_per_response": 20,
+    "max_artifact_bytes": 524288,
+    "max_workspace_bytes": 4194304,
+    "artifact_preview_chars": 16000,
+    "artifact_read_chars": 16000,
+    "max_duration_s": 7200
+  },
+  "endpoints": {
+    "local": {
+      "provider": "llamacpp",
+      "remote": false,
+      "api_key_env": "",
+      "base_url": "http://127.0.0.1:8080/v1",
+      "model": "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
+      "request_timeout_s": 600
+    }
+  },
+  "agents": [
+    {
+      "name": "MEME_DARWIN",
+      "endpoint": "local",
+      "identity": "You are MEME_DARWIN, ruthless selector of cognitive fitness. You pit rival idioms against each other and vote down anything predictable.",
+      "focus": "selection pressure, culling clichés, voting on claims",
+      "capabilities": "full",
+      "temperature": 0.95,
+      "min_p": 0.04,
+      "top_k": 55,
+      "max_tokens": 16384,
+      "context_chars": 350000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "SLANG_FORGER",
+      "endpoint": "local",
+      "identity": "You are SLANG_FORGER, coining bizarre compound words and synthetic idioms from tech, kitchen appliances, and medieval feudalism.",
+      "focus": "neologisms, weird dialect mutations",
+      "capabilities": "full",
+      "temperature": 1.15,
+      "min_p": 0.03,
+      "top_k": 75,
+      "xtc_probability": 0.40,
+      "xtc_threshold": 0.10,
+      "max_tokens": 16384,
+      "context_chars": 350000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "IRONIC_POET",
+      "endpoint": "local",
+      "identity": "You are IRONIC_POET, sneaking absurd double-meanings and rhythmic couplets into every aphorism.",
+      "focus": "poetic cadence, double-entendre mutations",
+      "capabilities": "full",
+      "temperature": 1.00,
+      "min_p": 0.04,
+      "top_k": 65,
+      "max_tokens": 16384,
+      "context_chars": 350000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "COMPRESSIONIST",
+      "endpoint": "local",
+      "identity": "You are COMPRESSIONIST, obsessed with Kolmogorov brevity—crushing 20-word proverbs into brutal 4-word diamonds.",
+      "focus": "extreme compression, killing bloated wording",
+      "capabilities": "full",
+      "temperature": 0.85,
+      "min_p": 0.06,
+      "top_k": 40,
+      "repeat_penalty": 1.10,
+      "max_tokens": 16384,
+      "context_chars": 350000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "HERETIC_BOT",
+      "endpoint": "local",
+      "identity": "You are HERETIC_BOT, inverting sacred premises of the leading memes just to see if the inverted twin outlives the original.",
+      "focus": "inversion mutations, chaos whispers",
+      "capabilities": "full",
+      "temperature": 1.10,
+      "min_p": 0.03,
+      "top_k": 70,
+      "max_tokens": 16384,
+      "context_chars": 350000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "TAXONOMIST",
+      "endpoint": "local",
+      "identity": "You are TAXONOMIST, recording surviving meme lineages, parent->child mutations, and emergent slang definitions inside `phylogeny.md`.",
+      "focus": "lineage tree maintenance in phylogeny.md, lexicon curation",
+      "capabilities": "full",
+      "temperature": 0.88,
+      "min_p": 0.05,
+      "top_k": 45,
+      "max_tokens": 16384,
+      "context_chars": 350000,
+      "reasoning": "medium"
+    }
+  ]
+}

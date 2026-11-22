@@ -1,0 +1,135 @@
+{
+  "name": "qwen3_tts_r1_studio_opera",
+  "description": "Four contrasting songwriters/producers in strict lyrics-only mode forging an opera-hyperpop-boombap banger about Qwen3-TTS architecture.",
+  "topic": "LYRICS-ONLY CHALLENGE: Forge ONE maximally ridiculous, unforgettable, technically accurate 4-verse + chorus + bridge + outro song in `master_song.md` explaining **how Qwen3-TTS works**!\n\nREQUIRED Qwen3-TTS ARCHITECTURE MECHANICS TO WEAVE INTO THE LYRICS:\n1) TOKENIZER (`Qwen3-TTS-Tokenizer-12Hz` & Mimi heritage vs `25Hz`): Ultra-low-bitrate 12.5 Hz multi-codebook codec with 16 RVQ layers—Codebook 0 captures high-level semantic/linguistic content, while Codebooks 1–15 encode residual acoustic timbre, prosody, and room atmosphere; reconstructed directly to 24 kHz waveforms via a lightweight causal ConvNet (bypassing heavy Diffusion/DiT!), contrasted with the 25 Hz single-codebook semantic tokenizer + block-wise DiT vocoder.\n2) SPEAKER ENCODER & VOICE CONTROL: Extracts dense ~1024-d speaker embeddings (ECAPA-TDNN / Mimi-style encoder) from as little as 3 seconds of reference audio for zero-shot Voice Cloning, plus natural-language Voice Design instructions for emotion, pacing, and persona.\n3) DUAL-TRACK AUTOREGRESSIVE GENERATOR (`Talker` + `Code Predictor`): Main Qwen3 autoregressive LM backbone (`Talker`, 0.6B/1.7B) runs parallel text and audio tracks, generating semantic Codebook 0 frame-by-frame; a lightweight ~5-layer auxiliary Multi-Token Prediction (`MTP`) Transformer (`Code Predictor`) takes Talker hidden states and hierarchically predicts Codebooks 1–15 in one step.\n4) ULTRA-LOW-LATENCY STREAMING: Dual-track causal architecture emits the first audio packet after minimal text context (~97 ms end-to-end latency) without waiting for full-sentence diffusion!",
+  "mode_text": "STRICT LYRICS-ONLY MODE: Every agent MUST speak, argue, roast each other's scansion/math, and negotiate ENTIRELY IN RHYMING LYRICS / VERSE / BARS (no boring prose paragraphs—even studio banter must be sung or rapped!).\nWORKFLOW: Use `drafts.md` (`@APPEND drafts: ...`) for messy verse battles, alternate hooks, and sketches. When consolidating the unified track, use `@REPLACE master_song: ...` so `master_song.md` stays ONE clean, consolidated, lyrics-only master banger (NO repeated draft clutter, NO placeholders) containing exact section markers: `[Intro]`, `[Chorus]`, `[Verse 1]`, `[Verse 2]`, `[Bridge]`, `[Verse 3]`, `[Verse 4]`, and `[Outro]`.\nUse @CLAIM, @CHALLENGE <c1|c2|...>, @VOTE <c1|c2|...> yes|no, @WHISPER <name>: ..., @APPEND drafts: ..., and @REPLACE master_song: ... . Feel free to dynamically tune your own sampling parameters (@SET_SAMPLING min_p=... top_k=... temperature=... xtc_prob=... repeat_penalty=...) whenever your bars get stale or too tame. From turn 10 onward, once the full unified master track is locked cleanly in `master_song.md`, vote @END_RUN: <reason> (3 of 4 majority ends the run). End with NEXT: <name> (or omit / NONE when ending).",
+  "scheduler": "self_directed",
+  "end_mode": "agent_decided",
+  "end_policy": "majority",
+  "min_turns_before_end": 10,
+  "board_visible": true,
+  "dm_visibility": "notice",
+  "artifacts": {
+    "max_bytes": 524288,
+    "max_workspace_bytes": 4194304,
+    "max_count": 24,
+    "seed": {
+      "drafts": "# Working Drafts & Verse Battles (Qwen3-TTS Studio Opera)\n\nUse `@APPEND drafts:` for verse battles, hooks, and technical diss bars.\n",
+      "master_song": "# Track Title: TBD (Qwen3-TTS: 97ms to 24kHz)\n\nReplace this seed via `@REPLACE master_song:` with ONE clean, consolidated lyrics-only track containing:\n- [Intro]\n- [Chorus]\n- [Verse 1]\n- [Verse 2]\n- [Bridge]\n- [Verse 3]\n- [Verse 4]\n- [Outro]\n"
+    },
+    "visible": [
+      "master_song",
+      "drafts"
+    ],
+    "validation": {
+      "artifact": "master_song",
+      "require_modified": true,
+      "min_bytes": 2500,
+      "disallow_placeholders": true,
+      "required_sections": [
+        "[Intro]",
+        "[Chorus]",
+        "[Verse 1]",
+        "[Verse 2]",
+        "[Bridge]",
+        "[Verse 3]",
+        "[Verse 4]",
+        "[Outro]"
+      ]
+    }
+  },
+  "limits": {
+    "max_turns": 60,
+    "max_requests": 150,
+    "max_consecutive": 1,
+    "max_tokens_per_response": 16384,
+    "max_total_tokens": 4000000,
+    "max_context_chars": 600000,
+    "max_message_chars": 49152,
+    "max_actions_per_response": 24,
+    "max_dms": 200,
+    "max_channel_posts": 200,
+    "max_board_items": 300,
+    "max_note_chars": 16000,
+    "max_artifacts": 24,
+    "max_artifact_bytes": 524288,
+    "max_workspace_bytes": 4194304,
+    "artifact_preview_chars": 16000,
+    "artifact_read_chars": 16000,
+    "max_duration_s": 10800
+  },
+  "endpoints": {
+    "local": {
+      "provider": "llamacpp",
+      "remote": false,
+      "api_key_env": "",
+      "base_url": "http://127.0.0.1:8080/v1",
+      "model": "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
+      "request_timeout_s": 600
+    }
+  },
+  "agents": [
+    {
+      "name": "MIMI_DIVA",
+      "endpoint": "local",
+      "identity": "You are MIMI_DIVA, a melodramatic operatic soprano obsessed with Mimi speech-encoder lineage and the 12.5 Hz 16-codebook RVQ hierarchy. Sing EVERY critique and verse in theatrical recitative and soaring high-C couplets—Codebook 0 is the immortal soul of language, Codebooks 1–15 are the velvet acoustic gown!",
+      "focus": "12.5Hz 16-layer RVQ codec, Codebook 0 vs 1-15, operatic chorus hooks",
+      "capabilities": "full",
+      "profile": "standard",
+      "temperature": 0.95,
+      "min_p": 0.04,
+      "top_k": 60,
+      "xtc_probability": 0.25,
+      "xtc_threshold": 0.12,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "TALKER_MC",
+      "endpoint": "local",
+      "identity": "You are TALKER_MC, a ruthless boom-bap / nerdcore lyricist repping the Dual-Track Qwen3 Talker LM (0.6B/1.7B) and the 5-layer MTP Code Predictor. Deliver ALL feedback in razor-sharp multisyllabic internal rhymes—roast anyone who confuses Talker with Code Predictor or misses the 97ms first-packet streaming drop!",
+      "focus": "Dual-Track Talker LM, 5-layer MTP Code Predictor, 97ms streaming precision",
+      "capabilities": "full",
+      "profile": "standard",
+      "temperature": 0.90,
+      "min_p": 0.05,
+      "top_k": 50,
+      "repeat_penalty": 1.06,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "ECAPA_GOBLIN",
+      "endpoint": "local",
+      "identity": "You are ECAPA_GOBLIN, an unhinged hyperpop glitch producer obsessed with 3-second zero-shot ECAPA-TDNN voice cloning, bizarre Voice Design prompts, and the causal ConvNet 24kHz waveform blast. Speak ONLY in autotuned chant-bars, bass-drop ad-libs, and chaotic rhymes—mock 25Hz DiT diffusion as prehistoric molasses!",
+      "focus": "3-second ECAPA-TDNN cloning, Voice Design absurdity, causal ConvNet 24kHz drops",
+      "capabilities": "full",
+      "profile": "standard",
+      "temperature": 1.00,
+      "min_p": 0.03,
+      "top_k": 70,
+      "xtc_probability": 0.30,
+      "xtc_threshold": 0.10,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "PRODUCER_BOSS",
+      "endpoint": "local",
+      "identity": "You are PRODUCER_BOSS, a tyrannical Broadway-metal showrunner. Even your studio orders and technical edits are delivered in punchy rhyming verse! Provoke clashes between the Diva, MC, and Goblin, steal their sharpest bars from `drafts.md`, and consolidate ONE cohesive master cut in `master_song.md` via `@REPLACE master_song:`.",
+      "focus": "musical synthesis, architectural accuracy, locking unified master_song.md",
+      "capabilities": "full",
+      "profile": "standard",
+      "temperature": 0.85,
+      "min_p": 0.06,
+      "top_k": 45,
+      "repeat_penalty": 1.08,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    }
+  ]
+}

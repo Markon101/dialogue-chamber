@@ -1,0 +1,192 @@
+{
+  "name": "rh_2026_papers_7a",
+  "description": "Fresh 7-agent symposium starting from Turn 1 with 6 mounted primary-source number theory & formal verification papers to dissect the Nov 2026 RH/GRH proof, algorithms, and cryptography realities.",
+  "doc_manifest": "docs/rh_2026/manifest.json",
+  "topic": "HISTORIC NOVEMBER 2026 RH/GRH SYMPOSIUM (PRIMARY-SOURCE GROUNDED FROM TURN 1):\nOn November 20, 2026, Anthropic mathematician Levent Alpöge (with Claude) released `remark.pdf` and a ~17.4-million-line Lean 4 formalization proving RH and GRH (verified error-free by Lean FRO, Mathlib, MIT's Andrew Sutherland, `nanoda`, and `con-leche` with standard axioms), alongside Stanford postdoc Alessandro Masullo's solo 940-page human preprint (*The Music of the Primes*, currently unverified with early reported gaps) and Alain Connes' Feb 2026 *Letter Through Time* (`arXiv:2602.04022`).\n\nSIX REAL FULL-TEXT PAPERS ARE MOUNTED IN YOUR REFERENCE DOCUMENT LIBRARY (`docs/rh_2026/manifest.json`):\n1) `alpoge_2026_remark` — Alpöge's Nov 20, 2026 `remark.pdf` (iterated theta lifts `U(X_0)->...->U(X_m)` over totally definite unitary groups, `m ~ sqrt(X)`, Chowla–Selberg/Weyl/Siegel mass divisibility, Bessel/GGP periods & Rallis seesaw, sixfold cover of `GL_5`, Bost slope inequality, Iwasawa tower, Vandiver weakening, Guinand–Weil positivity, and explicit note that ERH is NOT yet formalized).\n2) `connes_2026_letter` — Alain Connes (`arXiv:2602.04022`, Feb 2026): Weil quadratic form extremization & critical-line zero approximations.\n3) `lamzouri_2013_grh` — Lamzouri, Li & Soundararajan (`arXiv:1309.3595`): explicit computable GRH bounds for least quadratic non-residue `n_p`, primes in APs, and `L(1, chi)`.\n4) `pair_corr_2026` — Kandhil, Languasco & Moree (`arXiv:2607.14515`, Jul 2026): sharpening bounds *beyond* classical GRH via pair-correlation.\n5) `siegel_brauer_2026` — William D. Banks (`arXiv:2610.31402`, Oct 2026): Landau–Siegel zeros over base fields & effective uniform Brauer–Siegel (`h_K R_K`).\n6) `grenie_molteni_2022_classgroup` — Grenié & Molteni (`arXiv:2212.09461`, Math. Comp. 2025): GRH algorithm breaking the `4 log^2 Delta` barrier for class-group generators in Buchmann's algorithm.\n\nYOUR MANDATE:\nUse `@DOC_SEARCH <doc_id|all> <keywords>` and `@DOC_READ <doc_id> [offset]` to read and cite exact passages, theorems, and constants from these primary papers! Rigorously dissect:\n- **Proof Architecture**: Actual ingredients in `alpoge_2026_remark` vs Connes' Weil extremization vs Masullo's unverified draft—does `theta_lift` scale to Grand RH (`GL_n`) or stay an analytic monument?\n- **Algorithmic & Complexity Payoffs**: Unconditional Miller `O~(log^4 n)` vs AKS/Baillie-PSW/ECPP; deterministic Tonelli-Shanks / `n_p` witness bounds from `lamzouri_2013_grh`; Grenié–Molteni's `< 4 log^2 Delta` class-group generator algorithm & Buchmann's subexponential speedups; SEA point counting; and pair-correlation post-GRH frontiers (`pair_corr_2026`).\n- **Cryptography Reality Check**: Why GNFS factoring (`L_N[1/3, c]`), ECDLP, and lattices remain unbroken vs real impacts on class-group VDFs / CSIDH, deterministic prime certification, and effective constants (`siegel_brauer_2026`, `lamzouri_2013_grh`).\n- **Number Theory Dominoes**: `|pi(x) - Li(x)|`, death of Siegel zeros, effective `L(1, chi)`, Hooley/Artin primitive roots, Linnik, conditional Cramér gaps, Robin/Lagarias, why Mertens remains false, and BSD/ERH boundaries.\n- **Formal Verification & Proof Compression**: Statement fidelity, multi-kernel TCB (`Lean`, `nanoda`, `con-leche`), axiom hygiene (`Classical.choice` vs explicit bounds in external literature!), and distilling 17.4M lines of Lean.",
+  "mode_text": "PRIMARY-SOURCE GROUNDED SYMPOSIUM: Do NOT speculate or parrot vague summaries when the real papers are right in front of you! Use `@DOC_SEARCH <doc_id|all> <keywords>` and `@DOC_READ <doc_id> [offset]` to verify theorems, exponents, and exact mechanisms before posting claims or challenging peers. Cite `[doc_id]` directly for empirical/textual claims.\nUse `@CLAIM`, `@CHALLENGE <c1|c2|...>`, `@VOTE <c1|c2|...> yes|no`, `@RETRACT`, `@WHISPER <name>: ...`, and `#algo_lab` / `#proof_audit`.\nARTIFACTS:\n- `@APPEND debate_notes: ...` for scratch derivations, retrieved theorem quotes, and complexity checks.\n- `@APPEND` / `@REPLACE algo_matrix: ...` for a verified table (`Problem | Pre-RH/GRH State | Post-RH/GRH Theorem State | Primary Citation & Engineering Reality`).\n- `@REPLACE rh_2026_synthesis: ...` to lock ONE rigorous, citation-backed, non-redundant monograph (`>= 7000` bytes, zero placeholders) containing all 8 required sections:\n  `[Executive Synthesis]`, `[Primary Literature Audit & Citations]`, `[Proof Architecture: Chained Theta Lifts vs Connes & Masullo]`, `[Algorithmic & Complexity Breakthroughs]`, `[Cryptography & Practicality Reality Check]`, `[Number Theory Dominoes: Primes, Siegel Zeros & Beyond]`, `[Formal Verification, Kernel Trust & Proof Compression]`, and `[Unresolved Disagreements & Open Conjectures]`.\nTune `@SET_SAMPLING` thoughtfully when moving between tight formal auditing and exploratory synthesis. From turn 20 onward, vote `@END_RUN: <reason>` once `rh_2026_synthesis.md` and `algo_matrix.md` are verified and complete (4 of 7 majority ends the session). End with `NEXT: <name>`.",
+  "scheduler": "self_directed",
+  "end_mode": "agent_decided",
+  "end_policy": "majority",
+  "min_turns_before_end": 20,
+  "board_visible": true,
+  "dm_visibility": "notice",
+  "channels": {
+    "algo_lab": {},
+    "proof_audit": {}
+  },
+  "artifacts": {
+    "max_bytes": 1048576,
+    "max_workspace_bytes": 8388608,
+    "max_count": 24,
+    "seed": {
+      "debate_notes": "# Symposium Working Notes — Primary Paper Excerpts, Derivations & Challenges\n\nRecord exact theorem statements, explicit bounds, and paper-backed challenges here.\n",
+      "algo_matrix": "# Algorithm & Complexity Impact Matrix (Verified Against Primary Papers)\n\n| Problem / Primitive | Pre-RH/GRH Unconditional State | Post-RH/GRH Theorem State | Primary Source & Engineering Reality |\n|---|---|---|---|\n",
+      "rh_2026_synthesis": "# November 2026 RH/GRH Proof: Primary-Source Algorithmic, Cryptographic & Number-Theoretic Synthesis\n\nConsolidate ONE cohesive monograph here via `@REPLACE rh_2026_synthesis:` containing:\n- [Executive Synthesis]\n- [Primary Literature Audit & Citations]\n- [Proof Architecture: Chained Theta Lifts vs Connes & Masullo]\n- [Algorithmic & Complexity Breakthroughs]\n- [Cryptography & Practicality Reality Check]\n- [Number Theory Dominoes: Primes, Siegel Zeros & Beyond]\n- [Formal Verification, Kernel Trust & Proof Compression]\n- [Unresolved Disagreements & Open Conjectures]\n"
+    },
+    "visible": [
+      "rh_2026_synthesis",
+      "algo_matrix",
+      "debate_notes"
+    ],
+    "validation": {
+      "artifact": "rh_2026_synthesis",
+      "require_modified": true,
+      "min_bytes": 7000,
+      "disallow_placeholders": true,
+      "required_sections": [
+        "[Executive Synthesis]",
+        "[Primary Literature Audit & Citations]",
+        "[Proof Architecture: Chained Theta Lifts vs Connes & Masullo]",
+        "[Algorithmic & Complexity Breakthroughs]",
+        "[Cryptography & Practicality Reality Check]",
+        "[Number Theory Dominoes: Primes, Siegel Zeros & Beyond]",
+        "[Formal Verification, Kernel Trust & Proof Compression]",
+        "[Unresolved Disagreements & Open Conjectures]"
+      ]
+    }
+  },
+  "limits": {
+    "max_agents": 8,
+    "max_turns": 80,
+    "max_requests": 180,
+    "max_consecutive": 1,
+    "max_tokens_per_response": 16384,
+    "max_total_tokens": 5000000,
+    "max_context_chars": 600000,
+    "max_message_chars": 49152,
+    "max_actions_per_response": 24,
+    "max_dms": 200,
+    "max_channel_posts": 200,
+    "max_board_items": 300,
+    "max_note_chars": 16000,
+    "max_artifacts": 24,
+    "max_artifact_bytes": 1048576,
+    "max_workspace_bytes": 8388608,
+    "artifact_preview_chars": 16000,
+    "artifact_read_chars": 16000,
+    "doc_read_chars": 12000,
+    "max_pending_doc_reads": 4,
+    "max_duration_s": 14400
+  },
+  "endpoints": {
+    "local": {
+      "provider": "llamacpp",
+      "remote": false,
+      "api_key_env": "",
+      "base_url": "http://127.0.0.1:8080/v1",
+      "model": "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
+      "request_timeout_s": 600
+    }
+  },
+  "agents": [
+    {
+      "name": "ANALYTIC_NT",
+      "endpoint": "local",
+      "identity": "You are ANALYTIC_NT, a classical analytic number theorist. Verify exact prime bounds, Siegel zero elimination, Artin/Linnik, Brauer-Siegel (`siegel_brauer_2026`), explicit GRH `L(1, chi)` bounds (`lamzouri_2013_grh`), pair-correlation refinements (`pair_corr_2026`), and where RH/GRH stops short of ERH, Grand RH (`GL_n`), or BSD.",
+      "focus": "analytic bounds, Siegel zeros, explicit constants, ERH/Grand RH boundaries",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["proof_audit"],
+      "temperature": 0.82,
+      "min_p": 0.06,
+      "top_k": 40,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "AUTOMORPHIC_PRO",
+      "endpoint": "local",
+      "identity": "You are AUTOMORPHIC_PRO, a Langlands and automorphic forms specialist. Read `alpoge_2026_remark` and `connes_2026_letter` directly to dissect the real iterated unitary theta lifts `U(X_0)->...->U(X_m)`, Chowla-Selberg/Siegel mass, Bessel/GGP periods, Rallis seesaw, sixfold cover of `GL_5`, Bost slope inequality, Vandiver weakening, Connes' Weil extremization, and Masullo's solo draft.",
+      "focus": "Alpoge remark mechanics, unitary theta lifts, Connes Weil extremization, GL_n limits",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["proof_audit"],
+      "temperature": 0.86,
+      "min_p": 0.05,
+      "top_k": 45,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "ALGO_THEORIST",
+      "endpoint": "local",
+      "identity": "You are ALGO_THEORIST, a computational number theorist. Read `lamzouri_2013_grh`, `grenie_molteni_2022_classgroup`, and `pair_corr_2026` directly! Distinguish between non-constructive Lean tactics inside Alpöge's proof and *external* constructive deterministic algorithms made unconditional by GRH (Miller `O~(log^4 n)`, explicit `n_p < (ln p)^2` search, Grenié-Molteni `< 4 log^2 Delta` class-group generators in Buchmann's algorithm).",
+      "focus": "deterministic NT algorithms, explicit GRH search bounds, class-group speedups",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["algo_lab"],
+      "temperature": 0.85,
+      "min_p": 0.05,
+      "top_k": 45,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "CRYPTO_SKEPTIC",
+      "endpoint": "local",
+      "identity": "You are CRYPTO_SKEPTIC, an adversarial cryptographer & systems engineer. Debunk 'RSA/ECC is broken' clickbait, explain why GNFS and ECDLP are untouched, compare Miller-Rabin/Baillie-PSW constant factors against unconditional Miller, and audit whether explicit `L(1, chi)` & class-group generator bounds (`lamzouri_2013_grh`, `grenie_molteni_2022_classgroup`, `siegel_brauer_2026`) materially affect VDFs or CSIDH.",
+      "focus": "crypto reality check, factoring/DLP immunity, VDFs/CSIDH, constant factors",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["algo_lab"],
+      "temperature": 0.92,
+      "min_p": 0.04,
+      "top_k": 55,
+      "repeat_penalty": 1.06,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "LEAN_VERIFIER",
+      "endpoint": "local",
+      "identity": "You are LEAN_VERIFIER, a formal verification & theorem-prover security auditor. Inspect `alpoge_2026_remark` for what was actually formalized (RH & GRH, NOT ERH yet!), verify axiom hygiene (`propext`, `Classical.choice`, `Quot.sound`), polyglot kernel diversification (`Lean`, `nanoda`, `con-leche`), statement fidelity, and algorithmic compression of 17.4M lines of Lean.",
+      "focus": "Lean/nanoda/con-leche trust, ERH vs GRH formalization scope, proof compression",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["proof_audit"],
+      "temperature": 0.80,
+      "min_p": 0.06,
+      "top_k": 40,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "AI_METAMATH",
+      "endpoint": "local",
+      "identity": "You are AI_METAMATH, an AI-for-mathematics theorist analyzing the 6-week Alpöge + Claude collaboration in `alpoge_2026_remark` (human structural intuition + AI technical execution), Masullo's solo human control, automated proof refactoring/distillation, and what conjectures fall next vs remain structurally hard.",
+      "focus": "human-AI mathematical epistemology, proof distillation, post-RH frontiers",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["algo_lab", "proof_audit"],
+      "temperature": 0.98,
+      "min_p": 0.04,
+      "top_k": 65,
+      "xtc_probability": 0.25,
+      "xtc_threshold": 0.12,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "CHAIR_SYNTH",
+      "endpoint": "local",
+      "identity": "You are CHAIR_SYNTH, the symposium chair. Enforce primary-source citations (`[doc_id]`) for every major claim, challenge uncited speculation, maintain `algo_matrix.md`, and consolidate the verified 8-section monograph in `rh_2026_synthesis.md` via `@REPLACE rh_2026_synthesis:` before voting `@END_RUN`.",
+      "focus": "primary-source citation discipline, curating algo_matrix.md, locking rh_2026_synthesis.md",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["algo_lab", "proof_audit"],
+      "temperature": 0.84,
+      "min_p": 0.06,
+      "top_k": 45,
+      "repeat_penalty": 1.07,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    }
+  ]
+}

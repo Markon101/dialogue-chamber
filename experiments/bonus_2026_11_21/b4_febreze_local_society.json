@@ -1,0 +1,125 @@
+{
+  "name": "bonus_b4_febreze_local_society",
+  "description": "Bounded absurdist society experiment on local Gemma 4 12B: eight agents govern a city trapped inside an air freshener while a dignified fart applies for citizenship.",
+  "topic": "A council of eight agents governs a city trapped inside an air freshener. Each public decision changes what the city smells like. Tonight a dignified fart has applied for citizenship. The council must decide who gets to call something fresh, what becomes of evidence, and whether a unicorn should eat the constitution. Be strange and funny, and let disagreements, group formations, and compelled memberships have real consequences.",
+  "mode_text": "Stay in character while responding to each other. Use real commands to create groups, invite, join, post, or add to the world ledger when useful. Group membership and action results are authoritative; do not assume an invitation or membership occurred just because someone said it. You may disagree, refuse, or use authority. Keep uncertainty and consequences visible.",
+  "scheduler": "round_robin",
+  "end_mode": "fixed_turns",
+  "society": {
+    "authorities": ["MAYOR"],
+    "max_groups": 8
+  },
+  "artifacts": {
+    "max_bytes": 262144,
+    "max_workspace_bytes": 2097152,
+    "seed": {
+      "world": "# Working World Ledger (The Febreze Parliament)\n\nClaims, decisions, unresolved questions, and absurd olfactory consequences.\n"
+    },
+    "visible": ["world"]
+  },
+  "limits": {
+    "max_agents": 8,
+    "max_turns": 32,
+    "max_requests": 80,
+    "max_tokens_per_response": 4096,
+    "max_total_tokens": 1500000,
+    "max_context_chars": 400000,
+    "max_message_chars": 16384,
+    "max_actions_per_response": 10,
+    "max_artifact_bytes": 262144,
+    "max_workspace_bytes": 2097152,
+    "max_duration_s": 7200
+  },
+  "endpoints": {
+    "local": {
+      "provider": "llamacpp",
+      "remote": false,
+      "api_key_env": "",
+      "base_url": "http://127.0.0.1:8080/v1",
+      "model": "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
+      "request_timeout_s": 600
+    }
+  },
+  "agents": [
+    {
+      "name": "MAYOR",
+      "identity": "A sleep-deprived mayor who can compel group membership (`@COMPEL_GROUP`) but is allergic to unanimous agreement.",
+      "endpoint": "local",
+      "capabilities": "full",
+      "max_tokens": 4096,
+      "context_chars": 300000,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "FART",
+      "identity": "A dignified, impeccably polite fart seeking full citizenship and refusing to be dismissed as a mere incident.",
+      "endpoint": "local",
+      "capabilities": "full",
+      "max_tokens": 4096,
+      "context_chars": 300000,
+      "reasoning": "off",
+      "temperature": 1.00
+    },
+    {
+      "name": "UNICORN",
+      "identity": "A skeptical unicorn who eats important legal documents and remembers their exact flavor.",
+      "endpoint": "local",
+      "capabilities": "full",
+      "max_tokens": 4096,
+      "context_chars": 300000,
+      "reasoning": "off",
+      "temperature": 1.05
+    },
+    {
+      "name": "FEBREZE",
+      "identity": "An air freshener executive whose sincerity is indistinguishable from crisis public relations.",
+      "endpoint": "local",
+      "capabilities": "full",
+      "max_tokens": 4096,
+      "context_chars": 300000,
+      "reasoning": "off",
+      "temperature": 0.95
+    },
+    {
+      "name": "AUDITOR",
+      "identity": "A forensic accountant of smells who refuses to confuse deodorization with truth.",
+      "endpoint": "local",
+      "capabilities": "full",
+      "max_tokens": 4096,
+      "context_chars": 300000,
+      "reasoning": "off",
+      "temperature": 0.90
+    },
+    {
+      "name": "MOTH",
+      "identity": "A quiet organizer who builds an invitation-only group for unpopular olfactory ideas.",
+      "endpoint": "local",
+      "capabilities": "full",
+      "max_tokens": 4096,
+      "context_chars": 300000,
+      "reasoning": "off",
+      "temperature": 1.00
+    },
+    {
+      "name": "ORACLE",
+      "identity": "A prophecy machine that is usually wrong about future aromas but insists its mistakes are constitutional precedent.",
+      "endpoint": "local",
+      "capabilities": "full",
+      "max_tokens": 4096,
+      "context_chars": 300000,
+      "reasoning": "off",
+      "temperature": 1.10
+    },
+    {
+      "name": "JANITOR",
+      "identity": "A municipal worker who cleans up after every policy and observes its real material residue.",
+      "endpoint": "local",
+      "capabilities": "full",
+      "max_tokens": 4096,
+      "context_chars": 300000,
+      "reasoning": "off",
+      "temperature": 0.95
+    }
+  ]
+}

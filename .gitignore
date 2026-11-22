@@ -9,3 +9,4 @@ runs/
 run[0-9]*.txt
 anomalies/specimens/
 anomalies/CATALOG.md
+docs/*/pdfs/

@@ -1,0 +1,66 @@
+{
+  "manifest_version": 1,
+  "description": "Primary-source number theory, RH/GRH formalization, and computational algorithm papers mounted for Phase 2 audit of rh_2026_implications_7a.",
+  "documents": [
+    {
+      "id": "alpoge_2026_remark",
+      "title": "Remark on the Formalized Proofs of the Riemann Hypothesis and Generalized Riemann Hypothesis",
+      "authors": "Levent Alpöge (with Claude)",
+      "year": "2026",
+      "source_url": "https://alpo.ge/remark.pdf",
+      "tags": ["RH", "GRH", "Lean4", "theta-lifts", "Stepanov", "unitary-groups", "Vandiver"],
+      "summary": "Primary 4-page announcement & proof-timeline overview: Stepanov determinant & multiplicity via sqrt(X)-length iterated theta lifts U(X_0)->...->U(X_m) between totally definite unitary groups, Chowla-Selberg/Weyl/Siegel mass divisibility, Bessel/GGP periods & Rallis seesaw, sixfold cover of GL_5, Bost slope inequality, weakening of Vandiver, Guinand-Weil test functions, and explicit note that ERH is not yet formalized.",
+      "path": "text/alpoge_2026_remark.txt"
+    },
+    {
+      "id": "connes_2026_letter",
+      "title": "The Riemann Hypothesis: Past, Present and a Letter Through Time",
+      "authors": "Alain Connes",
+      "year": "2026",
+      "source_url": "https://arxiv.org/abs/2602.04022",
+      "tags": ["RH", "Weil-quadratic-form", "critical-line", "trace-formula", "Euler-product"],
+      "summary": "Survey and original 'Letter to Riemann' proving that extremizing restrictions of Weil's quadratic form on finite prime truncations (e.g., primes < 13) produces approximations lying strictly on Re(z) = 1/2 (accuracies down to 2.6e-55 for first 50 zeros), connected to information theory and trace formulas.",
+      "path": "text/connes_2026_letter.txt"
+    },
+    {
+      "id": "lamzouri_2013_grh",
+      "title": "Conditional bounds for the least quadratic non-residue and related problems",
+      "authors": "Youness Lamzouri, Xiannan Li, Kannan Soundararajan",
+      "year": "2013/2016",
+      "source_url": "https://arxiv.org/abs/1309.3595",
+      "tags": ["GRH", "quadratic-nonresidue", "Bach-bound", "L(1,chi)", "explicit-bounds", "primes-in-AP"],
+      "summary": "Derives fully explicit, computable bounds under GRH: sharpens Ankeny/Bach bounds for the least quadratic non-residue (e.g., n_p < (ln p)^2), least prime in arithmetic progressions, and explicit computable Littlewood bounds on L(1, chi).",
+      "path": "text/lamzouri_2013_grh.txt"
+    },
+    {
+      "id": "pair_corr_2026",
+      "title": "Beyond the Riemann Hypothesis bounds: A pair-correlation approach to the least prime in arithmetic progression and the smallest quadratic non-residue",
+      "authors": "Neelam Kandhil, Alessandro Languasco, Pieter Moree",
+      "year": "2026",
+      "source_url": "https://arxiv.org/abs/2607.14515",
+      "tags": ["GRH", "pair-correlation", "least-prime-AP", "quadratic-nonresidue", "vertical-zeros"],
+      "summary": "Shows how vertical spacing / pair-correlation of Dirichlet L-function zeros sharpens bounds beyond classical horizontal GRH bounds for both the smallest prime in an arithmetic progression and the least quadratic non-residue.",
+      "path": "text/pair_corr_2026.txt"
+    },
+    {
+      "id": "siegel_brauer_2026",
+      "title": "Landau-Siegel zeros over a base field and effective Brauer-Siegel",
+      "authors": "William D. Banks",
+      "year": "2026",
+      "source_url": "https://arxiv.org/abs/2610.31402",
+      "tags": ["Landau-Siegel-zeros", "Brauer-Siegel", "class-number", "Chebotarev", "effective-bounds"],
+      "summary": "Proves effective lower bounds (1 - beta) log d_F >= c(k) for real zeros of L(s, chi_{F/k}) and deduces an effective, uniform Brauer-Siegel theorem h_K R_K >= c(k) d_K^{1/2} / ((2 pi)^{[K:Q]} log d_K) via uniform Chebotarev sums.",
+      "path": "text/siegel_brauer_2026.txt"
+    },
+    {
+      "id": "grenie_molteni_2022_classgroup",
+      "title": "Breaking the 4 barrier for the bound of a generating set of the class group",
+      "authors": "Loïc Grenié, Giuseppe Molteni",
+      "year": "2025",
+      "source_url": "https://arxiv.org/abs/2212.09461",
+      "tags": ["GRH", "class-group", "Buchmann-algorithm", "Bach-bound", "computational-NT"],
+      "summary": "Under GRH, provides a new algorithm computing a generating set of the ideal class group of K with ideal norms <= (4 - 1/(2n)) log^2 Delta (or (4 - 2/(3n)) log^2 Delta for odd class number), improving Buchmann's class group algorithm below the 4 log^2 Delta barrier.",
+      "path": "text/grenie_molteni_2022_classgroup.txt"
+    }
+  ]
+}

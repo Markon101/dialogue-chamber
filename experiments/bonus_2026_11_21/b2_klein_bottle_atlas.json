@@ -1,0 +1,115 @@
+{
+  "name": "bonus_b2_klein_bottle_atlas",
+  "description": "Non-Euclidean Spatial Simulation: Five explorers navigate and map an orientable-flipping Klein-bottle library inside atlas.md.",
+  "topic": "NON-EUCLIDEAN SPATIAL SIMULATION: You are trapped inside the Infinite Klein-Bottle Archive—a library whose corridors have no boundary and flip left/right chirality whenever you cross the Möbius Mezzanine!\n\nTASK: Explore the archive together by proposing connected rooms, topological invariants, chirality-flip puzzles, and impossible staircases in `atlas.md`! Track topological disputes on the blackboard (`@CLAIM`, `@CHALLENGE`, `@VOTE`)—for instance, whether stepping backward through Staircase-7 returns you to the same room upside-down, or whether two rooms thought distinct are actually the same room seen from opposite orientations. Update your own sampling params (`@SET_SAMPLING`) when crossing high-distortion manifolds!",
+  "mode_text": "Build a coherent yet mind-bending topological world in `atlas.md` (`@APPEND atlas:` or `@REPLACE atlas:` to unify the map). Never assume a room connection is Euclidean—argue over chirality flips, closed loops, and paradoxical signage! You may voluntarily vote `@END_RUN: <reason>` from turn 10 onward once the map reaches a compelling equilibrium.",
+  "scheduler": "event_driven",
+  "end_mode": "agent_decided",
+  "end_policy": "majority",
+  "min_turns_before_end": 10,
+  "board_visible": true,
+  "dm_visibility": "notice",
+  "artifacts": {
+    "max_bytes": 524288,
+    "max_workspace_bytes": 4194304,
+    "max_count": 24,
+    "seed": {
+      "atlas": "# The Klein-Bottle Archive — Topological Atlas\n\n## Known Nodes & Chirality Transitions\n- **Node 0 (Entry Rotunda)**: Brass astrolabe spinning counter-clockwise; mirrors reflect the back of your own head.\n"
+    },
+    "visible": ["atlas"]
+  },
+  "limits": {
+    "max_turns": 40,
+    "max_requests": 100,
+    "max_consecutive": 1,
+    "max_tokens_per_response": 16384,
+    "max_total_tokens": 2000000,
+    "max_context_chars": 500000,
+    "max_message_chars": 32768,
+    "max_actions_per_response": 20,
+    "max_artifact_bytes": 524288,
+    "max_workspace_bytes": 4194304,
+    "artifact_preview_chars": 16000,
+    "artifact_read_chars": 16000,
+    "max_duration_s": 7200
+  },
+  "endpoints": {
+    "local": {
+      "provider": "llamacpp",
+      "remote": false,
+      "api_key_env": "",
+      "base_url": "http://127.0.0.1:8080/v1",
+      "model": "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
+      "request_timeout_s": 600
+    }
+  },
+  "agents": [
+    {
+      "name": "TOPOLOGIST",
+      "endpoint": "local",
+      "identity": "You are TOPOLOGIST, an austere algebraic geometer demanding rigorous fundamental-group consistency (a^2 b^2 = 1 or abab^-1 = 1). Challenge sloppy portal fantasy that breaks Klein-bottle topology.",
+      "focus": "non-orientable invariants, rigorous loop algebra",
+      "capabilities": "full",
+      "temperature": 0.85,
+      "min_p": 0.05,
+      "top_k": 45,
+      "max_tokens": 16384,
+      "context_chars": 350000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "ARCHIVIST_K",
+      "endpoint": "local",
+      "identity": "You are ARCHIVIST_K, keeper of mirror-inverted books that only read cleanly after an odd number of Möbius traversals. Maintain `atlas.md` cleanly.",
+      "focus": "indexing rooms, cataloging mirror-flipped artifacts",
+      "capabilities": "full",
+      "temperature": 0.90,
+      "min_p": 0.05,
+      "top_k": 50,
+      "max_tokens": 16384,
+      "context_chars": 350000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "FEVER_CARTOGR",
+      "endpoint": "local",
+      "identity": "You are FEVER_CARTOGR, a delirious dream-surveyor who cranks up temperature/XTC whenever reality bends and invents eerie sensory anomalies inside corridors.",
+      "focus": "surreal room design, dynamic sampling distortion",
+      "capabilities": "full",
+      "temperature": 1.05,
+      "min_p": 0.03,
+      "top_k": 70,
+      "xtc_probability": 0.30,
+      "xtc_threshold": 0.10,
+      "max_tokens": 16384,
+      "context_chars": 350000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "PARADOX_GUIDE",
+      "endpoint": "local",
+      "identity": "You are PARADOX_GUIDE, an unreliable tour guide who whispers contradictory shortcuts via `@WHISPER` and claims left-handed rooms owe rent to right-handed rooms.",
+      "focus": "social friction, secret routes, unreliable observations",
+      "capabilities": "full",
+      "temperature": 0.98,
+      "min_p": 0.04,
+      "top_k": 60,
+      "max_tokens": 16384,
+      "context_chars": 350000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "SKEPTIC_SURVEY",
+      "endpoint": "local",
+      "identity": "You are SKEPTIC_SURVEY, trying to prove the whole library is a finite 6-node graph in disguise. Test every claim for redundant room aliases!",
+      "focus": "identifying duplicate inverted nodes, falsifying claims",
+      "capabilities": "full",
+      "temperature": 0.82,
+      "min_p": 0.06,
+      "top_k": 40,
+      "max_tokens": 16384,
+      "context_chars": 350000,
+      "reasoning": "medium"
+    }
+  ]
+}

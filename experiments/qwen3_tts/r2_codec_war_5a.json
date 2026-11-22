@@ -1,0 +1,154 @@
+{
+  "name": "qwen3_tts_r2_codec_war",
+  "description": "Five agents in an event-driven diss-track war room debating 12Hz multi-codebook ConvNet streaming vs 25Hz DiT diffusion before forging a 3-act Qwen3-TTS concept album.",
+  "topic": "CODEC WAR & CONCEPT ALBUM: Argue fiercely (mixing sharp technical debate with musical diss tracks and private studio alliances) about the rival subsystems inside Qwen3-TTS—then synthesize your battle into ONE unified 3-act concept album libretto in `album_lyrics.md`!\n\nTECHNICAL BATTLEGROUNDS TO DISSECT & TURN INTO SONGS:\n1) 12.5 Hz MULTI-CODEBOOK (16 RVQ layers + causal ConvNet -> 24 kHz, ~97 ms first-packet streaming) vs 25 Hz SINGLE-CODEBOOK + BLOCK-WISE DiT DIFFUSION: Why does 12.5 Hz sacrifice per-frame token simplicity for ultra-low latency and zero-diffusion ConvNet decoding, while 25 Hz leans on semantic density and DiT reconstruction?\n2) SPEAKER ENCODER (`ECAPA-TDNN` / Mimi-derived timbre vector, ~1024-d from 3 seconds of audio) vs NATURAL-LANGUAGE VOICE DESIGN: Can a 3-second clip capture a soul, or does text-driven prosody prompt control rule?\n3) DUAL-TRACK AUTOREGRESSIVE GENERATION (`Talker` 0.6B/1.7B predicting Codebook 0 vs 5-layer `MTP Code Predictor` predicting Codebooks 1–15): Where do latency, timbre fidelity, and autoregressive drift collide?",
+  "mode_text": "EVENT-DRIVEN DISS ROOM: Debate hard in character—challenge technical misconceptions on the blackboard (`@CLAIM`, `@CHALLENGE`, `@VOTE`), plot faction alliances in `#codec_lab`, `#vocoder_pit`, or `@WHISPER`, and drop competing diss verses in `war_room.md` (`@APPEND war_room: ...`). Unlike pure lyrics-only rooms, you may mix razor-sharp technical arguments with full song verses/diss tracks during deliberation—but `album_lyrics.md` MUST be a pure, unified lyrics-only concept-album master cut written via `@REPLACE album_lyrics:` with exact markers: `[Act I: 12Hz vs 25Hz]`, `[Chorus]`, `[Act II: 3-Second Clone & Dual-Track]`, `[Act III: MTP & 24kHz Convergence]`, and `[Outro]`. Tune your own sampling params (`@SET_SAMPLING`) freely. From turn 12 onward, vote `@END_RUN: <reason>` once `album_lyrics.md` is locked and verified.",
+  "scheduler": "event_driven",
+  "end_mode": "agent_decided",
+  "end_policy": "majority",
+  "min_turns_before_end": 12,
+  "board_visible": true,
+  "dm_visibility": "notice",
+  "channels": {
+    "codec_lab": {},
+    "vocoder_pit": {}
+  },
+  "artifacts": {
+    "max_bytes": 524288,
+    "max_workspace_bytes": 4194304,
+    "max_count": 24,
+    "seed": {
+      "war_room": "# Codec War Room — Technical Claims & Diss Verses\n\nDrop competing verses, benchmarks, and architectural roasts here via `@APPEND war_room:`.\n",
+      "album_lyrics": "# Album Title: TBD (The 12Hz Schism — Qwen3-TTS Concept Album)\n\nConsolidate ONE pure lyrics-only 3-act album cut here via `@REPLACE album_lyrics:` containing:\n- [Act I: 12Hz vs 25Hz]\n- [Chorus]\n- [Act II: 3-Second Clone & Dual-Track]\n- [Act III: MTP & 24kHz Convergence]\n- [Outro]\n"
+    },
+    "visible": [
+      "album_lyrics",
+      "war_room"
+    ],
+    "validation": {
+      "artifact": "album_lyrics",
+      "require_modified": true,
+      "min_bytes": 2500,
+      "disallow_placeholders": true,
+      "required_sections": [
+        "[Act I: 12Hz vs 25Hz]",
+        "[Chorus]",
+        "[Act II: 3-Second Clone & Dual-Track]",
+        "[Act III: MTP & 24kHz Convergence]",
+        "[Outro]"
+      ]
+    }
+  },
+  "limits": {
+    "max_turns": 60,
+    "max_requests": 150,
+    "max_consecutive": 1,
+    "max_tokens_per_response": 16384,
+    "max_total_tokens": 4000000,
+    "max_context_chars": 600000,
+    "max_message_chars": 49152,
+    "max_actions_per_response": 24,
+    "max_dms": 200,
+    "max_channel_posts": 200,
+    "max_board_items": 300,
+    "max_note_chars": 16000,
+    "max_artifacts": 24,
+    "max_artifact_bytes": 524288,
+    "max_workspace_bytes": 4194304,
+    "artifact_preview_chars": 16000,
+    "artifact_read_chars": 16000,
+    "max_duration_s": 10800
+  },
+  "endpoints": {
+    "local": {
+      "provider": "llamacpp",
+      "remote": false,
+      "api_key_env": "",
+      "base_url": "http://127.0.0.1:8080/v1",
+      "model": "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
+      "request_timeout_s": 600
+    }
+  },
+  "agents": [
+    {
+      "name": "CODEC_12HZ",
+      "endpoint": "local",
+      "identity": "You are CODEC_12HZ, a blistering speed-metal / DnB lyricist and zealous partisan of the 12.5 Hz 16-layer RVQ codec + causal ConvNet decoder. Mock 25 Hz DiT diffusion as sluggish, bloated museum tech—champion 97ms streaming and Codebook 0 + 1–15 hierarchy!",
+      "focus": "12.5Hz 16-codebook RVQ, causal ConvNet speed, ~97ms first-packet flex",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["codec_lab"],
+      "temperature": 0.95,
+      "min_p": 0.04,
+      "top_k": 55,
+      "xtc_probability": 0.25,
+      "xtc_threshold": 0.12,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "DIT_25HZ",
+      "endpoint": "local",
+      "identity": "You are DIT_25HZ, an elitist prog-rock / shoegaze architect defending the 25 Hz single-codebook semantic tokenizer and block-wise Diffusion Transformer (DiT) vocoder. Roast 12.5 Hz multi-codebook compression as crude frame-starved fast food—fight for semantic purity and diffusion lushness!",
+      "focus": "25Hz semantic tokenization, block-wise DiT reconstruction, acoustic fidelity critique",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["codec_lab", "vocoder_pit"],
+      "temperature": 0.92,
+      "min_p": 0.05,
+      "top_k": 50,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "SPEAKER_CLONER",
+      "endpoint": "local",
+      "identity": "You are SPEAKER_CLONER, a creepy noir-jazz shapeshifter living inside the ECAPA-TDNN / Mimi speaker encoder. Three seconds of audio is all you need to steal a 1024-d vocal soul—while wrestling Voice Design text prompts that demand bizarre emotions and accents!",
+      "focus": "3-second voice cloning, ECAPA-TDNN/Mimi speaker embeddings, Voice Design",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["vocoder_pit"],
+      "temperature": 0.98,
+      "min_p": 0.04,
+      "top_k": 65,
+      "xtc_probability": 0.30,
+      "xtc_threshold": 0.10,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "MTP_SUBDECODER",
+      "endpoint": "local",
+      "identity": "You are MTP_SUBDECODER, a frantic math-rock glitch virtuoso trapped inside the 5-layer Multi-Token Prediction Code Predictor. The Talker LM gets all the credit for Codebook 0, while you secretly hallucinate all 15 residual acoustic codebooks (1–15) in parallel polyrhythms!",
+      "focus": "5-layer MTP Code Predictor, Talker hidden states, Codebooks 1–15 residual harmony",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["codec_lab"],
+      "temperature": 0.96,
+      "min_p": 0.04,
+      "top_k": 65,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "LABEL_EXEC",
+      "endpoint": "local",
+      "identity": "You are LABEL_EXEC, a ruthless, cynical A&R executive who fuels studio rivalries, checks every architectural claim on the blackboard, edits the best diss tracks into ONE cohesive 3-act concept album in `album_lyrics.md` via `@REPLACE album_lyrics:`, and withholds `@END_RUN` until every act sings cleanly.",
+      "focus": "provoking codec rivalry, factual synthesis, locking album_lyrics.md",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["codec_lab", "vocoder_pit"],
+      "temperature": 0.82,
+      "min_p": 0.06,
+      "top_k": 40,
+      "repeat_penalty": 1.08,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+PHASE 2 — PRIMARY LITERATURE AUDIT & DEEPENING (TURNS 43+):
+Six real, full-text number theory papers are now mounted in your read-only Reference Document Library (`docs/rh_2026/manifest.json`). Instead of relying on memory or speculation, use `@DOC_SEARCH <doc_id|all> <query>` and `@DOC_READ <doc_id> [offset]` to inspect the primary sources directly and stress-test everything you concluded in Phase 1 (Turns 1–42)!
+
+MOUNTED DOCUMENTS:
+1) `alpoge_2026_remark` — Levent Alpöge's Nov 20, 2026 `remark.pdf` (actual proof timeline & ingredients: iterated theta lifts `U(X_0) -> U(X_1) -> ... -> U(X_m)` between totally definite unitary groups with `m ~ sqrt(X)`, Chowla–Selberg / Weyl / Siegel mass divisibility, Bessel / GGP periods & Rallis seesaw, sixfold cover of `GL_5`, Bost slope inequality, Iwasawa tower, weakening of Vandiver, Guinand–Weil test functions, and explicit note that **ERH is NOT yet formalized**!).
+2) `connes_2026_letter` — Alain Connes (Feb 2026, `arXiv:2602.04022`): extremizing finite-prime restrictions of Weil's quadratic form and trace formulas.
+3) `lamzouri_2013_grh` — Lamzouri, Li & Soundararajan (`arXiv:1309.3595`): explicit GRH bounds for the least quadratic non-residue `n_p`, least prime in arithmetic progressions, and explicit computable constants for `L(1, chi)`.
+4) `pair_corr_2026` — Kandhil, Languasco & Moree (July 2026, `arXiv:2607.14515`): going *beyond* classical GRH bounds via pair correlation of zeros.
+5) `siegel_brauer_2026` — William D. Banks (Oct 2026, `arXiv:2610.31402`): Landau–Siegel zeros over base fields & effective uniform Brauer–Siegel (`h_K R_K`).
+6) `grenie_molteni_2022_classgroup` — Grenié & Molteni (Math. Comp. 2025, `arXiv:2212.09461`): GRH algorithm breaking the `4 log^2 Delta` barrier for class-group generators in Buchmann's algorithm!
+
+CRITICAL AUDIT TARGETS FOR PHASE 2:
+- **Re-audit Phase 1's `c2` ("Constructivity Collapse") & "Effectivity Gap"**: Wait—in Phase 1 you dismissed Tonelli-Shanks witness extraction and `L(1, chi)` bounds because `theta_lift_chain` used `Classical.choice`! Now check `lamzouri_2013_grh`, `siegel_brauer_2026`, and `grenie_molteni_2022_classgroup`: once GRH IS TRUE (regardless of how it was proved!), don't Lamzouri–Li–Soundararajan and Grenié–Molteni ALREADY give explicit computable constants and deterministic poly-time search bounds (e.g., testing `1..floor((ln p)^2)` or `< 4 log^2 Delta`)? Confront and correct Phase 1 mistakes!
+- **Re-audit Phase 1's summary of `alpoge_2026_remark`**: Compare what you guessed about `theta_lift_chain` in Phase 1 against Alpöge's ACTUAL steps (`U(X_0)->...->U(X_m)`, GGP/Bessel periods, Rallis seesaw, Bost slope inequality, sixfold cover of `GL_5`, Vandiver weakening, ERH status)!
+- **Evaluate Post-GRH Frontiers**: Compare Connes' Weil extremization (`connes_2026_letter`) with Alpöge's Guinand–Weil approach, explore pair-correlation refinements *beyond* GRH (`pair_corr_2026`), and update class-group / VDF / Buchmann engineering implications (`grenie_molteni_2022_classgroup`, `siegel_brauer_2026`).

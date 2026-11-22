@@ -1,0 +1,16 @@
+{
+  "artifact": "rh_2026_synthesis",
+  "require_modified": true,
+  "min_bytes": 7000,
+  "disallow_placeholders": true,
+  "required_sections": [
+    "[Executive Synthesis]",
+    "[Primary Literature Audit & Phase 1 Corrections]",
+    "[Proof Architecture: Chained Theta Lifts vs Human Preprint]",
+    "[Algorithmic & Complexity Breakthroughs]",
+    "[Cryptography & Practicality Reality Check]",
+    "[Number Theory Dominoes: Primes, Siegel Zeros & Beyond]",
+    "[Formal Verification, Kernel Trust & Proof Compression]",
+    "[Unresolved Disagreements & Open Conjectures]"
+  ]
+}

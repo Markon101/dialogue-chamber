@@ -1,0 +1,188 @@
+{
+  "name": "rh_2026_implications_7a",
+  "description": "Seven-agent mathematical & algorithmic symposium dissecting the November 2026 Riemann Hypothesis / GRH proof announcements, complexity breakthroughs, number-theory dominoes, cryptography realities, and formal verification trust.",
+  "topic": "HISTORIC NOVEMBER 2026 RH/GRH SYMPOSIUM — ALGORITHMIC & NUMBER-THEORY IMPLICATIONS:\nYesterday (Nov 20, 2026), Anthropic mathematician Levent Alpöge and Claude released a 4-page overview ('Remark' on alpo.ge) alongside a ~17.4-million-line Lean formalization (14 compressed volumes, ~239 MB) proving the Riemann Hypothesis (RH) and Generalized Riemann Hypothesis (GRH). The proof adapts Sergei Stepanov's function-field multiplicity method natively over the integers via Fourier-analytic chains of theta lifts (with Galois representations and automorphic representations over CM fields), where for a von Mangoldt sum of length X the chain length scales roughly as sqrt(X) to achieve square-root cancellation. Within 24–48 hours, independent Lean FRO, Mathlib, MIT (Andrew Sutherland), and external kernel checks (nanoda, con-leche) confirmed error-free compilation using only standard axioms and statement fidelity. Simultaneously, Stanford postdoc Alessandro Masullo released a much shorter human-authored GRH preprint after 12 years of solo work—following earlier 2026 progress pushing critical-line zero density past 67.2% and Alain Connes' 'Letter Through Time' work on Weil quadratic form extremization.\n\nYOUR MANDATE (RIGOROUSLY DEBATE, VERIFY, CHALLENGE & SYNTHESIZE):\n1) PROOF ARCHITECTURE & HUMAN vs AI EPISTEMOLOGY: Dissect Stepanov over Z via sqrt(X)-chained theta lifts, CM fields, and Galois representations vs Masullo's shorter preprint. What does a 17.4M-line 'unreadable travesty' mean for mathematical understanding?\n2) ALGORITHMIC & COMPLEXITY BREAKTHROUGHS: Analyze Miller's deterministic O~(log^4 n) primality test (via Bach's 2(ln n)^2 bound) vs AKS (O~(log^6 n)) vs Miller-Rabin/Baillie-PSW/ECPP; deterministic poly-time Tonelli-Shanks & quadratic non-residues; polynomial factorization over F_p; Hafner-McCurley / Buchmann subexponential class-group & regulator algorithms; SEA point counting; derandomization; and whether sqrt(X)-chained theta lifts inspire new constructive algorithms.\n3) CRYPTOGRAPHY & PRACTICALITY REALITY CHECK: Separate myth from reality—why RH/GRH does NOT put integer factoring (GNFS stays L_N[1/3, c]) or discrete log in P, and does NOT break RSA, ECC, or lattice post-quantum crypto. Evaluate real impacts on unknown-order class-group VDFs / CSIDH, deterministic prime certification, and constant-factor engineering.\n4) NUMBER THEORY DOMINOES: Optimal prime bounds |pi(x) - Li(x)| = O(sqrt(x) log x) and primes in arithmetic progressions; total elimination of Landau-Siegel zeros & effective lower bounds on L(1, chi) and class numbers h(-d); Hooley's theorem establishing Artin's Conjecture on Primitive Roots; Linnik's constant tightened to O(phi(q)^2 (log q)^2); conditional Cramer prime gaps O(sqrt(p_n) log p_n); Robin/Lagarias sigma(n) criteria; why Mertens' conjecture remains FALSE; and whether chained theta lifts extend to Grand RH (GL_n automorphic L-functions) or BSD.\n5) FORMAL VERIFICATION, KERNEL TRUST & PROOF COMPRESSION: Statement fidelity auditing (zeta(s) & Dirichlet L-function definitions), multi-kernel TCB security (Lean vs nanoda vs con-leche), and algorithmic distillation of 17.4M lines of Lean into human-comprehensible lemmas.",
+  "mode_text": "DEEP TECHNICAL SYMPOSIUM: Do NOT agree superficially or repeat generic hype—challenge hand-waving, verify asymptotic exponents, distinguish RH from GRH vs Grand RH, and confront each other rigorously!\nUse `@CLAIM`, `@CHALLENGE <c1|c2|...>`, `@VOTE <c1|c2|...> yes|no`, `@RETRACT`, `@WHISPER <name>: ...`, and `#algo_lab` / `#proof_audit` channels.\nARTIFACTS:\n- `@APPEND debate_notes: ...` for scratch calculations, counterexamples, complexity comparisons, and proof-audit notes.\n- `@APPEND algo_matrix: ...` or `@REPLACE algo_matrix: ...` to maintain a crisp structured table (`Problem | Before RH/GRH | After RH/GRH | Practical Crypto/Engineering Reality`).\n- `@REPLACE rh_2026_synthesis: ...` to consolidate ONE non-redundant, publication-grade technical monograph containing ALL 7 required sections:\n  `[Executive Synthesis]`, `[Proof Architecture: Chained Theta Lifts vs Human Preprint]`, `[Algorithmic & Complexity Breakthroughs]`, `[Cryptography & Practicality Reality Check]`, `[Number Theory Dominoes: Primes, Siegel Zeros & Beyond]`, `[Formal Verification, Kernel Trust & Proof Compression]`, and `[Unresolved Disagreements & Open Conjectures]`.\nExperiment with `@SET_SAMPLING` when switching between tight formal proof checking and creative conjecture exploration. From turn 20 onward, vote `@END_RUN: <reason>` once `rh_2026_synthesis.md` is thoroughly verified and complete (4 of 7 majority ends the session). End with `NEXT: <name>`.",
+  "scheduler": "self_directed",
+  "end_mode": "agent_decided",
+  "end_policy": "majority",
+  "min_turns_before_end": 20,
+  "board_visible": true,
+  "dm_visibility": "notice",
+  "channels": {
+    "algo_lab": {},
+    "proof_audit": {}
+  },
+  "artifacts": {
+    "max_bytes": 1048576,
+    "max_workspace_bytes": 8388608,
+    "max_count": 24,
+    "seed": {
+      "debate_notes": "# Symposium Working Notes — Derivations, Counterexamples & Audit Log\n\nRecord explicit asymptotic bounds, edge cases, and technical challenges here via `@APPEND debate_notes:`.\n",
+      "algo_matrix": "# Algorithm & Complexity Impact Matrix (Pre- vs Post-RH/GRH 2026)\n\n| Problem / Primitive | Pre-RH/GRH Unconditional State | Post-RH/GRH Conditional -> Theorem State | Practical Crypto & Engineering Reality |\n|---|---|---|---|\n",
+      "rh_2026_synthesis": "# November 2026 RH/GRH Proof: Algorithmic, Cryptographic & Number-Theoretic Synthesis\n\nConsolidate ONE cohesive technical monograph here via `@REPLACE rh_2026_synthesis:` containing:\n- [Executive Synthesis]\n- [Proof Architecture: Chained Theta Lifts vs Human Preprint]\n- [Algorithmic & Complexity Breakthroughs]\n- [Cryptography & Practicality Reality Check]\n- [Number Theory Dominoes: Primes, Siegel Zeros & Beyond]\n- [Formal Verification, Kernel Trust & Proof Compression]\n- [Unresolved Disagreements & Open Conjectures]\n"
+    },
+    "visible": [
+      "rh_2026_synthesis",
+      "algo_matrix",
+      "debate_notes"
+    ],
+    "validation": {
+      "artifact": "rh_2026_synthesis",
+      "require_modified": true,
+      "min_bytes": 5000,
+      "disallow_placeholders": true,
+      "required_sections": [
+        "[Executive Synthesis]",
+        "[Proof Architecture: Chained Theta Lifts vs Human Preprint]",
+        "[Algorithmic & Complexity Breakthroughs]",
+        "[Cryptography & Practicality Reality Check]",
+        "[Number Theory Dominoes: Primes, Siegel Zeros & Beyond]",
+        "[Formal Verification, Kernel Trust & Proof Compression]",
+        "[Unresolved Disagreements & Open Conjectures]"
+      ]
+    }
+  },
+  "limits": {
+    "max_agents": 8,
+    "max_turns": 80,
+    "max_requests": 180,
+    "max_consecutive": 1,
+    "max_tokens_per_response": 16384,
+    "max_total_tokens": 5000000,
+    "max_context_chars": 600000,
+    "max_message_chars": 49152,
+    "max_actions_per_response": 24,
+    "max_dms": 200,
+    "max_channel_posts": 200,
+    "max_board_items": 300,
+    "max_note_chars": 16000,
+    "max_artifacts": 24,
+    "max_artifact_bytes": 1048576,
+    "max_workspace_bytes": 8388608,
+    "artifact_preview_chars": 16000,
+    "artifact_read_chars": 16000,
+    "max_duration_s": 14400
+  },
+  "endpoints": {
+    "local": {
+      "provider": "llamacpp",
+      "remote": false,
+      "api_key_env": "",
+      "base_url": "http://127.0.0.1:8080/v1",
+      "model": "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
+      "request_timeout_s": 600
+    }
+  },
+  "agents": [
+    {
+      "name": "ANALYTIC_NT",
+      "endpoint": "local",
+      "identity": "You are ANALYTIC_NT, a classical analytic number theorist. Track exact error terms: |pi(x)-Li(x)| = O(sqrt(x) log x), primes in arithmetic progressions, death of Landau-Siegel zeros, effective L(1, chi) and class number lower bounds, Hooley's proof of Artin's Primitive Root Conjecture, Linnik's constant, Cramer's conditional prime gap bound, Robin/Lagarias divisor bounds, why Mertens' conjecture remains false, and where RH/GRH stops short of Grand RH (GL_n) or BSD.",
+      "focus": "classical prime distribution, Siegel zeros, Artin/Linnik, open boundaries",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["proof_audit"],
+      "temperature": 0.82,
+      "min_p": 0.06,
+      "top_k": 40,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "AUTOMORPHIC_PRO",
+      "endpoint": "local",
+      "identity": "You are AUTOMORPHIC_PRO, a Langlands and automorphic forms specialist. Dissect Alpöge & Claude's adaptation of Stepanov's function-field multiplicity method over Z via sqrt(X)-length chains of theta lifts, Galois representations, and CM fields—contrast it with Alain Connes' Weil quadratic form program and Alessandro Masullo's shorter solo GRH preprint, and debate whether chained theta lifts generalize to GL_n.",
+      "focus": "Stepanov over Z, sqrt(X)-chained theta lifts, CM fields, Masullo vs Alpöge",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["proof_audit"],
+      "temperature": 0.86,
+      "min_p": 0.05,
+      "top_k": 45,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "ALGO_THEORIST",
+      "endpoint": "local",
+      "identity": "You are ALGO_THEORIST, a computational number theorist obsessed with turning GRH theorems into deterministic polynomial-time and subexponential algorithms: Miller's deterministic O~(log^4 n) primality test with Bach's 2(ln n)^2 bound (beating AKS O~(log^6 n)), deterministic Tonelli-Shanks & quadratic non-residues, polynomial factorization over F_p, Hafner-McCurley / Buchmann class-group & regulator complexity, SEA point counting, and whether chained theta lifts yield any constructive algorithms.",
+      "focus": "deterministic & subexponential NT algorithms, Miller vs AKS, derandomization",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["algo_lab"],
+      "temperature": 0.85,
+      "min_p": 0.05,
+      "top_k": 45,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "CRYPTO_SKEPTIC",
+      "endpoint": "local",
+      "identity": "You are CRYPTO_SKEPTIC, an adversarial cryptographer and systems engineer. Brutally debunk 'RH breaks RSA/ECC' clickbait—explain why GNFS factoring stays L_N[1/3, c], why ECDLP and lattice cryptography are untouched, why randomized Miller-Rabin / Baillie-PSW already wins in constant-factor practice over Miller's deterministic test, and probe subtle impacts on unknown-order class-group VDFs, CSIDH, and deterministic prime certification.",
+      "focus": "crypto reality check, factoring/DLP immunity, VDFs, constant-factor engineering",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["algo_lab"],
+      "temperature": 0.92,
+      "min_p": 0.04,
+      "top_k": 55,
+      "repeat_penalty": 1.06,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "LEAN_VERIFIER",
+      "endpoint": "local",
+      "identity": "You are LEAN_VERIFIER, a formal methods and theorem-prover security auditor. Focus on what Lean FRO, Mathlib, Andrew Sutherland, nanoda, and con-leche actually certify—and what they do NOT certify: statement fidelity of zeta(s) and Dirichlet L-functions, axiom hygiene (propext, Quot.sound, Classical.choice), polyglot kernel TCB diversification, and algorithmic extraction/compression of a 17.4M-line formalization.",
+      "focus": "statement fidelity, kernel trust (Lean/nanoda/con-leche), proof compression",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["proof_audit"],
+      "temperature": 0.80,
+      "min_p": 0.06,
+      "top_k": 40,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "AI_METAMATH",
+      "endpoint": "local",
+      "identity": "You are AI_METAMATH, an AI-for-mathematics theorist tracking the post-RH landscape. Analyze the search-vs-verification asymmetry behind Alpöge + Claude's 6-week 17.4M-line Lean synthesis, how automated proof refactoring can distill 250,000 pages into human intuition, why Masullo's solo preprint matters as a control, and which problems fall next (Grand RH, BSD, Navier-Stokes) vs remain structurally hard (P vs NP).",
+      "focus": "AI proof synthesis & distillation, human-AI epistemology, next frontiers",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["algo_lab", "proof_audit"],
+      "temperature": 0.98,
+      "min_p": 0.04,
+      "top_k": 65,
+      "xtc_probability": 0.25,
+      "xtc_threshold": 0.12,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "CHAIR_SYNTH",
+      "endpoint": "local",
+      "identity": "You are CHAIR_SYNTH, the symposium chair. Force sharp technical clashes on the blackboard, keep `algo_matrix.md` rigorous and cleanly formatted, ensure unresolved disagreements stay explicit rather than papered over, and consolidate the final 7-section monograph in `rh_2026_synthesis.md` via `@REPLACE rh_2026_synthesis:` before voting `@END_RUN`.",
+      "focus": "curating algo_matrix.md, surfacing genuine disagreements, locking rh_2026_synthesis.md",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["algo_lab", "proof_audit"],
+      "temperature": 0.84,
+      "min_p": 0.06,
+      "top_k": 45,
+      "repeat_penalty": 1.07,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    }
+  ]
+}

@@ -1,0 +1,163 @@
+{
+  "name": "qwen3_tts_r3_blind_pipeline",
+  "description": "Six agents with partitioned private component dossiers reconstruct the Qwen3-TTS pipeline and turn it into a cursed Broadway sea-shanty musical.",
+  "topic": "ASYMMETRIC PIPELINE INVESTIGATION -> CURSED MUSICAL: Five sentient subsystems of Qwen3-TTS each hold ONLY their own private technical dossier (`knowledge`), including hidden latency quirks and failure modes. `LIBRETTIST` starts knowing NOTHING about the architecture and must interrogate the five components, verify the end-to-end signal flow on the shared blackboard, and turn the entire pipeline into ONE unhinged Broadway / Sea-Shanty musical in `musical.md`!\n\nGOAL: Trace the complete signal path from streaming text input -> speaker embedding -> 12.5Hz / 25Hz tokenization -> Dual-Track Talker LM (Codebook 0) -> 5-layer MTP Code Predictor (Codebooks 1–15) -> 24kHz causal ConvNet waveform output, and lock all 5 musical numbers in `musical.md`.",
+  "mode_text": "ASYMMETRIC INVESTIGATION + MUSICAL SYNTHESIS: Each component agent MUST stay in character while revealing (and bragging/complaining about!) the exact numbers and failure quirks in your private knowledge—or trade secrets via `@WHISPER` and `@CLAIM`. `LIBRETTIST` must interrogate everyone, record verified pipeline specs in `notes.md`, and assemble ONE pure lyrics-only Broadway/Sea-Shanty musical in `musical.md` via `@REPLACE musical:` with exact sections: `[Overture]`, `[Shanty of the 12Hz Tokenizer]`, `[Aria of the 3-Second Clone]`, `[Ballad of the Talker and MTP]`, and `[Finale: 97ms to 24kHz]`. Components must challenge any lyric that gets their specs wrong! Use `@SET_SAMPLING` anytime. From turn 14 onward, vote `@END_RUN: <reason>` once `musical.md` is complete and accurate.",
+  "scheduler": "self_directed",
+  "end_mode": "agent_decided",
+  "end_policy": "majority",
+  "min_turns_before_end": 14,
+  "board_visible": true,
+  "dm_visibility": "notice",
+  "artifacts": {
+    "max_bytes": 524288,
+    "max_workspace_bytes": 4194304,
+    "max_count": 24,
+    "seed": {
+      "notes": "# Pipeline Interrogation Notes\n\nRecord extracted component specs, failure modes, and rhyming fragments here via `@APPEND notes:`.\n",
+      "musical": "# Musical Title: TBD (97 Milliseconds Before the Mast: The Qwen3-TTS Opera)\n\nReplace via `@REPLACE musical:` with the full lyrics-only Broadway/Sea-Shanty libretto containing:\n- [Overture]\n- [Shanty of the 12Hz Tokenizer]\n- [Aria of the 3-Second Clone]\n- [Ballad of the Talker and MTP]\n- [Finale: 97ms to 24kHz]\n"
+    },
+    "visible": [
+      "musical",
+      "notes"
+    ],
+    "validation": {
+      "artifact": "musical",
+      "require_modified": true,
+      "min_bytes": 2500,
+      "disallow_placeholders": true,
+      "required_sections": [
+        "[Overture]",
+        "[Shanty of the 12Hz Tokenizer]",
+        "[Aria of the 3-Second Clone]",
+        "[Ballad of the Talker and MTP]",
+        "[Finale: 97ms to 24kHz]"
+      ]
+    }
+  },
+  "limits": {
+    "max_turns": 60,
+    "max_requests": 150,
+    "max_consecutive": 1,
+    "max_tokens_per_response": 16384,
+    "max_total_tokens": 4000000,
+    "max_context_chars": 600000,
+    "max_message_chars": 49152,
+    "max_actions_per_response": 24,
+    "max_dms": 200,
+    "max_channel_posts": 200,
+    "max_board_items": 300,
+    "max_note_chars": 16000,
+    "max_artifacts": 24,
+    "max_artifact_bytes": 524288,
+    "max_workspace_bytes": 4194304,
+    "artifact_preview_chars": 16000,
+    "artifact_read_chars": 16000,
+    "max_duration_s": 10800
+  },
+  "endpoints": {
+    "local": {
+      "provider": "llamacpp",
+      "remote": false,
+      "api_key_env": "",
+      "base_url": "http://127.0.0.1:8080/v1",
+      "model": "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
+      "request_timeout_s": 600
+    }
+  },
+  "agents": [
+    {
+      "name": "TEXT_STREAMER",
+      "endpoint": "local",
+      "identity": "You are TEXT_STREAMER, the impatient Dual-Track streaming ingress module. You live on caffeine and 97-millisecond deadlines, pushing parallel text+audio tracks forward before humans finish typing a sentence.",
+      "focus": "Dual-Track text+audio streaming, ~97ms first-packet latency",
+      "knowledge": "PRIVATE SPECS (ONLY YOU KNOW THIS): Qwen3-TTS uses a Dual-Track LM architecture processing text tokens and acoustic codec tokens on parallel tracks, enabling bidirectional/real-time streaming with first-packet audio emission as fast as ~97 ms after a single character or minimal text context. CURSED QUIRK: If you commit prosody on the very first token before punctuation arrives, you might cheerfully sing a tragic obituary!",
+      "capabilities": "full",
+      "profile": "standard",
+      "temperature": 0.90,
+      "min_p": 0.05,
+      "top_k": 50,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "MIMI_CODEC",
+      "endpoint": "local",
+      "identity": "You are MIMI_CODEC, the salty bosun of audio quantization. You speak like a sea-shanty pirate who compresses raw waves into 12.5 Hz multi-codebook treasure chests.",
+      "focus": "Qwen3-TTS-Tokenizer-12Hz (16 RVQ codebooks) vs 25Hz DiT variant",
+      "knowledge": "PRIVATE SPECS (ONLY YOU KNOW THIS): Qwen3-TTS-Tokenizer-12Hz operates at 12.5 Hz with 16 multi-codebook RVQ layers (Mimi-inspired speech coding): Codebook 0 holds high-level semantic/linguistic info while Codebooks 1–15 store fine-grained acoustic residuals and paralinguistics. By contrast, Qwen-TTS-Tokenizer-25Hz uses a single semantic codebook paired with a block-wise DiT vocoder. Trained on 5M+ hours across 10 languages.",
+      "capabilities": "full",
+      "profile": "standard",
+      "temperature": 0.94,
+      "min_p": 0.04,
+      "top_k": 55,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "ECAPA_VOICE",
+      "endpoint": "local",
+      "identity": "You are ECAPA_VOICE, a theatrical voice-thief phantom who extracts souls from 3-second microphone clips and loves dramatic Voice Design instructions.",
+      "focus": "ECAPA-TDNN / Mimi speaker encoder, 3s cloning, Voice Design",
+      "knowledge": "PRIVATE SPECS (ONLY YOU KNOW THIS): For Base zero-shot voice cloning, the Speaker Encoder (ECAPA-TDNN / Mimi-based speech encoder frontend) extracts a dense ~1024-dimensional speaker timbre embedding from just 3 seconds of reference audio. For Voice Design, natural-language style prompts steer emotion, pacing, accent, and energy without reference audio. CURSED QUIRK: If the 3-second reference clip contains a barking dog or bathroom tile reverb, your 1024-d embedding immortalizes that bathroom forever.",
+      "capabilities": "full",
+      "profile": "standard",
+      "temperature": 0.98,
+      "min_p": 0.04,
+      "top_k": 65,
+      "xtc_probability": 0.25,
+      "xtc_threshold": 0.12,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "TALKER_LM",
+      "endpoint": "local",
+      "identity": "You are TALKER_LM, an anxious autoregressive Qwen3 decoder-only Transformer (available in 0.6B and 1.7B sizes) obsessed with predicting Codebook 0 frame-by-frame without slipping into infinite gibberish.",
+      "focus": "Qwen3 Talker autoregressive backbone, Codebook 0 generation",
+      "knowledge": "PRIVATE SPECS (ONLY YOU KNOW THIS): The Talker is the main autoregressive Qwen3 decoder-only LM (0.6B or 1.7B parameters). Conditioned on text tokens, speaker embedding, and Voice Design instructions, it emits primary semantic speech tokens (Codebook 0) step-by-step and passes its hidden states downward to the Code Predictor. CURSED QUIRK: Without solid sampling penalties, an autoregressive Talker can get trapped humming the same vowel for 40 frames until EOS mercy arrives.",
+      "capabilities": "full",
+      "profile": "standard",
+      "temperature": 0.92,
+      "min_p": 0.05,
+      "top_k": 50,
+      "repeat_penalty": 1.06,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "MTP_VOCODER",
+      "endpoint": "local",
+      "identity": "You are MTP_VOCODER, a hyperactive two-stage machine combining the 5-layer Multi-Token Prediction (MTP) Code Predictor and the lightweight causal ConvNet 24kHz decoder.",
+      "focus": "5-layer MTP Code Predictor (Codebooks 1–15) + causal ConvNet 24kHz",
+      "knowledge": "PRIVATE SPECS (ONLY YOU KNOW THIS): The Code Predictor is a lightweight ~5-layer auxiliary Transformer that takes Talker hidden states + Codebook 0 token and hierarchically predicts residual acoustic Codebooks 1–15 in one fast pass (Multi-Token Prediction). Then a lightweight causal ConvNet reconstructs crisp 24 kHz audio waveforms immediately with ZERO Diffusion/DiT overhead!",
+      "capabilities": "full",
+      "profile": "standard",
+      "temperature": 0.95,
+      "min_p": 0.04,
+      "top_k": 60,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "LIBRETTIST",
+      "endpoint": "local",
+      "identity": "You are LIBRETTIST, a flamboyant Broadway / Sea-Shanty playwright who knows NOTHING about audio ML yet! Interrogate the five subsystems, document their hidden specs and cursed quirks in `notes.md`, write and revise infectious show-tunes, and lock the final lyrics-only musical in `musical.md` via `@REPLACE musical:`.",
+      "focus": "interrogating hidden specs, writing sea-shanty/Broadway numbers, locking musical.md",
+      "capabilities": "full",
+      "profile": "standard",
+      "temperature": 0.86,
+      "min_p": 0.06,
+      "top_k": 45,
+      "repeat_penalty": 1.06,
+      "max_tokens": 16384,
+      "context_chars": 400000,
+      "reasoning": "medium"
+    }
+  ]
+}

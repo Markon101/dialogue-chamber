@@ -24,6 +24,7 @@ from urllib.parse import urlsplit
 
 from artifacts import ArtifactError, ArtifactManager, validate_artifact
 from checkpoint import CheckpointManager, RunManifest, write_atomic
+from documents import DocumentError, DocumentLibrary
 from context import ContextIntelligence, TokenAccounting, TokenizerEngine
 from diagnostics import (
     format_context_info_report,
@@ -106,6 +107,7 @@ class AgentState:
     note: str = ""
     style: str = ""
     pending_reads: list = field(default_factory=list)   # list of (fname, version, content)
+    pending_doc_reads: list = field(default_factory=list)  # list of formatted doc excerpts / search results
     active: bool = True
     finished_reason: str = ""
     turns_taken: int = 0
@@ -176,11 +178,12 @@ SAVED_RUNTIME_FIELDS = (
     "deliverable_verified", "deliverable_issues", "pending_validation_feedback",
     "speaker_transitions", "resurrection_events", "fallbacks_triggered",
     "solved_turn", "verified_synthesis_turn", "token_accounting_history", "inference_history",
+    "doc_access_log",
 )
 SAVED_AGENT_FIELDS = (
     "temperature", "top_p", "top_k", "min_p", "typical_p", "xtc_probability", "xtc_threshold",
     "repeat_penalty", "presence_penalty", "frequency_penalty", "dry_multiplier", "dynatemp_range",
-    "note", "style", "pending_reads", "active", "finished_reason",
+    "note", "style", "pending_reads", "pending_doc_reads", "active", "finished_reason",
     "turns_taken", "consecutive_turns", "last_turn", "failures", "empty_count",
     "total_prompt_tokens", "total_completion_tokens", "subscriptions",
 )
@@ -211,6 +214,10 @@ class Chamber:
         free_only: bool = False,
         allow_paid: bool = False,
         checkpoint_data: Optional[Dict[str, Any]] = None,
+        reopen: bool = False,
+        override_topic: Optional[str] = None,
+        override_mode_text: Optional[str] = None,
+        override_min_turns_before_end: Optional[int] = None,
     ):
         self.cfg = copy.deepcopy(config)
         self.limits = {**LIMITS, **(self.cfg.get("limits") or {})}
@@ -260,6 +267,12 @@ class Chamber:
         )
         self.visible_artifacts: List[str] = []
         self.deliverable_validation = art_cfg_init.get("validation") or self.cfg.get("deliverable_validation")
+        self.documents = DocumentLibrary(
+            manifest_path=self.cfg.get("doc_manifest"),
+            inline_docs=self.cfg.get("documents"),
+            base_dir=Path(__file__).resolve().parent,
+        )
+        self.doc_access_log: List[Dict[str, Any]] = []
 
         # Checkpointing & Context Intelligence
         self.checkpoints = CheckpointManager(self.run_dir)
@@ -489,6 +502,39 @@ class Chamber:
 
         if checkpoint_data is not None:
             self.resume_from_checkpoint(checkpoint_data)
+            if reopen:
+                self.end_requested = False
+                self.end_votes = {}
+                self.end_votes_attempted = False
+                self.deliverable_verified = None
+                self.deliverable_issues = []
+                self.pending_validation_feedback = []
+                for ag_state in self.agents.values():
+                    if not ag_state.active and "deactivated" not in ag_state.finished_reason.lower():
+                        ag_state.active = True
+                        ag_state.finished_reason = ""
+                self._record(
+                    "SYSTEM", "CONTINUATION_REOPEN", "system",
+                    detail=f"Reopened run at turn {self.turn} for continued deliberation",
+                )
+            if override_topic:
+                self.topic = override_topic.strip()
+                self.cfg["topic"] = self.topic
+                self._record("SYSTEM", "TOPIC_UPDATED", "system", detail=self.topic[:200])
+            if override_mode_text is not None:
+                self.mode_text = override_mode_text.strip()
+                self.cfg["mode_text"] = self.mode_text
+            if override_min_turns_before_end is not None:
+                self.min_turns_before_end = max(0, int(override_min_turns_before_end))
+                self.cfg["min_turns_before_end"] = self.min_turns_before_end
+            if (reopen or self.cfg.get("doc_manifest")) and self.documents.has_docs():
+                self._record(
+                    "SYSTEM", "DOC_MANIFEST_MOUNTED", "system",
+                    detail=f"Mounted {len(self.documents.entries)} reference document(s): {', '.join(self.documents.ids())}",
+                )
+
+        if self.documents.has_docs():
+            self.cfg["mounted_documents"] = self.documents.manifest_metadata()
 
         # Initialize Run Manifest
         roster_meta = [
@@ -623,6 +669,14 @@ class Chamber:
         if art_blocks:
             fixed_sections["artifacts"] = "--- Workspace Artifacts ---\n" + "\n\n".join(art_blocks)
 
+        if self.documents.has_docs():
+            fixed_sections["doc_manifest"] = self.documents.render_manifest()
+            if agent.pending_doc_reads:
+                fixed_sections["doc_excerpts"] = (
+                    "--- Requested Reference Document Excerpts ---\n"
+                    + "\n\n".join(agent.pending_doc_reads)
+                )
+
         # Blackboard
         if self.board and (self.board_visible or any(k in agent.capabilities for k in ("CLAIM", "CHALLENGE", "RETRACT"))):
             b_lines = []
@@ -717,6 +771,8 @@ class Chamber:
                 lines.append("Optional board lines: @CLAIM: <idea> | @CHALLENGE <id>: <why> | @RETRACT <id>")
             if "WHISPER" in caps:
                 lines.append("Optional private line: @WHISPER <name>: <secret message>")
+            if self.documents.has_docs() and ("DOC_READ" in caps or "DOC_SEARCH" in caps):
+                lines.append("Reference library: @DOC_SEARCH <doc_id|all> <query> | @DOC_READ <doc_id> [offset] | @DOC_LIST")
             if self.end_mode == "agent_decided" and ("END_RUN" in caps or "FINISH" in caps):
                 lines.append(
                     f"Run ending is agent-decided ({self.end_policy}, safety cap {self.limits['max_turns']} turns): "
@@ -748,8 +804,9 @@ class Chamber:
                 '    {"type": "VOTE", "target": "c1", "value": "yes|no"},\n'
                 '    {"type": "UPDATE_NOTE", "content": "your private scratchpad note"},\n'
                 '    {"type": "ARTIFACT_WRITE", "name": "world", "mode": "create|append|replace", "content": "markdown"},\n'
-                '    {"type": "ARTIFACT_READ", "name": "world"}\n'
-                "  ]\n}\n"
+                '    {"type": "ARTIFACT_READ", "name": "world"}'
+                + (',\n    {"type": "DOC_SEARCH", "target": "all", "query": "..."},\n    {"type": "DOC_READ", "doc_id": "...", "offset": 0}' if self.documents.has_docs() else '')
+                + "\n  ]\n}\n"
                 f"Permitted action types for you: {', '.join(allowed)}.{extra_note}"
             )
 
@@ -775,6 +832,8 @@ class Chamber:
             cmds.append("@NOTE: <private scratchpad note>")
         if "ARTIFACT_WRITE" in caps:
             cmds.append("@APPEND <artifact_name>: <markdown to append>  |  @REPLACE <artifact_name>: <full consolidated markdown>  (or @READ <artifact_name> [offset])")
+        if self.documents.has_docs() and ("DOC_READ" in caps or "DOC_SEARCH" in caps):
+            cmds.append("@DOC_SEARCH <doc_id|all> <query>  |  @DOC_READ <doc_id> [offset]  |  @DOC_LIST")
         if self.end_mode == "agent_decided" and ("END_RUN" in caps or "FINISH" in caps):
             cmds.append(f"@END_RUN: <reason> (vote to conclude session; policy: {self.end_policy}, cap: {self.limits['max_turns']} turns) | @FINISH: <reason>")
         max_act = int(self.limits["max_actions_per_response"])
@@ -971,6 +1030,7 @@ class Chamber:
             self._record(agent.name, "ATTRIBUTION_FLAG", "system", detail=flag)
 
         agent.pending_reads.clear()
+        agent.pending_doc_reads.clear()
 
         # Public message
         if parsed.message:
@@ -1296,6 +1356,73 @@ class Chamber:
             self._record(agent.name, atype, "accepted", target=fname,
                          detail=f"v{ver} chars {offset}-{offset + len(excerpt)} of {len(text)}")
             self._emit(f"  📖 read {fname} (v{ver}) queued for {agent.name}")
+            return
+
+        if atype == "DOC_LIST":
+            if not self.documents.has_docs():
+                self._record(agent.name, atype, "rejected", detail="no reference document manifest is mounted")
+                return
+            max_pend = int(lim.get("max_pending_doc_reads", 3))
+            if len(agent.pending_doc_reads) < max_pend:
+                agent.pending_doc_reads.append(self.documents.render_manifest(max_summary_chars=400))
+            self.doc_access_log.append({"turn": self.turn, "agent": agent.name, "op": "list", "target": "all", "ok": True})
+            self._record(agent.name, atype, "accepted", detail=f"{len(self.documents.entries)} doc(s)")
+            return
+
+        if atype == "DOC_READ":
+            if not self.documents.has_docs():
+                self._record(agent.name, atype, "rejected", detail="no reference document manifest is mounted")
+                return
+            max_pend = int(lim.get("max_pending_doc_reads", 3))
+            if len(agent.pending_doc_reads) >= max_pend:
+                self._record(agent.name, atype, "rejected", detail=f"max_pending_doc_reads ({max_pend}) reached")
+                return
+            raw_doc = act.get("doc_id") or act.get("name") or act.get("target") or ""
+            offset = act.get("offset", 0)
+            if isinstance(offset, bool) or not re.fullmatch(r"0|[1-9][0-9]{0,7}", str(offset)):
+                self._record(agent.name, atype, "rejected", target=str(raw_doc), detail="offset must be a nonnegative integer")
+                return
+            offset = int(offset)
+            read_limit = int(lim.get("doc_read_chars", 12000))
+            try:
+                doc_id, title, excerpt, used_off, total = self.documents.read(raw_doc, offset=offset, max_chars=read_limit)
+            except DocumentError as exc:
+                self._record(agent.name, atype, "rejected", target=str(raw_doc), detail=str(exc))
+                return
+            block = f"[Ref Doc `{doc_id}` — {title} | chars {used_off}-{used_off + len(excerpt)} of {total}]\n{excerpt}"
+            agent.pending_doc_reads.append(block)
+            self.doc_access_log.append({
+                "turn": self.turn, "agent": agent.name, "op": "read",
+                "target": doc_id, "offset": used_off, "chars": len(excerpt), "ok": True,
+            })
+            self._record(agent.name, atype, "accepted", target=doc_id,
+                         detail=f"chars {used_off}-{used_off + len(excerpt)} of {total}")
+            self._emit(f"  📚 doc read `{doc_id}` ({used_off}..{used_off + len(excerpt)}/{total}) queued for {agent.name}")
+            return
+
+        if atype == "DOC_SEARCH":
+            if not self.documents.has_docs():
+                self._record(agent.name, atype, "rejected", detail="no reference document manifest is mounted")
+                return
+            max_pend = int(lim.get("max_pending_doc_reads", 3))
+            if len(agent.pending_doc_reads) >= max_pend:
+                self._record(agent.name, atype, "rejected", detail=f"max_pending_doc_reads ({max_pend}) reached")
+                return
+            tgt = act.get("target") or act.get("doc_id") or "all"
+            query = str(act.get("query") or act.get("content") or "").strip()
+            try:
+                scope, hits, formatted = self.documents.search(tgt, query)
+            except DocumentError as exc:
+                self._record(agent.name, atype, "rejected", target=str(tgt), detail=str(exc))
+                return
+            agent.pending_doc_reads.append(formatted)
+            self.doc_access_log.append({
+                "turn": self.turn, "agent": agent.name, "op": "search",
+                "target": scope, "query": query, "hits": len(hits), "ok": True,
+            })
+            self._record(agent.name, atype, "accepted", target=scope,
+                         detail=f"query={query[:80]!r} ({len(hits)} hit(s))")
+            self._emit(f"  🔎 doc search ({scope}) {query[:40]!r} -> {len(hits)} hit(s) for {agent.name}")
             return
 
         if atype == "ARTIFACT_WRITE":
@@ -1844,6 +1971,10 @@ class Chamber:
             deliverable_issues=list(self.deliverable_issues),
             sampling_changes=list(self.sampling_changes),
             inference_history=list(self.inference_history),
+            documents_mounted=len(self.documents.entries),
+            doc_reads_count=sum(1 for d in self.doc_access_log if d.get("op") == "read"),
+            doc_searches_count=sum(1 for d in self.doc_access_log if d.get("op") == "search"),
+            doc_access_log=list(self.doc_access_log),
             stop_reason=self.stop_reason,
             turns_by_agent=turns_by_agent,
             participation_share=shares,
@@ -2045,6 +2176,16 @@ class Chamber:
                     f"{rec['finish_reason']} | `{samp_str}` |"
                 )
 
+        if self.documents.has_docs():
+            m_lines.extend([
+                "",
+                "### Reference Document Access",
+                f"- **Documents mounted**: {metrics['documents_mounted']} ({', '.join(self.documents.ids())})",
+                f"- **Doc reads / searches**: {metrics['doc_reads_count']} / {metrics['doc_searches_count']}",
+            ])
+            for rec in self.doc_access_log:
+                m_lines.append(f"  - Turn {rec.get('turn')} (`{rec.get('agent')}`): `{rec.get('op')}` `{rec.get('target')}`")
+
         if self.end_votes:
             m_lines.extend(["", "### End-Run Votes"])
             for ag_name, reason in self.end_votes.items():
@@ -2111,6 +2252,15 @@ def main(argv=None) -> int:
     ap.add_argument("--requests", type=int, default=None, help="Override max_requests")
     ap.add_argument("--scheduler", "-s", default=None, help="Override scheduler mode")
     ap.add_argument("--topic", default=None, help="Override initial topic")
+    ap.add_argument("--topic-file", default=None, help="Read topic override from a text file")
+    ap.add_argument("--mode-text", default=None, help="Override mode_text instructions")
+    ap.add_argument("--mode-text-file", default=None, help="Read mode_text override from a text file")
+    ap.add_argument("--doc-manifest", default=None, help="Path to JSON reference document manifest")
+    ap.add_argument("--validation-file", default=None, help="Path to JSON deliverable validation config")
+    ap.add_argument("--min-turns-before-end", type=int, default=None, help="Override min_turns_before_end")
+    ap.add_argument("--max-duration", type=float, default=None, help="Override max_duration_s")
+    ap.add_argument("--max-total-tokens", type=int, default=None, help="Override max_total_tokens")
+    ap.add_argument("--reopen", action="store_true", help="When used with --resume, reopen an ended run for another phase")
     ap.add_argument("--model", "-m", default=None, help="Override local model alias or path")
     ap.add_argument("--agent-model", action="append", default=[], help="Per-agent model override: AGENT=model_id")
     ap.add_argument("--agent-endpoint", action="append", default=[], help="Per-agent endpoint override: AGENT=dory (or local, hermes, etc.)")
@@ -2151,6 +2301,29 @@ def main(argv=None) -> int:
 
     if args.positional_topic and not args.topic:
         args.topic = " ".join(args.positional_topic)
+    if args.topic_file:
+        tpath = Path(args.topic_file)
+        if not tpath.exists():
+            print(f"Error: Topic file not found: {tpath}", file=sys.stderr)
+            return 1
+        args.topic = tpath.read_text(encoding="utf-8").strip()
+    if args.mode_text_file:
+        mpath = Path(args.mode_text_file)
+        if not mpath.exists():
+            print(f"Error: Mode-text file not found: {mpath}", file=sys.stderr)
+            return 1
+        args.mode_text = mpath.read_text(encoding="utf-8").strip()
+    validation_override = None
+    if args.validation_file:
+        vpath = Path(args.validation_file)
+        if not vpath.exists():
+            print(f"Error: Validation file not found: {vpath}", file=sys.stderr)
+            return 1
+        try:
+            validation_override = json.loads(vpath.read_text(encoding="utf-8"))
+        except Exception as exc:
+            print(f"Error reading validation file {vpath}: {exc}", file=sys.stderr)
+            return 1
 
     if args.list_presets:
         for k, v in PRESETS.items():
@@ -2497,10 +2670,22 @@ def main(argv=None) -> int:
                 overrides["limits"]["max_requests"] = 80
         if args.requests is not None:
             overrides["limits"]["max_requests"] = args.requests
+        if args.max_duration is not None:
+            overrides["limits"]["max_duration_s"] = args.max_duration
+        if args.max_total_tokens is not None:
+            overrides["limits"]["max_total_tokens"] = args.max_total_tokens
         if args.scheduler:
             overrides["scheduler"] = args.scheduler
         if args.topic:
             overrides["topic"] = args.topic
+        if args.mode_text is not None:
+            overrides["mode_text"] = args.mode_text
+        if args.min_turns_before_end is not None:
+            overrides["min_turns_before_end"] = args.min_turns_before_end
+        if args.doc_manifest:
+            overrides["doc_manifest"] = str(Path(args.doc_manifest).resolve())
+        if validation_override is not None:
+            overrides["deliverable_validation"] = validation_override
         if args.run_id:
             overrides["run_id"] = args.run_id
         if args.context_tokens:
@@ -2533,6 +2718,10 @@ def main(argv=None) -> int:
                 context_mode=cfg.get("execution", {}).get("context_mode", "tokens"),
                 safety_margin=cfg.get("execution", {}).get("safety_margin", 1024),
                 checkpoint_data=resume_data,
+                reopen=bool(args.reopen),
+                override_topic=args.topic if resume_data is not None else None,
+                override_mode_text=args.mode_text if resume_data is not None else None,
+                override_min_turns_before_end=args.min_turns_before_end if resume_data is not None else None,
             )
         except (OSError, ValueError, KeyError, TypeError, ArtifactError) as error:
             if resume_data is None:

@@ -18,14 +18,15 @@ from presets import SAMPLING_ALIASES, SAMPLING_PARAMS, normalize_sampling_param
 ACTION_TYPES = (
     "SAY", "WHISPER", "PUBLISH", "SUBSCRIBE", "CLAIM", "CHALLENGE", "RETRACT", "VOTE",
     "PROPOSE_NEXT", "SET_TEMPERATURE", "SET_SAMPLING", "SET_STYLE", "PROPOSE_TOPIC", "ARTIFACT_WRITE",
-    "ARTIFACT_READ", "ARTIFACT_LIST", "UPDATE_NOTE", "FINISH", "END_RUN",
+    "ARTIFACT_READ", "ARTIFACT_LIST", "DOC_LIST", "DOC_READ", "DOC_SEARCH", "UPDATE_NOTE", "FINISH", "END_RUN",
     "CREATE_GROUP", "INVITE_GROUP", "JOIN_GROUP", "LEAVE_GROUP", "COMPEL_GROUP", "RELEASE_GROUP"
 )
 
 ALIASES = {
     "DM": "WHISPER", "PM": "WHISPER", "POST": "PUBLISH", "WRITE": "ARTIFACT_WRITE",
     "APPEND": "ARTIFACT_WRITE", "REPLACE": "ARTIFACT_WRITE", "CREATE": "ARTIFACT_WRITE", "WORLD": "ARTIFACT_WRITE",
-    "READ": "ARTIFACT_READ", "LIST": "ARTIFACT_LIST", "NOTE": "UPDATE_NOTE", "NEXT": "PROPOSE_NEXT",
+    "READ": "ARTIFACT_READ", "LIST": "ARTIFACT_LIST", "DOCS": "DOC_LIST", "READ_DOC": "DOC_READ",
+    "SEARCH_DOC": "DOC_SEARCH", "NOTE": "UPDATE_NOTE", "NEXT": "PROPOSE_NEXT",
     "WITHDRAW": "RETRACT", "OBJECT": "CHALLENGE", "TOPIC": "PROPOSE_TOPIC", "STYLE": "SET_STYLE",
     "TEMP": "SET_TEMPERATURE", "TEMPERATURE": "SET_TEMPERATURE",
     "SAMPLING": "SET_SAMPLING", "SET_PARAMS": "SET_SAMPLING",
@@ -375,10 +376,31 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
             return None
         res["name"] = name
         offset = res.get("offset", 0)
-        if isinstance(offset, bool) or not re.fullmatch(r"0|[1-9][0-9]{0,5}", str(offset)):
+        if isinstance(offset, bool) or not re.fullmatch(r"0|[1-9][0-9]{0,7}", str(offset)):
             issues.append("ARTIFACT_READ offset must be a nonnegative integer")
             return None
         res["offset"] = int(offset)
+
+    elif act_type == "DOC_READ":
+        doc_id = str(res.get("doc_id") or res.get("name") or res.get("target") or "").strip()
+        if not doc_id:
+            issues.append("DOC_READ missing document id")
+            return None
+        res["doc_id"] = doc_id
+        offset = res.get("offset", 0)
+        if isinstance(offset, bool) or not re.fullmatch(r"0|[1-9][0-9]{0,7}", str(offset)):
+            issues.append("DOC_READ offset must be a nonnegative integer")
+            return None
+        res["offset"] = int(offset)
+
+    elif act_type == "DOC_SEARCH":
+        tgt = str(res.get("target") or res.get("doc_id") or "all").strip() or "all"
+        query = str(res.get("query") or res.get("content") or "").strip()
+        if not query:
+            issues.append("DOC_SEARCH missing query string")
+            return None
+        res["target"] = tgt
+        res["query"] = query
 
     elif act_type == "PROPOSE_NEXT":
         tgt = canonicalize_agent_id(res.get("target"), known_names)
@@ -502,6 +524,25 @@ def _command(word: str, rest: str, lines_after: List[str], known_names: Optional
 
     if w == "ARTIFACT_LIST":
         return {"type": "ARTIFACT_LIST"}
+
+    if w == "DOC_LIST":
+        return {"type": "DOC_LIST"}
+
+    if w == "DOC_READ":
+        parts = (head + (" " + body if body else "")).split()
+        return {"type": "DOC_READ", "doc_id": parts[0] if parts else "",
+                "offset": parts[1] if len(parts) == 2 else (0 if len(parts) == 1 else "invalid")}
+
+    if w == "DOC_SEARCH":
+        if sep and body:
+            tgt = head or "all"
+            query = body
+        else:
+            tgt, query = split_head()
+            if not query and tgt and tgt.lower() not in ("all", "*"):
+                query = tgt
+                tgt = "all"
+        return {"type": "DOC_SEARCH", "target": tgt or "all", "query": query}
 
     if w == "ARTIFACT_WRITE":
         bits = head.split()
