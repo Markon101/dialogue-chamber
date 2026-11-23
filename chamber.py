@@ -502,6 +502,7 @@ class Chamber:
         self.deliverable_verified: Optional[bool] = None
         self.deliverable_issues: List[str] = []
         self.pending_validation_feedback: List[str] = []
+        self._turn_replaced_artifacts: Set[str] = set()
         self.speaker_transitions: List[Tuple[int, str, str]] = []
         self.resurrection_events: List[dict] = []
         self.fallbacks_triggered: List[dict] = []
@@ -648,13 +649,16 @@ class Chamber:
             tail_sections["communication"] = self.communication.describe(agent.name)
 
         min_fb_turn = max(0, int(agent.last_turn)) if agent.last_turn else 0
-        recent_rejections = [
+        recent_feedback = [
             e for e in self.events
-            if e.status == "rejected" and e.actor == agent.name and e.turn >= min_fb_turn
-        ][-5:]
+            if e.actor == agent.name and e.turn >= min_fb_turn
+            and (e.status == "rejected" or e.type in ("DELIVERABLE_WARNING", "DELIVERABLE_HINT"))
+        ][-6:]
         feedback_lines = [
-            f"{e.type}" + (f" [{e.target}]" if e.target else "") + f": REJECTED ({e.detail})"
-            for e in recent_rejections
+            (f"{e.type}" + (f" [{e.target}]" if e.target else "") + f": REJECTED ({e.detail})")
+            if e.status == "rejected"
+            else e.detail
+            for e in recent_feedback
         ]
         if self.pending_validation_feedback:
             feedback_lines.append("END_RUN BLOCKED — Deliverable validation failed:")
@@ -690,7 +694,8 @@ class Chamber:
             if fname in self.artifacts.versions and fname not in shown_files:
                 try:
                     _, ver, text = self.artifacts.read(agent.name, fname, turn=self.turn)
-                    art_blocks.append(f"[Shared Artifact {fname} (v{ver})]\n{preview_artifact(fname, text, limit=preview_limit)}")
+                    sz_b = len(text.encode("utf-8"))
+                    art_blocks.append(f"[Shared Artifact {fname} (v{ver}, {sz_b}B)]\n{preview_artifact(fname, text, limit=preview_limit)}")
                 except ArtifactError:
                     pass
         if "ARTIFACT_WRITE" in agent.capabilities or "ARTIFACT_READ" in agent.capabilities:
@@ -751,21 +756,23 @@ class Chamber:
                 active_cnt = sum(1 for a in self.agents.values() if a.active)
                 voted_cnt = sum(1 for n, a in self.agents.items() if a.active and n in self.end_votes)
                 status_parts.append(f"End votes ({self.end_policy}): {voted_cnt}/{active_cnt} active")
+            status_lines = [" | ".join(status_parts)]
             if self.deliverable_validation:
                 deliv_ok, deliv_issues, deliv_det = validate_artifact(self.artifacts, self.deliverable_validation)
                 dname = deliv_det.get("artifact", str(self.deliverable_validation.get("artifact", "")))
+                dver = deliv_det.get("version")
+                dsz = deliv_det.get("size_bytes", 0)
+                meta_str = f"v{dver}, {dsz}B" if dver else "missing"
                 if deliv_ok:
-                    status_parts.append(f"Deliverable `{dname}`: READY ({deliv_det.get('size_bytes')}B, all required sections present)")
+                    status_lines.append(f"Deliverable `{dname}`: READY ({meta_str}, all required sections present)")
                 else:
-                    status_parts.append(f"Deliverable `{dname}`: INCOMPLETE ({'; '.join(deliv_issues)})")
-            status_lines = [" | ".join(status_parts)]
+                    status_lines.append(f"Deliverable `{dname}`: INCOMPLETE ({meta_str})")
+                    for iss in deliv_issues:
+                        status_lines.append(f"  - {iss}")
             if self.documents.has_docs():
                 all_doc_ids = self.documents.ids()
-                inspected_ids = {
-                    rec.get("target")
-                    for rec in self.doc_access_log
-                    if rec.get("ok") and rec.get("op") in ("read", "toc") and rec.get("target") in all_doc_ids
-                }
+                doc_audit = self._compute_doc_citation_audit()
+                inspected_ids = set(doc_audit["docs_inspected_ids"])
                 unread = [d for d in all_doc_ids if d not in inspected_ids]
                 cov = (
                     f"Ref docs inspected ({len(inspected_ids)}/{len(all_doc_ids)}): unread = {', '.join(unread)}"
@@ -784,6 +791,12 @@ class Chamber:
                     recent_reads.reverse()
                     cov += f" | Recent reads: {', '.join(recent_reads)}"
                 status_lines.append(cov)
+                unverified = doc_audit["unverified_doc_citations"]
+                if unverified:
+                    status_lines.append(
+                        "Unverified doc citations (cited without @DOC_READ/@DOC_TOC/@DOC_SEARCH): "
+                        + ", ".join(unverified.keys())
+                    )
             tail_sections["session_status"] = "--- Session Status ---\n" + "\n".join(status_lines)
 
         # Public messages (append-only shared prefix across all agents)
@@ -874,7 +887,7 @@ class Chamber:
                 '    {"type": "PUBLISH", "channel": "planning", "content": "channel post"},\n'
                 '    {"type": "VOTE", "target": "c1", "value": "yes|no"},\n'
                 '    {"type": "UPDATE_NOTE", "content": "your private scratchpad note"},\n'
-                '    {"type": "ARTIFACT_WRITE", "name": "world", "mode": "create|append|replace", "content": "markdown"},\n'
+                '    {"type": "ARTIFACT_WRITE", "name": "world", "mode": "create|append|replace|replace_section", "section": "optional heading for replace_section", "content": "markdown"},\n'
                 '    {"type": "ARTIFACT_READ", "name": "world"}'
                 + (',\n    {"type": "DOC_TOC", "doc_id": "..."},\n    {"type": "DOC_SEARCH", "target": "all", "query": "..."},\n    {"type": "DOC_READ", "doc_id": "...", "offset": 0}' if self.documents.has_docs() else '')
                 + "\n  ]\n}\n"
@@ -902,7 +915,10 @@ class Chamber:
         if "UPDATE_NOTE" in caps:
             cmds.append("@NOTE: <private scratchpad note>")
         if "ARTIFACT_WRITE" in caps:
-            cmds.append("@APPEND <artifact_name>: <markdown to append>  |  @REPLACE <artifact_name>: <full consolidated markdown>  (or @READ <artifact_name> 0)")
+            cmds.append(
+                "@APPEND <artifact>: <markdown to append>  |  @SECTION <artifact> | <heading>: <replace one section>  |  "
+                "@REPLACE <artifact>: <full consolidated markdown>  (or @READ <artifact> 0)"
+            )
         if self.documents.has_docs() and ("DOC_READ" in caps or "DOC_SEARCH" in caps or "DOC_TOC" in caps):
             cmds.append("@DOC_TOC <doc_id>  |  @DOC_SEARCH <doc_id|all> <query>  |  @DOC_READ <doc_id> 0 (use numeric integer offset)  |  @DOC_LIST")
         if self.end_mode == "agent_decided" and ("END_RUN" in caps or "FINISH" in caps):
@@ -1170,12 +1186,16 @@ class Chamber:
                 term_act = deduped_actions.pop(term_indices[0])
                 deduped_actions.insert(max_act - 1, term_act)
 
-        for idx, act in enumerate(deduped_actions):
-            if idx >= max_act:
-                self._record(agent.name, act.get("type", "UNKNOWN"), "rejected",
-                             detail=f"exceeded max_actions_per_response ({max_act}); keep <= {max_act} actions per turn")
-                continue
-            self._apply_action(agent, act)
+        self._turn_replaced_artifacts.clear()
+        try:
+            for idx, act in enumerate(deduped_actions):
+                if idx >= max_act:
+                    self._record(agent.name, act.get("type", "UNKNOWN"), "rejected",
+                                 detail=f"exceeded max_actions_per_response ({max_act}); keep <= {max_act} actions per turn")
+                    continue
+                self._apply_action(agent, act)
+        finally:
+            self._turn_replaced_artifacts.clear()
 
     def _apply_action(self, agent: AgentState, act: dict):
         atype = str(act.get("type") or "").upper()
@@ -1202,6 +1222,9 @@ class Chamber:
                 return
             old_t = agent.temperature
             new_t = max(float(lim["temp_min"]), min(float(lim["temp_max"]), req_t))
+            if abs(new_t - old_t) < 1e-6:
+                self._record(agent.name, atype, "accepted", detail=f"{old_t:.2f} -> {new_t:.2f} (unchanged)")
+                return
             agent.temperature = new_t
             self.temp_changes.append((self.turn, agent.name, old_t, new_t))
             clamped = " (clamped)" if abs(new_t - req_t) > 1e-6 else ""
@@ -1336,6 +1359,23 @@ class Chamber:
             if not content:
                 self._record(agent.name, atype, "rejected", detail="empty claim content")
                 return
+            if re.fullmatch(r"c\d+", content, re.I) and content.lower() in self.board:
+                self._record(
+                    agent.name, atype, "rejected", target=content.lower(),
+                    detail=f"CLAIM content cannot be existing claim ID {content.lower()!r}; use @VOTE or @CHALLENGE instead",
+                )
+                return
+            m_prefix = re.match(r"^(c\d+)\s*:\s*(.+)$", content, re.I)
+            if m_prefix:
+                content = m_prefix.group(2).strip()
+            norm_claim = " ".join(content.lower().split())
+            for existing in self.board.values():
+                if existing.status != "retracted" and " ".join(existing.content.lower().split()) == norm_claim:
+                    self._record(
+                        agent.name, atype, "rejected", target=existing.id,
+                        detail=f"duplicate of active board item {existing.id}; use @VOTE {existing.id} yes|no instead",
+                    )
+                    return
             cid = f"c{len(self.board) + 1}"
             item = BoardItem(id=cid, turn=self.turn, author=agent.name, kind=kind, content=content, assignee=act.get("assignee"))
             self.board[cid] = item
@@ -1537,21 +1577,57 @@ class Chamber:
             mode = str(act.get("mode") or "append").lower()
             content = str(act.get("content") or "")
             exp_ver = act.get("expected_version")
+            section = act.get("section")
+            force = bool(act.get("force", False))
+            try:
+                norm_name = self.artifacts.normalize(name)
+            except ArtifactError:
+                norm_name = ""
+            if mode == "replace" and not force and norm_name and norm_name in self._turn_replaced_artifacts:
+                self._record(
+                    agent.name, atype, "rejected", target=norm_name,
+                    detail=f"duplicate @REPLACE on {norm_name} in the same turn ignored to protect your earlier write; combine edits or use @SECTION",
+                )
+                return
+            existed_before = bool(norm_name and norm_name in self.artifacts.versions)
             try:
                 fname, ver = self.artifacts.write(
-                    agent.name, name, mode, content, expected_version=exp_ver, turn=self.turn
+                    agent.name, name, mode, content, expected_version=exp_ver, turn=self.turn,
+                    section=section, force=force, min_replace_ratio=float(lim.get("min_replace_ratio", 0.25)),
                 )
             except ArtifactError as e:
                 self._record(agent.name, atype, "rejected", target=name, detail=str(e))
                 return
+            if mode == "replace":
+                self._turn_replaced_artifacts.add(fname)
+            try:
+                size_bytes = os.lstat(self.artifacts._path(fname)).st_size
+            except OSError:
+                size_bytes = len(content.encode("utf-8"))
             self._check_answer_key(content)
-            self._record(agent.name, atype, "accepted", target=fname, detail=f"{mode} -> v{ver}")
-            self._emit(f"  📝 artifact {fname} ({mode} by {agent.name} → v{ver})")
-            if self.deliverable_validation and self.pending_validation_feedback:
-                ok, issues, _ = validate_artifact(self.artifacts, self.deliverable_validation)
-                self.deliverable_verified = ok
-                self.deliverable_issues = issues
-                self.pending_validation_feedback = [] if ok else issues
+            mode_label = f"replace_section[{str(section or '')[:40]}]" if mode == "replace_section" else mode
+            self._record(agent.name, atype, "accepted", target=fname, detail=f"{mode_label} -> v{ver} ({size_bytes}B)")
+            self._emit(f"  📝 artifact {fname} ({mode_label} by {agent.name} → v{ver}, {size_bytes}B)")
+            if self.deliverable_validation:
+                raw_deliv = str(self.deliverable_validation.get("artifact") or "")
+                try:
+                    deliv_fname = self.artifacts.normalize(raw_deliv) if raw_deliv else ""
+                except ArtifactError:
+                    deliv_fname = ""
+                if self.pending_validation_feedback or (deliv_fname and fname == deliv_fname):
+                    ok, issues, _ = validate_artifact(self.artifacts, self.deliverable_validation)
+                    self.deliverable_verified = ok
+                    self.deliverable_issues = issues
+                    if self.pending_validation_feedback:
+                        self.pending_validation_feedback = [] if ok else issues
+                if not existed_before and fname not in self.visible_artifacts and deliv_fname and fname != deliv_fname:
+                    short_new = fname.removesuffix(".md")
+                    short_deliv = deliv_fname.removesuffix(".md")
+                    if short_new in short_deliv or short_deliv in short_new:
+                        self._record(
+                            agent.name, "DELIVERABLE_HINT", "system", target=fname,
+                            detail=f"Created separate artifact {fname} ({size_bytes}B), not the required deliverable {deliv_fname}.",
+                        )
             return
 
         if atype == "FINISH":
@@ -1586,6 +1662,14 @@ class Chamber:
                 self._record(agent.name, atype, "accepted", detail=reason)
                 self._emit(f"  🏁 {agent.name} voted to end run: {reason}")
             self._evaluate_agent_end()
+            if not self.end_requested and self.deliverable_validation and not self.pending_validation_feedback:
+                d_ok, d_issues, d_det = validate_artifact(self.artifacts, self.deliverable_validation)
+                if not d_ok:
+                    d_name = d_det.get("artifact", str(self.deliverable_validation.get("artifact", "")))
+                    self._record(
+                        agent.name, "DELIVERABLE_WARNING", "system", target=d_name,
+                        detail=f"Your @END_RUN vote is recorded, but deliverable {d_name} is still INCOMPLETE: {'; '.join(d_issues)}",
+                    )
             return
 
     def _evaluate_agent_end(self):
@@ -1755,13 +1839,51 @@ class Chamber:
                         "SYSTEM", "SCHEDULER", "system", target=chosen,
                         detail=f"dyad lock-in breaker ({'/'.join(sorted(dyad_set))})",
                     )
-            elif self.nominated_next and self.nominated_next in eligible:
-                chosen = self.nominated_next
-                self._record("SCHEDULER", "SPEAKER_NOMINATION", "accepted", target=chosen)
-            elif self.reactive_queue:
-                chosen = self.reactive_queue.pop(0)
             else:
-                chosen = fair_fallback()
+                hub_cfg = self.limits.get("max_speaker_window_turns")
+                hub_nominee = None
+                hub_count = 0
+                hub_win = 0
+                non_hub_eligible: List[str] = []
+                if hub_cfg and len(active) >= 4 and self.nominated_next and self.nominated_next in eligible:
+                    if isinstance(hub_cfg, (list, tuple)) and len(hub_cfg) >= 2:
+                        hub_win, hub_max = int(hub_cfg[0]), int(hub_cfg[1])
+                    elif isinstance(hub_cfg, dict):
+                        hub_win = int(hub_cfg.get("window", max(6, len(active))))
+                        hub_max = int(hub_cfg.get("max_turns", 3))
+                    else:
+                        hub_win = max(6, len(active))
+                        hub_max = int(hub_cfg)
+                    if hub_win >= 2 and hub_max >= 1 and len(self.public_messages) >= hub_win:
+                        recent_slice = self.public_messages[-hub_win:]
+                        hub_count = sum(1 for m in recent_slice if m.speaker == self.nominated_next)
+                        if hub_count >= hub_max:
+                            cands = [
+                                n for n in eligible
+                                if n != self.nominated_next
+                                and sum(1 for m in recent_slice if m.speaker == n) < hub_max
+                            ] or [n for n in eligible if n != self.nominated_next]
+                            if cands:
+                                hub_nominee = self.nominated_next
+                                non_hub_eligible = cands
+                if hub_nominee is not None:
+                    rq_non_hub = [x for x in self.reactive_queue if x in non_hub_eligible]
+                    if rq_non_hub:
+                        chosen = rq_non_hub[0]
+                        self.reactive_queue.remove(chosen)
+                    else:
+                        chosen = fair_fallback(non_hub_eligible)
+                    self._record(
+                        "SYSTEM", "SCHEDULER", "system", target=chosen,
+                        detail=f"hub lock-in breaker ({hub_nominee} had {hub_count}/{hub_win} recent turns)",
+                    )
+                elif self.nominated_next and self.nominated_next in eligible:
+                    chosen = self.nominated_next
+                    self._record("SCHEDULER", "SPEAKER_NOMINATION", "accepted", target=chosen)
+                elif self.reactive_queue:
+                    chosen = self.reactive_queue.pop(0)
+                else:
+                    chosen = fair_fallback()
 
         self.nominated_next = None
         return chosen
@@ -2045,6 +2167,46 @@ class Chamber:
         }
         self.checkpoints.save_checkpoint(turn, snapshot)
 
+    def _compute_doc_citation_audit(self) -> Dict[str, Any]:
+        """Compare bracketed document citations in speech/artifacts against actual DOC_* tool calls."""
+        if not self.documents.has_docs():
+            return {"docs_inspected_count": 0, "docs_inspected_ids": [], "unverified_doc_citations": {}}
+        all_ids = self.documents.ids()
+        accessed_ids = {
+            rec.get("target")
+            for rec in self.doc_access_log
+            if rec.get("ok") and rec.get("op") in ("read", "toc", "search") and rec.get("target") in all_ids
+        }
+        inspected_ids = [
+            d for d in all_ids
+            if any(
+                rec.get("ok") and rec.get("op") in ("read", "toc") and rec.get("target") == d
+                for rec in self.doc_access_log
+            )
+        ]
+        corpus_chunks = [m.content for m in self.public_messages]
+        for fname in self.artifacts.names():
+            try:
+                corpus_chunks.append(self.artifacts._read_file(self.artifacts._path(fname)))
+            except Exception:
+                pass
+        joined = "\n".join(corpus_chunks)
+        bracket_blocks = re.findall(r"\[[^\]\n]{1,160}\]", joined)
+        unverified: Dict[str, int] = {}
+        if bracket_blocks:
+            for doc_id in all_ids:
+                if doc_id in accessed_ids:
+                    continue
+                pat = re.compile(rf"(?<![A-Za-z0-9_-]){re.escape(doc_id)}(?![A-Za-z0-9_-])")
+                cnt = sum(1 for blk in bracket_blocks if pat.search(blk))
+                if cnt > 0:
+                    unverified[doc_id] = cnt
+        return {
+            "docs_inspected_count": len(inspected_ids),
+            "docs_inspected_ids": inspected_ids,
+            "unverified_doc_citations": unverified,
+        }
+
     # ── metrics & reports ──
     def compute_metrics(self) -> dict:
         def trigrams(s):
@@ -2096,6 +2258,7 @@ class Chamber:
         doc_searches = [d for d in self.doc_access_log if d.get("op") == "search"]
         doc_hits = sum(1 for d in doc_searches if int(d.get("hits") or 0) > 0)
         doc_search_hit_rate = round(doc_hits / len(doc_searches), 3) if doc_searches else None
+        doc_audit = self._compute_doc_citation_audit()
 
         return dict(
             turns_completed=len(self.public_messages),
@@ -2132,6 +2295,9 @@ class Chamber:
             doc_searches_count=len(doc_searches),
             doc_search_hits=doc_hits,
             doc_search_hit_rate=doc_search_hit_rate,
+            docs_inspected_count=doc_audit["docs_inspected_count"],
+            docs_inspected_ids=doc_audit["docs_inspected_ids"],
+            unverified_doc_citations=doc_audit["unverified_doc_citations"],
             doc_access_log=list(self.doc_access_log),
             stop_reason=self.stop_reason,
             turns_by_agent=turns_by_agent,
@@ -2344,13 +2510,8 @@ class Chamber:
 
         if self.documents.has_docs():
             all_doc_ids = self.documents.ids()
-            inspected_docs = [
-                d for d in all_doc_ids
-                if any(
-                    rec.get("ok") and rec.get("op") in ("read", "toc") and rec.get("target") == d
-                    for rec in self.doc_access_log
-                )
-            ]
+            inspected_docs = list(metrics.get("docs_inspected_ids") or [])
+            unverified_cites = metrics.get("unverified_doc_citations") or {}
             hit_str = (
                 f" ({metrics['doc_search_hits']}/{metrics['doc_searches_count']} hit, "
                 f"{metrics['doc_search_hit_rate'] * 100:.0f}%)"
@@ -2364,6 +2525,8 @@ class Chamber:
                 f"- **Documents inspected (TOC/read)**: {len(inspected_docs)}/{len(all_doc_ids)}"
                 + (f" ({', '.join(inspected_docs)})" if inspected_docs else ""),
                 f"- **Doc TOCs / reads / searches**: {metrics['doc_toc_count']} / {metrics['doc_reads_count']} / {metrics['doc_searches_count']}{hit_str}",
+                f"- **Unverified bracket citations (docs cited without DOC_* access)**: "
+                + (", ".join(f"`{k}` ({v}x)" for k, v in unverified_cites.items()) if unverified_cites else "none"),
             ])
             for rec in self.doc_access_log:
                 m_lines.append(f"  - Turn {rec.get('turn')} (`{rec.get('agent')}`): `{rec.get('op')}` `{rec.get('target')}`")

@@ -13,6 +13,73 @@ from pathlib import Path
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,47}$")
 CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
+_NUM_SECTION_PREFIX = (
+    r"(?:(?:Section|Part|Chapter)[ \t]+)?"
+    r"(?:\d+(?:\.\d+)*|[IVX]{1,5})"
+    r"[ \t]*[:.)\-][ \t]+"
+)
+
+
+def section_heading_regex(section_spec: str) -> re.Pattern:
+    """Compile a tolerant, line-anchored regex matching a Markdown or bracketed section heading.
+
+    Matches equivalent forms such as ``[Intro]``, ``## [Intro]``, ``## Intro``,
+    ``## 1. Intro``, ``## [1. Intro]``, and hyphen/dash variations without
+    matching ordinary body prose sentences.
+    """
+    core = str(section_spec or "").strip().strip("[]").strip()
+    parts = re.split(r"(\s+|[-–—])", core)
+    core_pat = "".join(
+        r"[ \t]+" if p.isspace()
+        else (r"[-–—]" if p in ("-", "–", "—") else re.escape(p))
+        for p in parts if p
+    )
+    if not core_pat:
+        return re.compile(r"(?!)")
+    trail = r"(?:[ \t]*[:\-–—].*|[ \t]+\([^)]*\))?"
+    b_hashed = rf"#{{1,6}}[ \t]*[*_]*\[?[ \t]*(?:{_NUM_SECTION_PREFIX})?{core_pat}[ \t]*\]?[*_]*{trail}"
+    b_delim = rf"(?:[*_]{{1,2}}\[?[ \t]*|\[[ \t]*)(?:{_NUM_SECTION_PREFIX})?{core_pat}(?:[ \t]*\][*_]{{0,2}}|[*_]{{1,2}}){trail}"
+    b_bare = rf"(?:{_NUM_SECTION_PREFIX})?{core_pat}[ \t]*:?"
+    return re.compile(rf"(?im)^[ \t]*(?:{b_hashed}|{b_delim}|{b_bare})[ \t]*$")
+
+
+def find_section_span(text: str, section_spec: str):
+    """Find ``(heading_start, heading_end, body_end, level)`` for ``section_spec`` in ``text``.
+
+    Returns ``None`` if no matching section heading exists. ``body_end`` extends to
+    the next Markdown heading of equal/higher level (or next bracketed marker when
+    un-hashed), ignoring headings inside fenced code blocks.
+    """
+    pat = section_heading_regex(section_spec)
+    m = pat.search(text)
+    if not m:
+        return None
+    line_text = text[m.start():m.end()]
+    hm = re.match(r"^[ \t]*(#{1,6})(?=[ \t]|$)", line_text)
+    level = len(hm.group(1)) if hm else None
+    tail = text[m.end():]
+    body_end = len(text)
+    in_fence = False
+    for lm in re.finditer(r"([^\n]*)", tail):
+        ln = lm.group(1)
+        if not ln:
+            continue
+        stripped = ln.lstrip()
+        if stripped.startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        hm2 = re.match(r"^[ \t]*(#{1,6})[ \t]+\S", ln)
+        if hm2:
+            if level is None or len(hm2.group(1)) <= level:
+                body_end = m.end() + lm.start()
+                break
+        elif level is None and re.match(r"^[ \t]*\[[^\]\n]{1,120}\](?:[ \t]*[:\-–—].*)?[ \t]*$", ln):
+            body_end = m.end() + lm.start()
+            break
+    return m.start(), m.end(), body_end, level
+
 
 class ArtifactError(Exception):
     """An artifact operation was refused."""
@@ -154,18 +221,24 @@ class ArtifactManager:
         self.log.append(dict(turn=turn, agent=agent, op="read", name=fname, version=self.versions[fname], ok=True, detail=""))
         return fname, self.versions[fname], text
 
-    def write(self, agent, name, mode, content, expected_version=None, turn=0, attribution=True):
+    def write(self, agent, name, mode, content, expected_version=None, turn=0, attribution=True,
+              section=None, force=False, min_replace_ratio=0.0):
         try:
-            fname, version = self._write(agent, name, mode, content, expected_version, turn, attribution)
+            fname, version, size = self._write(
+                agent, name, mode, content, expected_version, turn, attribution,
+                section=section, force=force, min_replace_ratio=min_replace_ratio,
+            )
         except ArtifactError as e:
-            self.log.append(dict(turn=turn, agent=agent, op=str(mode)[:10], name=str(name)[:60], version=None, ok=False, detail=str(e)))
+            self.log.append(dict(turn=turn, agent=agent, op=str(mode)[:16], name=str(name)[:60], version=None, ok=False, detail=str(e)))
             raise
-        self.log.append(dict(turn=turn, agent=agent, op=mode, name=fname, version=version, ok=True, detail=f"{len(content)} chars"))
+        self.log.append(dict(turn=turn, agent=agent, op=mode, name=fname, version=version, ok=True,
+                             detail=f"{len(content)} chars -> {size}B"))
         return fname, version
 
-    def _write(self, agent, name, mode, content, expected_version, turn, attribution):
-        if mode not in ("create", "append", "replace"):
-            raise ArtifactError("mode must be create, append or replace")
+    def _write(self, agent, name, mode, content, expected_version, turn, attribution,
+               section=None, force=False, min_replace_ratio=0.0):
+        if mode not in ("create", "append", "replace", "replace_section"):
+            raise ArtifactError("mode must be create, append, replace or replace_section")
         if not isinstance(content, str) or not content.strip():
             raise ArtifactError("artifact content must be non-empty text")
         content = CONTROL_CHARS.sub("", content)
@@ -186,19 +259,64 @@ class ArtifactManager:
                 raise ArtifactError("expected_version must be a number")
             if expected_version != current:
                 raise ArtifactError(f"{fname} is at v{current}, not v{expected_version}; read it again")
-        if mode == "replace" and exists and expected_version is None and self.seen.get((agent, fname)) != current:
+        if mode in ("replace", "replace_section") and exists and expected_version is None and self.seen.get((agent, fname)) != current:
             raise ArtifactError(f"{fname} changed since you last saw it (now v{current}); read it before replacing")
         current_size = os.lstat(path).st_size if exists else 0
         req_size = len(content.encode("utf-8"))
         art_limit = self.limit_for(fname)
         short_name = fname.removesuffix(".md")
-        if mode == "append" and exists:
+
+        if mode == "replace_section":
+            if not isinstance(section, str) or not section.strip():
+                raise ArtifactError("replace_section requires a target section heading")
+            sec_spec = CONTROL_CHARS.sub("", section).strip()
+            body_clean = content.strip()
+            sec_pat = section_heading_regex(sec_spec)
+            first_line = next((ln for ln in body_clean.splitlines() if ln.strip()), "")
+            has_heading = bool(sec_pat.match(first_line))
+            if exists:
+                old = self._read_file(path, max_bytes=art_limit)
+                span = find_section_span(old, sec_spec)
+                if span:
+                    h_start, h_end, b_end, _ = span
+                    if has_heading:
+                        replacement_block = body_clean
+                    else:
+                        replacement_block = old[h_start:h_end].rstrip("\n") + "\n\n" + body_clean
+                    parts = [old[:h_start].rstrip("\n"), replacement_block, old[b_end:].lstrip("\n")]
+                    new = "\n\n".join(p for p in parts if p) + "\n"
+                else:
+                    heading_line = sec_spec if sec_spec.startswith(("#", "[")) else f"## {sec_spec}"
+                    add_block = body_clean if has_heading else f"{heading_line}\n\n{body_clean}"
+                    new = old.rstrip("\n") + "\n\n" + add_block + "\n"
+            else:
+                heading_line = sec_spec if sec_spec.startswith(("#", "[")) else f"## {sec_spec}"
+                new = (body_clean if has_heading else f"{heading_line}\n\n{body_clean}") + "\n"
+        elif mode == "append" and exists:
             old = self._read_file(path, max_bytes=art_limit)
             note = f"\n\n— *{agent}, turn {turn}*" if attribution else ""
             new = old.rstrip("\n") + "\n\n" + content.strip() + note + "\n"
         else:
             new = content.strip() + "\n"
+
         size = len(new.encode("utf-8"))
+        if mode == "replace" and exists and not force:
+            if current_size >= 500 and is_placeholder_stub(content):
+                raise ArtifactError(
+                    f"{fname} replace rejected: content looks like a template/placeholder stub rather than full text. "
+                    f"Use @SECTION {short_name} | <heading>: <content> to edit one section, "
+                    f"or @FORCE_REPLACE {short_name}: <content> if intentional."
+                )
+            if min_replace_ratio and current_size >= 1500 and current_size < int(art_limit * 0.85):
+                min_allowed = max(300, int(current_size * float(min_replace_ratio)))
+                if size < min_allowed:
+                    raise ArtifactError(
+                        f"{fname} replace rejected: would shrink artifact from {current_size}B to {size}B "
+                        f"(< {int(float(min_replace_ratio) * 100)}% of current size). "
+                        f"Use @SECTION {short_name} | <heading>: <content> to update one section without overwriting peers' work, "
+                        f"@APPEND {short_name}: ... to add content, or @FORCE_REPLACE {short_name}: <content> if intentional."
+                    )
+
         if size > art_limit:
             raise ArtifactError(
                 f"{fname} write rejected: current={current_size}B, update={req_size}B, "
@@ -216,15 +334,32 @@ class ArtifactManager:
         self._atomic_write(path, new)
         self.versions[fname] = current + 1
         self.seen[(agent, fname)] = current + 1
-        return fname, current + 1
+        return fname, current + 1, size
 
 
 DEFAULT_PLACEHOLDER_PATTERNS = (
     r"\.\.\.\s*\(full\s+(?:lyrics|text|content|track|draft)\b",
+    r"\.\.\.\s*\(\s*insert\b[^)]*\)",
     r"\[\s*(?:TBD|TODO|PLACEHOLDER|INSERT\b[^\]]*)\s*\]",
     r"(?m)^\s*(?:TBD|TODO)\s*[:\-]?\s*$",
     r"Track Title:\s*TBD\b",
 )
+
+
+def is_placeholder_stub(text: str) -> bool:
+    """Return True if ``text`` is an unfilled template or stub replacement rather than full content."""
+    s = str(text or "").strip()
+    if not s:
+        return True
+    if re.fullmatch(r"<[^<>\n]{1,160}>", s):
+        return True
+    if len(s) < 250:
+        for pat in DEFAULT_PLACEHOLDER_PATTERNS:
+            if re.search(pat, s, re.I):
+                return True
+        if re.fullmatch(r"\[(?:END|DONE|COMPLETE|FINAL)[^\]]*\]", s, re.I):
+            return True
+    return False
 
 
 def validate_artifact(manager: ArtifactManager, spec: dict):
@@ -275,9 +410,7 @@ def validate_artifact(manager: ArtifactManager, spec: dict):
     if req_sections:
         positions = []
         for sec in req_sections:
-            # Match either literal "[Intro]" or markdown heading "## Intro" / "Intro"
-            core = sec.strip().strip("[]").strip()
-            pat = re.compile(rf"(?im)^(?:#+[ \t]*)?(?:\[\s*{re.escape(core)}\s*\]|{re.escape(sec)})(?:[ \t]*[:\-].*|[ \t]+.*)?$")
+            pat = section_heading_regex(sec)
             m = pat.search(text)
             if not m:
                 missing_sections.append(sec)
@@ -300,6 +433,9 @@ def validate_artifact(manager: ArtifactManager, spec: dict):
         "artifact": fname,
         "version": version,
         "size_bytes": size_bytes,
+        "min_bytes": min_bytes,
+        "required_sections_count": len(req_sections),
+        "matched_sections_count": len(req_sections) - len(missing_sections),
         "missing_sections": missing_sections,
         "empty_sections": empty_sections,
     }

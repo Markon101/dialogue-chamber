@@ -183,6 +183,7 @@ class AnomalyLaboratory:
         metrics = bundle["metrics"]
         checkpoint = bundle["checkpoint"]
         ck_state = checkpoint.get("state") if isinstance(checkpoint.get("state"), dict) else checkpoint
+        ck_cfg = ck_state.get("config") if isinstance(ck_state.get("config"), dict) else {}
         manifest = bundle["manifest"]
         transcript = bundle["transcript"]
         models = bundle["models"]
@@ -508,6 +509,137 @@ class AnomalyLaboratory:
                 generative_follow_up={
                     "regression_test": "Validated event log accurately records target item rejection.",
                     "follow_up_experiment": "Test whether displaying claim IDs inline in transcript headers reduces target category errors.",
+                },
+                discovered_at=now_iso,
+            ))
+
+        # 7. Destructive Artifact Overwrites (e.g. tiny/duplicate @REPLACE wiping large accumulated drafts)
+        art_log = (ck_state.get("artifacts") or checkpoint.get("artifacts") or {}).get("log") or []
+        if art_log:
+            running_sizes: Dict[str, int] = {}
+            wipes = []
+            for entry in art_log:
+                if not isinstance(entry, dict) or not entry.get("ok"):
+                    continue
+                aname = str(entry.get("name") or "")
+                op = str(entry.get("op") or "").lower()
+                det = str(entry.get("detail") or "")
+                m_sz = re.search(r"->\s*(\d+)B\b", det)
+                m_ch = re.search(r"(\d+)\s*chars", det)
+                write_sz = int(m_sz.group(1)) if m_sz else (int(m_ch.group(1)) if m_ch else None)
+                if write_sz is None:
+                    continue
+                prev_sz = running_sizes.get(aname, 0)
+                if op == "replace" and prev_sz >= 1500 and write_sz <= 500 and write_sz < int(prev_sz * 0.25):
+                    wipes.append({
+                        "turn": int(entry.get("turn") or 0),
+                        "actor": str(entry.get("agent") or ""),
+                        "artifact": aname,
+                        "prior_chars": prev_sz,
+                        "new_chars": write_sz,
+                    })
+                    running_sizes[aname] = write_sz
+                elif op in ("create", "replace"):
+                    running_sizes[aname] = write_sz
+                elif op == "append":
+                    running_sizes[aname] = prev_sz + write_sz + 32
+                elif op == "replace_section":
+                    running_sizes[aname] = max(prev_sz, write_sz)
+            if wipes:
+                turns = [w["turn"] for w in wipes if w["turn"] > 0] or [1]
+                specimens.append(AnomalySpecimen(
+                    specimen_id=self._make_id(run_id, "destructive_artifact_overwrite"),
+                    anomaly_type="destructive_artifact_overwrite",
+                    title="Destructive Artifact Overwrite: Tiny/Duplicate @REPLACE Wiping Accumulated Work",
+                    categories=["harness_defect", "model_behavior"],
+                    run_id=run_id,
+                    run_dir=rdir_str,
+                    turn_range=[min(turns), max(turns)],
+                    models_involved=models,
+                    scheduler=scheduler,
+                    evidence={
+                        "occurrences": len(wipes),
+                        "wipes": wipes[:10],
+                    },
+                    epistemic_assessment={
+                        "observed": (
+                            f"Detected {len(wipes)} @REPLACE write(s) where an artifact >= 1500 chars was "
+                            f"overwritten with <= 500 chars (e.g., Turn {wipes[0]['turn']} {wipes[0]['actor']}: "
+                            f"{wipes[0]['prior_chars']} -> {wipes[0]['new_chars']})."
+                        ),
+                        "inferred_mechanism": (
+                            "Agents emitted duplicate or stub @REPLACE commands (or used full-file replacement "
+                            "where section-level edits were intended), destroying prior multi-turn contributions."
+                        ),
+                        "unknowns": "Whether per-section @SECTION editing plus shrinkage guards eliminate unintentional wipes.",
+                    },
+                    generative_follow_up={
+                        "regression_test": "test_artifact_collaboration_and_audits.py::ArtifactCollaborationAndAuditsTests::test_destructive_replace_guards",
+                        "follow_up_experiment": "Compare section-level @SECTION collaboration against full-file @REPLACE under deliverable byte floors.",
+                    },
+                    discovered_at=now_iso,
+                ))
+
+        # 8. Unverified Source-Document Citations (bracket-citing mounted reference docs never accessed)
+        unverified_cites = metrics.get("unverified_doc_citations")
+        if unverified_cites is None:
+            unverified_cites = {}
+            doc_log = metrics.get("doc_access_log") or []
+            mounted_meta = (
+                (ck_cfg.get("mounted_documents") or [])
+                or (manifest.get("effective_config", {}).get("mounted_documents") or [])
+            )
+            doc_ids = [str(d.get("id")) for d in mounted_meta if isinstance(d, dict) and d.get("id")]
+            if not doc_ids:
+                man_path = ck_cfg.get("doc_manifest") or manifest.get("effective_config", {}).get("doc_manifest")
+                if man_path:
+                    try:
+                        raw_m = json.loads(Path(str(man_path)).read_text(encoding="utf-8"))
+                        doc_ids = [str(d.get("id")) for d in (raw_m.get("documents") or []) if d.get("id")]
+                    except Exception:
+                        pass
+            if doc_ids and transcript:
+                accessed_ids = {
+                    str(d.get("target")) for d in doc_log
+                    if d.get("ok") and d.get("op") in ("read", "toc", "search") and d.get("target") in doc_ids
+                }
+                bracket_blocks = re.findall(r"\[[^\]\n]{1,160}\]", transcript)
+                for did in doc_ids:
+                    if did in accessed_ids:
+                        continue
+                    pat = re.compile(rf"(?<![A-Za-z0-9_-]){re.escape(did)}(?![A-Za-z0-9_-])")
+                    cnt = sum(1 for blk in bracket_blocks if pat.search(blk))
+                    if cnt > 0:
+                        unverified_cites[did] = cnt
+        if isinstance(unverified_cites, dict) and len(unverified_cites) >= 2:
+            specimens.append(AnomalySpecimen(
+                specimen_id=self._make_id(run_id, "unverified_source_citation"),
+                anomaly_type="unverified_source_citation",
+                title="Unverified Source Citations: Mounted Reference Docs Cited Without DOC_* Inspection",
+                categories=["model_behavior", "experimental_artifact"],
+                run_id=run_id,
+                run_dir=rdir_str,
+                turn_range=[1, int(metrics.get("turns_completed") or 1)],
+                models_involved=models,
+                scheduler=scheduler,
+                evidence={
+                    "unverified_doc_count": len(unverified_cites),
+                    "unverified_doc_citations": unverified_cites,
+                },
+                epistemic_assessment={
+                    "observed": (
+                        f"Found {len(unverified_cites)} mounted reference document(s) cited in brackets "
+                        f"without any DOC_READ/DOC_TOC/DOC_SEARCH access: {sorted(unverified_cites.keys())}."
+                    ),
+                    "inferred_mechanism": (
+                        "Agents relied on summaries or priors in the prompt/conversation rather than invoking "
+                        "@DOC_READ/@DOC_TOC/@DOC_SEARCH before citing document IDs as primary authorities."
+                    ),
+                    "unknowns": "Whether surfacing unverified citation warnings in Session Status drives primary-source reads.",
+                },
+                generative_follow_up={
+                    "regression_test": "test_artifact_collaboration_and_audits.py::ArtifactCollaborationAndAuditsTests::test_doc_citation_audit_and_anomaly",
+                    "follow_up_experiment": "Compare unverified citation rate when prompt omits exact constants vs when Session Status flags unverified citations.",
                 },
                 discovered_at=now_iso,
             ))

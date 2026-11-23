@@ -25,6 +25,9 @@ ACTION_TYPES = (
 ALIASES = {
     "DM": "WHISPER", "PM": "WHISPER", "POST": "PUBLISH", "WRITE": "ARTIFACT_WRITE",
     "APPEND": "ARTIFACT_WRITE", "REPLACE": "ARTIFACT_WRITE", "CREATE": "ARTIFACT_WRITE", "WORLD": "ARTIFACT_WRITE",
+    "SECTION": "ARTIFACT_WRITE", "UPDATE_SECTION": "ARTIFACT_WRITE",
+    "PATCH_SECTION": "ARTIFACT_WRITE", "REPLACE_SECTION": "ARTIFACT_WRITE",
+    "FORCE_REPLACE": "ARTIFACT_WRITE",
     "READ": "ARTIFACT_READ", "LIST": "ARTIFACT_LIST", "DOCS": "DOC_LIST", "TOC": "DOC_TOC",
     "DOC_INDEX": "DOC_TOC", "DOC_OUTLINE": "DOC_TOC", "READ_DOC": "DOC_READ",
     "SEARCH_DOC": "DOC_SEARCH", "NOTE": "UPDATE_NOTE", "NEXT": "PROPOSE_NEXT",
@@ -40,7 +43,7 @@ ITEM_KINDS = (
 JSON_KEYS = {"message", "actions", "next_speaker", "temperature_request", "sampling_request"}
 
 _SAMPLING_CTRL_KEYS = "|".join(sorted((k.upper() for k in SAMPLING_ALIASES if k not in ("temp", "temperature")), key=len, reverse=True))
-CMD_RE = re.compile(r"^\s*[@/]([A-Za-z_]+)\b[ \t]*(.*)$")
+CMD_RE = re.compile(r"^\s*[@/]([A-Za-z_]+)(?=$|[\s:])[ \t]*(.*)$")
 CTRL_RE = re.compile(rf"^\W*(NEXT(?:_SPEAKER)?|TEMP(?:ERATURE)?|{_SAMPLING_CTRL_KEYS})\W*:\s*(.*)$", re.I)
 TAIL_NEXT_RE = re.compile(r"\bNEXT\s*:\s*([A-Za-z][\w]{0,23})\W*$", re.I)
 LABEL_RE = re.compile(r"^\s*[*_]*\[?([A-Za-z][A-Za-z0-9_]{0,23})\]?[*_]*\s*:[*_]*\s*")
@@ -421,9 +424,17 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
             return None
         res["name"] = name
         mode = str(res.get("mode", "append")).strip().lower()
-        if mode not in ("create", "append", "replace"):
+        if mode not in ("create", "append", "replace", "replace_section"):
             mode = "append"
         res["mode"] = mode
+        if mode == "replace_section":
+            sec = str(res.get("section") or "").strip()
+            if not sec:
+                issues.append("ARTIFACT_WRITE replace_section missing target section heading")
+                return None
+            res["section"] = sec
+        if res.get("force"):
+            res["force"] = True
         if "content" not in res:
             res["content"] = ""
 
@@ -675,10 +686,50 @@ def _command(word: str, rest: str, lines_after: List[str], known_names: Optional
         return {"type": "DOC_SEARCH", "target": tgt or "all", "query": query}
 
     if w == "ARTIFACT_WRITE":
+        w_up = word.upper()
+        if w_up in ("SECTION", "UPDATE_SECTION", "PATCH_SECTION", "REPLACE_SECTION"):
+            raw_s = (rest or "").strip()
+            art_tok, sec_name, inline_body = "", "", ""
+            m_pipe = re.match(r"^([^\s|:]+)\s*\|\s*(.+)$", raw_s)
+            if m_pipe:
+                art_tok = m_pipe.group(1).strip()
+                rhs = m_pipe.group(2).strip()
+                m_rbr = re.match(r"^\s*(\[[^\]]+\])\s*:?\s*(.*)$", rhs)
+                if m_rbr:
+                    sec_name, inline_body = m_rbr.group(1).strip(), m_rbr.group(2).strip()
+                elif ":" in rhs:
+                    sec_name, _, inline_body = rhs.partition(":")
+                else:
+                    sec_name = rhs
+            else:
+                m_br = re.match(r"^([^\s:]+)\s+(\[[^\]]+\])\s*:?\s*(.*)$", raw_s)
+                if m_br:
+                    art_tok, sec_name, inline_body = m_br.group(1).strip(), m_br.group(2).strip(), m_br.group(3).strip()
+                else:
+                    parts = raw_s.split(None, 1)
+                    art_tok = parts[0].rstrip(":") if parts else ""
+                    if len(parts) > 1 and ":" in parts[1]:
+                        sec_name, _, inline_body = parts[1].partition(":")
+                    elif len(parts) > 1:
+                        sec_name = parts[1]
+            text = "\n".join(([inline_body.strip()] if inline_body.strip() else []) + lines_after).strip()
+            return {
+                "type": "ARTIFACT_WRITE",
+                "name": art_tok,
+                "mode": "replace_section",
+                "section": sec_name.strip(),
+                "content": text,
+            }
         bits = head.split()
-        mode = word.lower() if word.lower() in ("append", "replace", "create") else (bits[1].lower() if len(bits) > 1 else "append")
+        is_force = (w_up == "FORCE_REPLACE")
+        mode = "replace" if is_force else (
+            word.lower() if word.lower() in ("append", "replace", "create") else (bits[1].lower() if len(bits) > 1 else "append")
+        )
         text = "\n".join([body] + lines_after).strip() if lines_after else body
-        return {"type": "ARTIFACT_WRITE", "name": bits[0] if bits else "", "mode": mode, "content": text}
+        act_out = {"type": "ARTIFACT_WRITE", "name": bits[0] if bits else "", "mode": mode, "content": text}
+        if is_force:
+            act_out["force"] = True
+        return act_out
 
     if w == "FINISH":
         return {"type": "FINISH", "content": body or head}

@@ -54,6 +54,7 @@ LIMITS = dict(
     doc_read_chars=12000, max_pending_doc_reads=8,
     max_note_chars=8000, max_style_chars=320, max_subscriptions=4,
     temp_min=0.2, temp_max=1.5, max_empty_streak=3, max_dyad_turns=None,
+    min_replace_ratio=0.25, max_speaker_window_turns=None,
 )
 
 # Supported per-agent sampling parameters: name -> (value_type, min_val, max_val, llamacpp_only)
