@@ -695,7 +695,9 @@ class Chamber:
                 try:
                     _, ver, text = self.artifacts.read(agent.name, fname, turn=self.turn)
                     sz_b = len(text.encode("utf-8"))
-                    art_blocks.append(f"[Shared Artifact {fname} (v{ver}, {sz_b}B)]\n{preview_artifact(fname, text, limit=preview_limit)}")
+                    trail = self.artifacts.recent_history_summary(fname, limit=4)
+                    trail_line = f"Version history: {trail}\n" if trail else ""
+                    art_blocks.append(f"[Shared Artifact {fname} (v{ver}, {sz_b}B)]\n{trail_line}{preview_artifact(fname, text, limit=preview_limit)}")
                 except ArtifactError:
                     pass
         if "ARTIFACT_WRITE" in agent.capabilities or "ARTIFACT_READ" in agent.capabilities:
@@ -763,10 +765,15 @@ class Chamber:
                 dver = deliv_det.get("version")
                 dsz = deliv_det.get("size_bytes", 0)
                 meta_str = f"v{dver}, {dsz}B" if dver else "missing"
+                trail = self.artifacts.recent_history_summary(dname, limit=5) if dver else ""
                 if deliv_ok:
                     status_lines.append(f"Deliverable `{dname}`: READY ({meta_str}, all required sections present)")
+                    if trail:
+                        status_lines.append(f"  Versions: {trail}")
                 else:
                     status_lines.append(f"Deliverable `{dname}`: INCOMPLETE ({meta_str})")
+                    if trail:
+                        status_lines.append(f"  Versions: {trail}")
                     for iss in deliv_issues:
                         status_lines.append(f"  - {iss}")
             if self.documents.has_docs():
@@ -887,7 +894,7 @@ class Chamber:
                 '    {"type": "PUBLISH", "channel": "planning", "content": "channel post"},\n'
                 '    {"type": "VOTE", "target": "c1", "value": "yes|no"},\n'
                 '    {"type": "UPDATE_NOTE", "content": "your private scratchpad note"},\n'
-                '    {"type": "ARTIFACT_WRITE", "name": "world", "mode": "create|append|replace|replace_section", "section": "optional heading for replace_section", "content": "markdown"},\n'
+                '    {"type": "ARTIFACT_WRITE", "name": "world", "mode": "create|append|replace|replace_section|revert", "section": "optional heading", "target_version": 2, "content": "markdown"},\n'
                 '    {"type": "ARTIFACT_READ", "name": "world"}'
                 + (',\n    {"type": "DOC_TOC", "doc_id": "..."},\n    {"type": "DOC_SEARCH", "target": "all", "query": "..."},\n    {"type": "DOC_READ", "doc_id": "...", "offset": 0}' if self.documents.has_docs() else '')
                 + "\n  ]\n}\n"
@@ -917,7 +924,7 @@ class Chamber:
         if "ARTIFACT_WRITE" in caps:
             cmds.append(
                 "@APPEND <artifact>: <markdown to append>  |  @SECTION <artifact> | <heading>: <replace one section>  |  "
-                "@REPLACE <artifact>: <full consolidated markdown>  (or @READ <artifact> 0)"
+                "@REPLACE <artifact>: <full consolidated markdown>  |  @REVERT <artifact> v<N>  (or @READ <artifact> 0)"
             )
         if self.documents.has_docs() and ("DOC_READ" in caps or "DOC_SEARCH" in caps or "DOC_TOC" in caps):
             cmds.append("@DOC_TOC <doc_id>  |  @DOC_SEARCH <doc_id|all> <query>  |  @DOC_READ <doc_id> 0 (use numeric integer offset)  |  @DOC_LIST")
@@ -1583,31 +1590,51 @@ class Chamber:
                 norm_name = self.artifacts.normalize(name)
             except ArtifactError:
                 norm_name = ""
-            if mode == "replace" and not force and norm_name and norm_name in self._turn_replaced_artifacts:
-                self._record(
-                    agent.name, atype, "rejected", target=norm_name,
-                    detail=f"duplicate @REPLACE on {norm_name} in the same turn ignored to protect your earlier write; combine edits or use @SECTION",
-                )
-                return
             existed_before = bool(norm_name and norm_name in self.artifacts.versions)
-            try:
-                fname, ver = self.artifacts.write(
-                    agent.name, name, mode, content, expected_version=exp_ver, turn=self.turn,
-                    section=section, force=force, min_replace_ratio=float(lim.get("min_replace_ratio", 0.25)),
+
+            if mode == "revert":
+                try:
+                    fname, ver, restored_from, size_bytes, delta_bytes = self.artifacts.revert(
+                        agent.name, name, act.get("target_version"), turn=self.turn,
+                    )
+                except ArtifactError as e:
+                    self._record(agent.name, atype, "rejected", target=name, detail=str(e))
+                    return
+                mode_label = f"revert(v{restored_from})"
+                self._record(
+                    agent.name, atype, "accepted", target=fname,
+                    detail=f"{mode_label} -> v{ver} ({size_bytes}B, {delta_bytes:+d}B)",
                 )
-            except ArtifactError as e:
-                self._record(agent.name, atype, "rejected", target=name, detail=str(e))
-                return
-            if mode == "replace":
-                self._turn_replaced_artifacts.add(fname)
-            try:
-                size_bytes = os.lstat(self.artifacts._path(fname)).st_size
-            except OSError:
-                size_bytes = len(content.encode("utf-8"))
-            self._check_answer_key(content)
-            mode_label = f"replace_section[{str(section or '')[:40]}]" if mode == "replace_section" else mode
-            self._record(agent.name, atype, "accepted", target=fname, detail=f"{mode_label} -> v{ver} ({size_bytes}B)")
-            self._emit(f"  📝 artifact {fname} ({mode_label} by {agent.name} → v{ver}, {size_bytes}B)")
+                self._emit(f"  ⏪ artifact {fname} (reverted to v{restored_from} by {agent.name} → v{ver}, {size_bytes}B, {delta_bytes:+d}B)")
+            else:
+                if mode == "replace" and not force and norm_name and norm_name in self._turn_replaced_artifacts:
+                    self._record(
+                        agent.name, atype, "rejected", target=norm_name,
+                        detail=f"duplicate @REPLACE on {norm_name} in the same turn ignored to protect your earlier write; combine edits or use @SECTION",
+                    )
+                    return
+                try:
+                    fname, ver = self.artifacts.write(
+                        agent.name, name, mode, content, expected_version=exp_ver, turn=self.turn,
+                        section=section, force=force, min_replace_ratio=float(lim.get("min_replace_ratio", 0.25)),
+                    )
+                except ArtifactError as e:
+                    self._record(agent.name, atype, "rejected", target=name, detail=str(e))
+                    return
+                if mode == "replace":
+                    self._turn_replaced_artifacts.add(fname)
+                try:
+                    size_bytes = os.lstat(self.artifacts._path(fname)).st_size
+                except OSError:
+                    size_bytes = len(content.encode("utf-8"))
+                hist = self.artifacts.history.get(fname) or []
+                delta_bytes = hist[-1]["delta_bytes"] if hist else size_bytes
+                self._check_answer_key(content)
+                mode_label = f"replace_section[{str(section or '')[:40]}]" if mode == "replace_section" else mode
+                sz_label = f"{size_bytes}B, {delta_bytes:+d}B" if ver > 1 else f"{size_bytes}B"
+                self._record(agent.name, atype, "accepted", target=fname, detail=f"{mode_label} -> v{ver} ({sz_label})")
+                self._emit(f"  📝 artifact {fname} ({mode_label} by {agent.name} → v{ver}, {sz_label})")
+
             if self.deliverable_validation:
                 raw_deliv = str(self.deliverable_validation.get("artifact") or "")
                 try:
@@ -1620,7 +1647,7 @@ class Chamber:
                     self.deliverable_issues = issues
                     if self.pending_validation_feedback:
                         self.pending_validation_feedback = [] if ok else issues
-                if not existed_before and fname not in self.visible_artifacts and deliv_fname and fname != deliv_fname:
+                if mode != "revert" and not existed_before and fname not in self.visible_artifacts and deliv_fname and fname != deliv_fname:
                     short_new = fname.removesuffix(".md")
                     short_deliv = deliv_fname.removesuffix(".md")
                     if short_new in short_deliv or short_deliv in short_new:

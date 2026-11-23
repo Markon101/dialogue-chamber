@@ -302,6 +302,154 @@ class ArtifactCollaborationAndAuditsTests(unittest.TestCase):
         self.assertNotEqual(speakers[4], "HUB")
         self.assertTrue(any("hub lock-in breaker" in e.detail for e in ch.events))
 
+    def test_artifact_version_history_revert_and_checkpoint_compat(self):
+        mgr = ArtifactManager(self.root / "hist_arts", max_history_per_artifact=8)
+        v1_text = "# Research Report\n\n## [Overview]\nInitial seed body.\n"
+        mgr.write("SYSTEM", "report", "create", v1_text, turn=0, attribution=False)
+
+        rich_v2_body = ("Verified theorem citation and proof sketch.\n" * 65)  # ~2.7KB
+        mgr.write("ALPHA", "report", "append", rich_v2_body, turn=1, attribution=False)
+        mgr.read("BETA", "report", turn=2)
+
+        # Partial shrinking rewrite (~1.4KB, > 25% floor so allowed under replace guard)
+        shrunk_v3 = "# Research Report\n\n" + ("Compressed partial summary.\n" * 50)
+        mgr.write("BETA", "report", "replace", shrunk_v3, turn=2, min_replace_ratio=0.25)
+
+        trail = mgr.recent_history_summary("report", limit=4)
+        self.assertIn("v1(", trail)
+        self.assertIn("v2(", trail)
+        self.assertIn(", +", trail)
+        self.assertIn("v3(", trail)
+        self.assertIn(", -", trail)
+
+        # Validation errors on revert: invalid token, current version, missing version
+        with self.assertRaisesRegex(ArtifactError, "invalid target version"):
+            mgr.revert("CHAIR", "report", "not_a_ver", turn=3)
+        with self.assertRaisesRegex(ArtifactError, "already at v3"):
+            mgr.revert("CHAIR", "report", "v3", turn=3)
+        with self.assertRaisesRegex(ArtifactError, "no saved history for v99"):
+            mgr.revert("CHAIR", "report", 99, turn=3)
+
+        # Successful revert to v2 restores exact v2 content and bumps to v4
+        fname, new_ver, restored_from, size_b, delta_b = mgr.revert("CHAIR", "report", "v2", turn=3)
+        self.assertEqual(fname, "report.md")
+        self.assertEqual(restored_from, 2)
+        self.assertEqual(new_ver, 4)
+        self.assertGreater(delta_b, 0)
+        _, check_ver, check_text = mgr.read("ALPHA", "report", turn=4)
+        self.assertEqual(check_ver, 4)
+        self.assertIn("Initial seed body.", check_text)
+        self.assertIn("Verified theorem citation", check_text)
+        self.assertEqual(mgr.seen[("CHAIR", "report.md")], 4)
+
+        # Snapshot/restore round-trip preserves full history cleanly
+        snap = mgr.snapshot()
+        mgr_restored = ArtifactManager(self.root / "hist_restored")
+        mgr_restored.restore(snap)
+        self.assertEqual(mgr_restored.snapshot(), snap)
+        self.assertEqual(len(mgr_restored.history["report.md"]), 4)
+
+        # Legacy snapshot without 'history' key restores gracefully
+        legacy_snap = {k: v for k, v in snap.items() if k != "history"}
+        mgr_legacy = ArtifactManager(self.root / "hist_legacy")
+        mgr_legacy.restore(legacy_snap)
+        self.assertEqual(mgr_legacy.versions["report.md"], 4)
+        self.assertEqual(len(mgr_legacy.history["report.md"]), 1)
+
+        # Corrupt history entry fails checksum check BEFORE touching files on disk
+        tampered_snap = json.loads(json.dumps(snap))
+        tampered_snap["history"]["report.md"][0]["content"] = "tampered history!"
+        mgr_corrupt_dir = self.root / "hist_corrupt"
+        mgr_corrupt = ArtifactManager(mgr_corrupt_dir)
+        with self.assertRaisesRegex(ArtifactError, "history checksum mismatch"):
+            mgr_corrupt.restore(tampered_snap)
+        self.assertFalse((mgr_corrupt_dir / "report.md").exists())
+
+    def test_revert_protocol_parsing_and_chamber_recovery(self):
+        # Single-line @REVERT must NOT swallow subsequent speech lines
+        reply = (
+            "Rolling back after seeing shrinkage.\n"
+            "@REVERT report v2\n"
+            "@ARTIFACT_REVERT ledger: 4\n"
+            "@ROLLBACK notes to v1\n"
+            "This closing line remains public speech."
+        )
+        p = parse_reply(reply, me="CHAIR", names=("CHAIR", "ALPHA"))
+        self.assertEqual(p.issues, [])
+        self.assertEqual(len(p.actions), 3)
+        self.assertEqual(p.actions[0], {"type": "ARTIFACT_WRITE", "name": "report", "mode": "revert", "target_version": 2, "content": ""})
+        self.assertEqual(p.actions[1], {"type": "ARTIFACT_WRITE", "name": "ledger", "mode": "revert", "target_version": 4, "content": ""})
+        self.assertEqual(p.actions[2], {"type": "ARTIFACT_WRITE", "name": "notes", "mode": "revert", "target_version": 1, "content": ""})
+        self.assertIn("Rolling back after seeing shrinkage.", p.message)
+        self.assertIn("This closing line remains public speech.", p.message)
+
+        p_json = parse_reply(json.dumps({
+            "message": "Reverting via JSON.",
+            "actions": [{"type": "ARTIFACT_REVERT", "name": "report", "version": 2}],
+        }), me="CHAIR", names=("CHAIR",))
+        self.assertEqual(p_json.issues, [])
+        self.assertEqual(p_json.actions[0]["mode"], "revert")
+        self.assertEqual(p_json.actions[0]["target_version"], 2)
+
+        p_bad = parse_reply("@REVERT report nope", me="CHAIR", names=("CHAIR",))
+        self.assertTrue(any("invalid target version" in iss for iss in p_bad.issues))
+
+        # End-to-end Chamber recovery: ALPHA fills [Overview], BETA degrades it via @REPLACE, CHAIR @REVERTs to v2, ALPHA finishes [Audit]
+        overview_body = "Rigorous Section 1 analysis of Stepanov hyperderivatives and theta lifts. " * 6
+        audit_body = "Verified Section 2 primary-source audit and Lean TCB check. " * 6
+        cfg = {
+            "name": "revert_recovery_test",
+            "topic": "Collaborate and recover from a shrinking rewrite",
+            "scheduler": "round_robin",
+            "end_mode": "agent_decided",
+            "end_policy": "majority",
+            "min_turns_before_end": 4,
+            "artifacts": {
+                "seed": {"report": "# Master Report\n\n## [Overview]\n\n## [Audit]\n"},
+                "visible": ["report"],
+                "validation": {
+                    "artifact": "report",
+                    "require_modified": True,
+                    "min_bytes": 250,
+                    "required_sections": ["[Overview]", "[Audit]"],
+                },
+            },
+            "limits": {"max_turns": 6, "min_replace_ratio": 0.25},
+            "agents": [
+                {"name": "ALPHA", "endpoint": "local", "capabilities": "full"},
+                {"name": "BETA", "endpoint": "local", "capabilities": "full"},
+                {"name": "CHAIR", "endpoint": "local", "capabilities": "full"},
+            ],
+        }
+        backend = MockBackend({
+            "ALPHA": [
+                f"Drafted Overview.\n@SECTION report | [Overview]: {overview_body}",
+                f"Completed Audit and voting end.\n@SECTION report | [Audit]: {audit_body}\n@END_RUN: Deliverable complete",
+            ],
+            "BETA": [
+                # Degrades artifact by replacing everything with ~200B (> 25% of ~440B, and < 1500B threshold) dropping [Overview]
+                "Rewrote quickly.\n@REPLACE report: # Master Report\n\n## [Audit]\nTruncated draft without overview section at all, losing prior peer work in the process.",
+            ],
+            "CHAIR": [
+                "Noticed size drop and lost [Overview]; reverting to v2!\n@REVERT report v2",
+                "Verified both sections intact >= 250B; concurring.\n@END_RUN: Verified ready",
+            ],
+        })
+        ch = Chamber(cfg, run_dir=self.root / "revert_run", backend=backend, quiet=True, copy_dir="").run()
+        # CHAIR on Turn 3 saw version history & delta trail in prompt
+        t3_tail = backend.calls[2][1]["messages"][-1]["content"]
+        self.assertIn("Version history:", t3_tail)
+        self.assertIn("Versions: v1(", t3_tail)
+        self.assertTrue(ch.deliverable_verified)
+        self.assertIn("agents decided to end run", ch.stop_reason)
+        _, final_ver, final_text = ch.artifacts.read("CHAIR", "report")
+        self.assertEqual(final_ver, 5)  # v1 seed -> v2 Overview -> v3 BETA wipe -> v4 CHAIR revert(v2) -> v5 Audit
+        self.assertIn("Stepanov hyperderivatives", final_text)
+        self.assertIn("Lean TCB check", final_text)
+        revert_events = [e for e in ch.events if e.type == "ARTIFACT_WRITE" and "revert(v2)" in e.detail]
+        self.assertEqual(len(revert_events), 1)
+        self.assertEqual(revert_events[0].status, "accepted")
+
 
 if __name__ == "__main__":
     unittest.main()

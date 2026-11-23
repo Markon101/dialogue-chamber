@@ -86,13 +86,15 @@ class ArtifactError(Exception):
 
 
 class ArtifactManager:
-    def __init__(self, root, max_count=16, max_bytes=131072, max_total_bytes=524288, per_artifact_max_bytes=None):
+    def __init__(self, root, max_count=16, max_bytes=131072, max_total_bytes=524288,
+                 per_artifact_max_bytes=None, max_history_per_artifact=16):
         root = Path(root)
         if root.is_symlink():
             raise ArtifactError("workspace root must not be a symlink")
         root.mkdir(parents=True, exist_ok=True)
         self.root = root.resolve()
         self.max_count, self.max_bytes, self.max_total = max_count, max_bytes, max_total_bytes
+        self.max_history_per_artifact = max(1, int(max_history_per_artifact))
         self.per_artifact_max_bytes = {}
         if per_artifact_max_bytes:
             for k, v in per_artifact_max_bytes.items():
@@ -100,6 +102,7 @@ class ArtifactManager:
         self.versions = {}   # file name -> version (only artifacts created through this manager exist)
         self.seen = {}       # (agent, file name) -> last version that agent read or wrote
         self.log = []        # dicts: turn, agent, op, name, version, ok, detail
+        self.history = {}    # file name -> bounded list of version snapshots
 
     def limit_for(self, fname):
         return int(self.per_artifact_max_bytes.get(fname, self.max_bytes))
@@ -167,14 +170,55 @@ class ArtifactManager:
     def listing(self):
         return [(f, self.versions[f], os.lstat(self.root / f).st_size) for f in self.names()]
 
+    def _record_history(self, fname, version, turn, agent, op, content, prev_size_bytes):
+        encoded = content.encode("utf-8")
+        size_bytes = len(encoded)
+        delta_bytes = size_bytes - int(prev_size_bytes)
+        sha = hashlib.sha256(encoded).hexdigest()
+        hist = self.history.setdefault(fname, [])
+        hist.append({
+            "version": int(version),
+            "turn": int(turn),
+            "agent": str(agent),
+            "op": str(op),
+            "size_bytes": size_bytes,
+            "delta_bytes": delta_bytes,
+            "content": content,
+            "sha256": sha,
+        })
+        if len(hist) > self.max_history_per_artifact:
+            del hist[:-self.max_history_per_artifact]
+
+    def recent_history_summary(self, name, limit=4) -> str:
+        """Return a concise 'v3(6778B) -> v4(12572B, +5794B)' trail when >= 2 versions exist."""
+        try:
+            fname = self.normalize(name)
+        except ArtifactError:
+            return ""
+        hist = self.history.get(fname, [])
+        if len(hist) <= 1:
+            return ""
+        tail = hist[-max(2, int(limit)):]
+        parts = []
+        for idx, entry in enumerate(tail):
+            ver = entry["version"]
+            sz = entry["size_bytes"]
+            if idx == 0:
+                parts.append(f"v{ver}({sz}B)")
+            else:
+                parts.append(f"v{ver}({sz}B, {entry['delta_bytes']:+d}B)")
+        return " -> ".join(parts)
+
     def snapshot(self):
         files = {}
         for name in self.names():
             content = self._read_file(self._path(name))
             files[name] = dict(content=content, version=self.versions[name],
                                sha256=hashlib.sha256(content.encode("utf-8")).hexdigest())
+        history = {name: [dict(e) for e in self.history.get(name, [])] for name in self.names()}
         return dict(files=files, seen=[[agent, name, version]
-                                      for (agent, name), version in self.seen.items()], log=self.log[:])
+                                      for (agent, name), version in self.seen.items()],
+                    log=self.log[:], history=history)
 
     def restore(self, snapshot):
         files = snapshot["files"]
@@ -201,11 +245,71 @@ class ArtifactManager:
         for (_, name), version in seen.items():
             if name not in files or not 1 <= version <= files[name]["version"]:
                 raise ArtifactError("invalid saved artifact read version")
+
+        raw_history = snapshot.get("history")
+        restored_history = {}
+        if raw_history is None:
+            for name, saved in files.items():
+                encoded = saved["content"].encode("utf-8")
+                restored_history[name] = [{
+                    "version": saved["version"],
+                    "turn": 0,
+                    "agent": "system",
+                    "op": "restore",
+                    "size_bytes": len(encoded),
+                    "delta_bytes": len(encoded),
+                    "content": saved["content"],
+                    "sha256": saved["sha256"],
+                }]
+        else:
+            if not isinstance(raw_history, dict):
+                raise ArtifactError("invalid saved artifact history")
+            for name, entries in raw_history.items():
+                if name not in files or not isinstance(entries, list):
+                    raise ArtifactError(f"invalid saved artifact history for {name}")
+                clean_entries = []
+                for entry in entries:
+                    if not isinstance(entry, dict):
+                        raise ArtifactError(f"invalid saved artifact history entry for {name}")
+                    ver = entry.get("version")
+                    content = entry.get("content")
+                    sha = entry.get("sha256")
+                    if not isinstance(ver, int) or ver < 1 or not isinstance(content, str):
+                        raise ArtifactError(f"invalid saved artifact history metadata for {name}")
+                    encoded = content.encode("utf-8")
+                    if hashlib.sha256(encoded).hexdigest() != sha:
+                        raise ArtifactError(f"saved artifact history checksum mismatch: {name}")
+                    clean_entries.append({
+                        "version": ver,
+                        "turn": int(entry.get("turn", 0)),
+                        "agent": str(entry.get("agent", "")),
+                        "op": str(entry.get("op", "write")),
+                        "size_bytes": int(entry.get("size_bytes", len(encoded))),
+                        "delta_bytes": int(entry.get("delta_bytes", 0)),
+                        "content": content,
+                        "sha256": sha,
+                    })
+                restored_history[name] = clean_entries
+            for name, saved in files.items():
+                if not restored_history.get(name):
+                    encoded = saved["content"].encode("utf-8")
+                    restored_history[name] = [{
+                        "version": saved["version"],
+                        "turn": 0,
+                        "agent": "system",
+                        "op": "restore",
+                        "size_bytes": len(encoded),
+                        "delta_bytes": len(encoded),
+                        "content": saved["content"],
+                        "sha256": saved["sha256"],
+                    }]
+
         for name, saved in files.items():
             self._atomic_write(self._path(name), saved["content"])
         self.versions = {name: saved["version"] for name, saved in files.items()}
         self.seen = seen
         self.log = list(snapshot["log"])
+        self.history = restored_history
 
     def read(self, agent, name, turn=0, mark_seen=True):
         try:
@@ -332,9 +436,72 @@ class ArtifactManager:
                 f"Use @REPLACE {short_name}: <consolidated content> to trim."
             )
         self._atomic_write(path, new)
-        self.versions[fname] = current + 1
-        self.seen[(agent, fname)] = current + 1
-        return fname, current + 1, size
+        new_ver = current + 1
+        self.versions[fname] = new_ver
+        self.seen[(agent, fname)] = new_ver
+        self._record_history(fname, new_ver, turn, agent, mode, new, current_size)
+        return fname, new_ver, size
+
+    def revert(self, agent, name, target_version, turn=0):
+        """Restore an artifact's content from a saved historical version without deleting history."""
+        try:
+            fname, new_ver, target_ver, size, delta = self._revert(agent, name, target_version, turn)
+        except ArtifactError as e:
+            self.log.append(dict(turn=turn, agent=agent, op="revert", name=str(name)[:60], version=None, ok=False, detail=str(e)))
+            raise
+        self.log.append(dict(
+            turn=turn, agent=agent, op="revert", name=fname, version=new_ver, ok=True,
+            detail=f"reverted to v{target_ver} -> {size}B ({delta:+d}B)",
+        ))
+        return fname, new_ver, target_ver, size, delta
+
+    def _revert(self, agent, name, target_version, turn):
+        fname = self.normalize(name)
+        if fname not in self.versions:
+            raise ArtifactError(f"no artifact named {fname}")
+        if isinstance(target_version, bool):
+            raise ArtifactError(f"invalid target version {target_version!r} for {fname}")
+        target_ver = None
+        if isinstance(target_version, int):
+            target_ver = target_version
+        elif isinstance(target_version, str):
+            cleaned = re.sub(r"^[vV]+", "", target_version.strip().strip("[]()<>\"'`,.;:"))
+            if re.fullmatch(r"\d+", cleaned):
+                target_ver = int(cleaned)
+        if target_ver is None or target_ver < 1:
+            raise ArtifactError(f"invalid target version {target_version!r} for {fname}")
+
+        current = self.versions[fname]
+        if target_ver == current:
+            raise ArtifactError(f"{fname} is already at v{current}")
+
+        hist = self.history.get(fname, [])
+        entry = next((e for e in hist if e.get("version") == target_ver), None)
+        if entry is None:
+            avail = ", ".join(f"v{e['version']}" for e in hist) or "none"
+            raise ArtifactError(f"{fname} has no saved history for v{target_ver} (available: {avail})")
+
+        restored_text = str(entry["content"])
+        size = len(restored_text.encode("utf-8"))
+        art_limit = self.limit_for(fname)
+        if size > art_limit:
+            raise ArtifactError(f"{fname} revert rejected: v{target_ver} ({size}B) exceeds limit={art_limit}B")
+        other_bytes = self._total_bytes(exclude=fname)
+        if other_bytes + size > self.max_total:
+            raise ArtifactError(
+                f"workspace size limit reached: other_artifacts={other_bytes}B + {fname}={size}B "
+                f"exceeds max_workspace_bytes={self.max_total}B"
+            )
+
+        path = self._path(fname)
+        current_size = os.lstat(path).st_size if path.exists() else 0
+        delta = size - current_size
+        self._atomic_write(path, restored_text)
+        new_ver = current + 1
+        self.versions[fname] = new_ver
+        self.seen[(agent, fname)] = new_ver
+        self._record_history(fname, new_ver, turn, agent, "revert", restored_text, current_size)
+        return fname, new_ver, target_ver, size, delta
 
 
 DEFAULT_PLACEHOLDER_PATTERNS = (

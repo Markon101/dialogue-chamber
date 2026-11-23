@@ -28,6 +28,7 @@ ALIASES = {
     "SECTION": "ARTIFACT_WRITE", "UPDATE_SECTION": "ARTIFACT_WRITE",
     "PATCH_SECTION": "ARTIFACT_WRITE", "REPLACE_SECTION": "ARTIFACT_WRITE",
     "FORCE_REPLACE": "ARTIFACT_WRITE",
+    "REVERT": "ARTIFACT_WRITE", "ARTIFACT_REVERT": "ARTIFACT_WRITE", "ROLLBACK": "ARTIFACT_WRITE",
     "READ": "ARTIFACT_READ", "LIST": "ARTIFACT_LIST", "DOCS": "DOC_LIST", "TOC": "DOC_TOC",
     "DOC_INDEX": "DOC_TOC", "DOC_OUTLINE": "DOC_TOC", "READ_DOC": "DOC_READ",
     "SEARCH_DOC": "DOC_SEARCH", "NOTE": "UPDATE_NOTE", "NEXT": "PROPOSE_NEXT",
@@ -120,6 +121,23 @@ def parse_read_offset(raw_offset: Any) -> Tuple[Optional[int], Optional[str]]:
         if start_val < 100_000_000:
             return start_val, None
     return None, f"offset must be a nonnegative integer (got {raw_offset!r}; e.g. 0 or 12000)"
+
+
+def _parse_version_token(raw_val: Any) -> Optional[int]:
+    """Parse a positive integer version number from ints or strings like 'v4', '[V12]', or '4'."""
+    if isinstance(raw_val, bool):
+        return None
+    if isinstance(raw_val, int):
+        return raw_val if raw_val >= 1 else None
+    s = str(raw_val if raw_val is not None else "").strip()
+    if not s:
+        return None
+    cleaned = s.strip("[]()<>\"'`,.;:")
+    cleaned = re.sub(r"^[vV]+", "", cleaned).strip()
+    if re.fullmatch(r"\d+", cleaned):
+        val = int(cleaned)
+        return val if val >= 1 else None
+    return None
 
 
 def _strip_trailing_sampling_commentary(raw_spec: str) -> str:
@@ -370,6 +388,7 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
         return None
 
     t = t.strip().upper().replace("-", "_").replace(" ", "_")
+    raw_t = t
     act_type = ALIASES.get(t, t)
     if act_type not in ACTION_TYPES:
         issues.append(f"Unknown action type: {act_type}")
@@ -423,11 +442,20 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
             issues.append("ARTIFACT_WRITE missing artifact name")
             return None
         res["name"] = name
-        mode = str(res.get("mode", "append")).strip().lower()
-        if mode not in ("create", "append", "replace", "replace_section"):
-            mode = "append"
+        default_mode = "revert" if raw_t in ("REVERT", "ARTIFACT_REVERT", "ROLLBACK") else "append"
+        mode = str(res.get("mode", default_mode)).strip().lower()
+        if mode not in ("create", "append", "replace", "replace_section", "revert"):
+            mode = default_mode
         res["mode"] = mode
-        if mode == "replace_section":
+        if mode == "revert":
+            raw_ver = res.get("target_version", res.get("version"))
+            ver_int = _parse_version_token(raw_ver)
+            if ver_int is None:
+                issues.append(f"ARTIFACT_WRITE revert invalid target version: {raw_ver!r}")
+                return None
+            res["target_version"] = ver_int
+            res["content"] = ""
+        elif mode == "replace_section":
             sec = str(res.get("section") or "").strip()
             if not sec:
                 issues.append("ARTIFACT_WRITE replace_section missing target section heading")
@@ -687,6 +715,20 @@ def _command(word: str, rest: str, lines_after: List[str], known_names: Optional
 
     if w == "ARTIFACT_WRITE":
         w_up = word.upper()
+        if w_up in ("REVERT", "ARTIFACT_REVERT", "ROLLBACK"):
+            raw_s = re.sub(r"^([^\s|:]+)\s*[:|]\s*", r"\1 ", (rest or "").strip())
+            parts = raw_s.split()
+            art_tok = parts[0] if parts else ""
+            if len(parts) >= 3 and parts[1].lower() in ("to", "at"):
+                ver_tok = parts[2]
+            else:
+                ver_tok = parts[1] if len(parts) > 1 else ""
+            return {
+                "type": "ARTIFACT_WRITE",
+                "name": art_tok,
+                "mode": "revert",
+                "target_version": ver_tok,
+            }
         if w_up in ("SECTION", "UPDATE_SECTION", "PATCH_SECTION", "REPLACE_SECTION"):
             raw_s = (rest or "").strip()
             art_tok, sec_name, inline_body = "", "", ""
@@ -780,7 +822,9 @@ def _extract_commands(text: str, p: Parsed, known_names: Optional[Set[str]] = No
         if m and (m.group(1).upper() in ALIASES or m.group(1).upper() in ACTION_TYPES or m.group(1).lower() in ITEM_KINDS):
             word, rest = m.group(1), m.group(2)
             after = []
-            if ALIASES.get(word.upper(), word.upper()) == "ARTIFACT_WRITE" and word.upper() != "WORLD":
+            if ALIASES.get(word.upper(), word.upper()) == "ARTIFACT_WRITE" and word.upper() not in (
+                "WORLD", "REVERT", "ARTIFACT_REVERT", "ROLLBACK"
+            ):
                 j = i + 1
                 while j < len(lines) and not _is_chamber_command_line(lines[j]) and not _is_valid_ctrl_line(lines[j], known_names):
                     after.append(lines[j])
