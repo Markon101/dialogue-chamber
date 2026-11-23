@@ -644,6 +644,78 @@ class AnomalyLaboratory:
                 discovered_at=now_iso,
             ))
 
+        # 9. Duplicate Section Headings Within Artifacts (e.g. from same-level subheading span splits)
+        art_texts: Dict[str, str] = {}
+        arts_dir = bundle["run_dir"] / "artifacts"
+        if arts_dir.is_dir():
+            for p in sorted(arts_dir.glob("*.md")):
+                try:
+                    art_texts[p.name] = p.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    pass
+        if not art_texts:
+            saved_files = (ck_state.get("artifacts") or checkpoint.get("artifacts") or {}).get("files") or {}
+            if isinstance(saved_files, dict):
+                for fname, meta in sorted(saved_files.items()):
+                    if isinstance(meta, dict) and isinstance(meta.get("content"), str):
+                        art_texts[str(fname)] = meta["content"]
+        dup_artifacts: Dict[str, Dict[str, int]] = {}
+        for fname, text in art_texts.items():
+            counts: Dict[str, int] = {}
+            labels: Dict[str, str] = {}
+            in_fence = False
+            for ln in text.splitlines():
+                if ln.lstrip().startswith("```"):
+                    in_fence = not in_fence
+                    continue
+                if in_fence:
+                    continue
+                hm = re.match(r"^[ \t]*(#{1,2})[ \t]+(.+?)[ \t]*$", ln)
+                if not hm:
+                    continue
+                raw_h = hm.group(2).strip()
+                norm_h = re.sub(r"\s+", " ", raw_h.strip("[]*_")).strip().lower()
+                if not norm_h:
+                    continue
+                counts[norm_h] = counts.get(norm_h, 0) + 1
+                labels.setdefault(norm_h, raw_h)
+            dups = {labels[k]: c for k, c in counts.items() if c >= 2}
+            if dups:
+                dup_artifacts[fname] = dups
+        if dup_artifacts:
+            total_dups = sum(sum(d.values()) - len(d) for d in dup_artifacts.values())
+            specimens.append(AnomalySpecimen(
+                specimen_id=self._make_id(run_id, "duplicate_artifact_section_headings"),
+                anomaly_type="duplicate_artifact_section_headings",
+                title="Duplicate Level-1/2 Section Headings Inside Collaborative Artifacts",
+                categories=["harness_defect", "model_behavior"],
+                run_id=run_id,
+                run_dir=rdir_str,
+                turn_range=[1, int(metrics.get("turns_completed") or 1)],
+                models_involved=models,
+                scheduler=scheduler,
+                evidence={
+                    "extra_duplicate_occurrences": total_dups,
+                    "artifacts": dup_artifacts,
+                },
+                epistemic_assessment={
+                    "observed": (
+                        f"Detected duplicate level 1-2 headings in {len(dup_artifacts)} artifact(s): "
+                        + "; ".join(f"{fn} ({list(dups.items())[:3]})" for fn, dups in dup_artifacts.items())
+                    ),
+                    "inferred_mechanism": (
+                        "Agents wrote level-1/2 headings inside @SECTION bodies whose parent was level-2; "
+                        "subsequent @SECTION updates stopped at the inner equal-level heading and orphaned prior text."
+                    ),
+                    "unknowns": "Whether automatic heading demotion inside @SECTION eliminates duplicate subsections cleanly.",
+                },
+                generative_follow_up={
+                    "regression_test": "test_artifact_collaboration_and_audits.py::ArtifactCollaborationAndAuditsTests::test_section_heading_demotion_and_duplicate_section_validation",
+                    "follow_up_experiment": "Verify @SECTION heading demotion preserves single canonical section headers across multi-edit runs.",
+                },
+                discovered_at=now_iso,
+            ))
+
         return specimens
 
     def save_specimens(self, specimens: List[AnomalySpecimen]) -> List[Path]:

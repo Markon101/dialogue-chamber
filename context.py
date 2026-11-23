@@ -199,6 +199,7 @@ class ContextIntelligence:
         agent_context_chars: int = 300000,
         tail_sections: Optional[Dict[str, str]] = None,
         prompt_layout: str = "single",
+        kv_evict_stride: int = 16,
     ) -> Tuple[List[Dict[str, str]], TokenAccounting]:
         """Assembles prompt messages while enforcing tokenizer-aware context budget.
 
@@ -315,6 +316,16 @@ class ContextIntelligence:
                 kept_lines.append(line)
                 used_chars += len(line) + 2
                 used_tokens += effective_line_tok
+
+        # In kv_messages layout, evict omitted turns in cache-friendly strides so the
+        # remaining prefix stays bit-identical across consecutive turns for SWA checkpoints.
+        if use_kv_messages and omitted > 0 and kv_evict_stride > 1 and len(formatted_msgs) > kv_evict_stride:
+            target_omitted = ((omitted + kv_evict_stride - 1) // kv_evict_stride) * kv_evict_stride
+            if target_omitted < len(formatted_msgs):
+                extra_drop = target_omitted - omitted
+                if extra_drop > 0 and len(kept_lines) > extra_drop:
+                    kept_lines = kept_lines[:-extra_drop]
+                    omitted = target_omitted
 
         accounting.omitted_messages_count = omitted
         kept_lines.reverse()

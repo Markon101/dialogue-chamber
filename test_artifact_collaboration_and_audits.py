@@ -8,6 +8,7 @@ from pathlib import Path
 from anomaly_lab import AnomalyLaboratory
 from artifacts import ArtifactError, ArtifactManager, find_section_span, validate_artifact
 from chamber import Chamber
+from context import ContextIntelligence
 from inference import MockBackend
 from protocol import parse_reply
 
@@ -449,6 +450,162 @@ class ArtifactCollaborationAndAuditsTests(unittest.TestCase):
         revert_events = [e for e in ch.events if e.type == "ARTIFACT_WRITE" and "revert(v2)" in e.detail]
         self.assertEqual(len(revert_events), 1)
         self.assertEqual(revert_events[0].status, "accepted")
+
+    def test_section_heading_demotion_and_duplicate_section_validation(self):
+        mgr = ArtifactManager(self.root / "demote_arts")
+        seed = "# Monograph\n\n## [Overview]\n\n## [Analysis]\nKeep analysis untouched.\n"
+        mgr.write("SYSTEM", "report", "create", seed, turn=0, attribution=False)
+        mgr.read("ALPHA", "report", turn=1)
+
+        first_body = (
+            "## [Overview]\n"
+            "# Internal Title\n"
+            "Intro paragraph.\n"
+            "## Subheading One\n"
+            "First detail.\n"
+            "```md\n"
+            "# Inside Code Fence\n"
+            "## Keep Fenced Heading Exact\n"
+            "```\n"
+            "### Deeper Point\n"
+            "Closing thought."
+        )
+        mgr.write("ALPHA", "report", "replace_section", first_body, section="[Overview]", turn=1)
+        _, v2, t2 = mgr.read("BETA", "report", turn=2)
+        self.assertIn("## [Overview]\n\n### Internal Title\n", t2)
+        self.assertIn("#### Subheading One\n", t2)
+        self.assertIn("##### Deeper Point\n", t2)
+        self.assertIn("# Inside Code Fence\n## Keep Fenced Heading Exact\n", t2)
+        self.assertEqual(t2.count("## [Overview]"), 1)
+        self.assertIn("## [Analysis]\nKeep analysis untouched.", t2)
+
+        # Updating [Overview] a 2nd and 3rd time with internal '## Another Subheading' must NOT orphan duplicates
+        mgr.write(
+            "BETA", "report", "replace_section",
+            "## Another Subheading\nUpdated pass two with verified citations.",
+            section="[Overview]", turn=2,
+        )
+        mgr.read("ALPHA", "report", turn=3)
+        mgr.write(
+            "ALPHA", "report", "replace_section",
+            "## Final Subheading\nFinal pass three content replacing pass two cleanly.",
+            section="[Overview]", turn=3,
+        )
+        _, v4, t4 = mgr.read("ALPHA", "report", turn=4)
+        self.assertEqual(v4, 4)
+        self.assertEqual(t4.count("## [Overview]"), 1)
+        self.assertNotIn("Another Subheading", t4)
+        self.assertNotIn("Subheading One", t4)
+        self.assertIn("### Final Subheading\n", t4)
+        self.assertIn("## [Analysis]\nKeep analysis untouched.", t4)
+
+        # validate_artifact must reject duplicate matching headings for a required section
+        mgr_dup = ArtifactManager(self.root / "dup_val_arts")
+        dup_doc = (
+            "# Master\n\n"
+            "## [Overview]\nFirst copy with enough body length to pass size checks.\n\n"
+            "## Overview\nDuplicate second copy that should fail validation.\n"
+        )
+        mgr_dup.write("A", "report", "create", dup_doc, turn=1)
+        mgr_dup.write("A", "report", "append", "Footer note.", turn=2)
+        ok, issues, details = validate_artifact(mgr_dup, {
+            "artifact": "report",
+            "require_modified": True,
+            "min_bytes": 50,
+            "required_sections": ["[Overview]"],
+        })
+        self.assertFalse(ok)
+        self.assertEqual(details["duplicate_sections"], ["[Overview]"])
+        self.assertTrue(any("duplicate heading(s)" in iss for iss in issues))
+
+    def test_kv_messages_stride_eviction_preserves_prefix_stability(self):
+        ctx = ContextIntelligence(default_safety_margin=100)
+        sys_sec = {"preamble": "Chamber system prompt."}
+        fixed_sec = {"topic": "Long-horizon mathematical proof verification."}
+        msgs = [
+            {
+                "id": f"m{i}",
+                "turn": i,
+                "speaker": f"AGENT_{i % 4}",
+                "content": f"Turn {i} analytical derivation and theorem check. " * 3,
+            }
+            for i in range(1, 46)
+        ]
+
+        # Choose an effective_context budget where 35 msgs fit, so 37 omits 2 and 40 omits 5 naively;
+        # stride=16 should round omitted to 16 for BOTH, keeping identical prefix [system, fixed, notice+m17..m37]!
+        r37, acc37 = ctx.assemble_and_budget(
+            agent_name="AGENT_1",
+            endpoint={"provider": "mock"},
+            system_sections=sys_sec,
+            fixed_sections=fixed_sec,
+            public_messages=msgs[:37],
+            effective_context=2600,
+            context_source="config",
+            reserved_output=400,
+            safety_margin=100,
+            tail_sections={"agent_identity": "You are AGENT_1."},
+            prompt_layout="kv_messages",
+            kv_evict_stride=16,
+        )
+        r40, acc40 = ctx.assemble_and_budget(
+            agent_name="AGENT_2",
+            endpoint={"provider": "mock"},
+            system_sections=sys_sec,
+            fixed_sections=fixed_sec,
+            public_messages=msgs[:40],
+            effective_context=2600,
+            context_source="config",
+            reserved_output=400,
+            safety_margin=100,
+            tail_sections={"agent_identity": "You are AGENT_2."},
+            prompt_layout="kv_messages",
+            kv_evict_stride=16,
+        )
+        self.assertEqual(acc37.omitted_messages_count, 16)
+        self.assertEqual(acc40.omitted_messages_count, 16)
+        # Shared prefix of r37 (all messages except the final per-agent tail) must match r40[:len(r37)-1] verbatim
+        self.assertEqual(r37[:-1], r40[: len(r37) - 1])
+        self.assertIn("[16 earlier public message(s) omitted", r40[2]["content"])
+
+    def test_anomaly_lab_detects_duplicate_artifact_section_headings(self):
+        lab = AnomalyLaboratory(lab_dir=self.root / "dup_anom_out")
+
+        # 1. Run with duplicated level-2 headings outside code fences -> detected
+        bad_run = self.root / "bad_dup_run"
+        (bad_run / "artifacts").mkdir(parents=True)
+        (bad_run / "artifacts" / "monograph.md").write_text(
+            "# Master\n\n## The Rank Wall\nFirst copy.\n\n## The Rank Wall\nOrphaned copy.\n",
+            encoding="utf-8",
+        )
+        (bad_run / "metrics.json").write_text(json.dumps({"turns_completed": 10}), encoding="utf-8")
+        (bad_run / "events.jsonl").write_text("", encoding="utf-8")
+        (bad_run / "transcript.md").write_text("# Transcript\n", encoding="utf-8")
+        (bad_run / "checkpoint.json").write_text(json.dumps({
+            "schema_version": 2,
+            "state": {"config": {"scheduler": "self_directed", "agents": [{"name": "A"}]}},
+        }), encoding="utf-8")
+
+        found_bad = [sp for sp in lab.inspect_run(bad_run) if sp.anomaly_type == "duplicate_artifact_section_headings"]
+        self.assertEqual(len(found_bad), 1)
+        self.assertIn("monograph.md", found_bad[0].evidence["artifacts"])
+
+        # 2. Run with unique level-2 headings and duplicate headings only inside ``` fences -> 0 specimens
+        good_run = self.root / "good_nodup_run"
+        (good_run / "artifacts").mkdir(parents=True)
+        (good_run / "artifacts" / "monograph.md").write_text(
+            "# Master\n\n## [Section One]\nBody.\n```md\n## Fenced\n```\n## [Section Two]\nMore.\n```md\n## Fenced\n```\n",
+            encoding="utf-8",
+        )
+        (good_run / "metrics.json").write_text(json.dumps({"turns_completed": 10}), encoding="utf-8")
+        (good_run / "events.jsonl").write_text("", encoding="utf-8")
+        (good_run / "transcript.md").write_text("# Transcript\n", encoding="utf-8")
+        (good_run / "checkpoint.json").write_text(json.dumps({
+            "schema_version": 2,
+            "state": {"config": {"scheduler": "self_directed", "agents": [{"name": "A"}]}},
+        }), encoding="utf-8")
+        found_good = [sp for sp in lab.inspect_run(good_run) if sp.anomaly_type == "duplicate_artifact_section_headings"]
+        self.assertEqual(found_good, [])
 
 
 if __name__ == "__main__":

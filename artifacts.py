@@ -81,13 +81,42 @@ def find_section_span(text: str, section_spec: str):
     return m.start(), m.end(), body_end, level
 
 
+def normalize_section_body_headings(body: str, parent_level: int) -> str:
+    """Demote internal ATX headings inside a section body so they nest strictly below ``parent_level``."""
+    if not body or parent_level < 1:
+        return body
+    lines = body.splitlines()
+    in_fence = False
+    matches = []  # (line_idx, indent, hashes, rest)
+    for idx, ln in enumerate(lines):
+        if ln.lstrip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        hm = re.match(r"^([ \t]*)(#{1,6})([ \t]+\S.*)$", ln)
+        if hm:
+            matches.append((idx, hm.group(1), hm.group(2), hm.group(3)))
+    if not matches:
+        return body
+    min_lvl = min(len(h) for _, _, h, _ in matches)
+    if min_lvl > parent_level:
+        return body
+    shift = (parent_level + 1) - min_lvl
+    for idx, indent, hashes, rest in matches:
+        new_hashes = "#" * min(6, len(hashes) + shift)
+        lines[idx] = f"{indent}{new_hashes}{rest}"
+    trailing_nl = "\n" if body.endswith("\n") else ""
+    return "\n".join(lines) + trailing_nl
+
+
 class ArtifactError(Exception):
     """An artifact operation was refused."""
 
 
 class ArtifactManager:
     def __init__(self, root, max_count=16, max_bytes=131072, max_total_bytes=524288,
-                 per_artifact_max_bytes=None, max_history_per_artifact=16):
+                 per_artifact_max_bytes=None, max_history_per_artifact=24):
         root = Path(root)
         if root.is_symlink():
             raise ArtifactError("workspace root must not be a symlink")
@@ -376,26 +405,39 @@ class ArtifactManager:
             sec_spec = CONTROL_CHARS.sub("", section).strip()
             body_clean = content.strip()
             sec_pat = section_heading_regex(sec_spec)
-            first_line = next((ln for ln in body_clean.splitlines() if ln.strip()), "")
-            has_heading = bool(sec_pat.match(first_line))
+            raw_lines = body_clean.splitlines()
+            first_idx = next((idx for idx, ln in enumerate(raw_lines) if ln.strip()), None)
+            first_line = raw_lines[first_idx] if first_idx is not None else ""
+            has_heading = bool(first_line and sec_pat.match(first_line))
+            body_without_heading = (
+                "\n".join(raw_lines[first_idx + 1:]).strip() if (has_heading and first_idx is not None) else body_clean
+            )
             if exists:
                 old = self._read_file(path, max_bytes=art_limit)
                 span = find_section_span(old, sec_spec)
                 if span:
-                    h_start, h_end, b_end, _ = span
-                    if has_heading:
-                        replacement_block = body_clean
-                    else:
-                        replacement_block = old[h_start:h_end].rstrip("\n") + "\n\n" + body_clean
+                    h_start, h_end, b_end, level = span
+                    canonical_heading = old[h_start:h_end].rstrip("\n")
+                    eff_level = level if level is not None else 2
+                    body_norm = normalize_section_body_headings(body_without_heading, eff_level)
+                    replacement_block = f"{canonical_heading}\n\n{body_norm}" if body_norm else canonical_heading
                     parts = [old[:h_start].rstrip("\n"), replacement_block, old[b_end:].lstrip("\n")]
                     new = "\n\n".join(p for p in parts if p) + "\n"
                 else:
                     heading_line = sec_spec if sec_spec.startswith(("#", "[")) else f"## {sec_spec}"
-                    add_block = body_clean if has_heading else f"{heading_line}\n\n{body_clean}"
+                    first_hdg = first_line.strip() if has_heading else heading_line
+                    hm_new = re.match(r"^[ \t]*(#{1,6})(?=[ \t]|$)", first_hdg)
+                    eff_level = len(hm_new.group(1)) if hm_new else 2
+                    rest_norm = normalize_section_body_headings(body_without_heading, eff_level)
+                    add_block = f"{first_hdg}\n\n{rest_norm}" if rest_norm else first_hdg
                     new = old.rstrip("\n") + "\n\n" + add_block + "\n"
             else:
                 heading_line = sec_spec if sec_spec.startswith(("#", "[")) else f"## {sec_spec}"
-                new = (body_clean if has_heading else f"{heading_line}\n\n{body_clean}") + "\n"
+                first_hdg = first_line.strip() if has_heading else heading_line
+                hm_new = re.match(r"^[ \t]*(#{1,6})(?=[ \t]|$)", first_hdg)
+                eff_level = len(hm_new.group(1)) if hm_new else 2
+                rest_norm = normalize_section_body_headings(body_without_heading, eff_level)
+                new = (f"{first_hdg}\n\n{rest_norm}" if rest_norm else first_hdg) + "\n"
         elif mode == "append" and exists:
             old = self._read_file(path, max_bytes=art_limit)
             note = f"\n\n— *{agent}, turn {turn}*" if attribution else ""
@@ -570,19 +612,22 @@ def validate_artifact(manager: ArtifactManager, spec: dict):
         if m:
             issues.append(f"{fname} contains unfinished placeholder text matching {m.group(0)!r}; replace with full content.")
 
-    # Required sections check (case-insensitive header/marker match with non-empty body)
+    # Required sections check (case-insensitive header/marker match with non-empty body and uniqueness)
     req_sections = [str(s) for s in (spec.get("required_sections") or []) if str(s).strip()]
     missing_sections = []
     empty_sections = []
+    duplicate_sections = []
     if req_sections:
         positions = []
         for sec in req_sections:
             pat = section_heading_regex(sec)
-            m = pat.search(text)
-            if not m:
+            matches = list(pat.finditer(text))
+            if not matches:
                 missing_sections.append(sec)
             else:
-                positions.append((m.start(), m.end(), sec))
+                positions.append((matches[0].start(), matches[0].end(), sec))
+                if len(matches) > 1:
+                    duplicate_sections.append(sec)
         positions.sort()
         for idx, (_, end_pos, sec) in enumerate(positions):
             next_start = positions[idx + 1][0] if idx + 1 < len(positions) else len(text)
@@ -595,6 +640,11 @@ def validate_artifact(manager: ArtifactManager, spec: dict):
         issues.append(f"{fname} is missing required section(s): {', '.join(missing_sections)}.")
     if empty_sections:
         issues.append(f"{fname} has empty/stub section(s): {', '.join(empty_sections)}.")
+    if duplicate_sections:
+        issues.append(
+            f"{fname} contains duplicate heading(s) for required section(s): {', '.join(duplicate_sections)}; "
+            f"consolidate or @REVERT."
+        )
 
     details = {
         "artifact": fname,
@@ -605,5 +655,6 @@ def validate_artifact(manager: ArtifactManager, spec: dict):
         "matched_sections_count": len(req_sections) - len(missing_sections),
         "missing_sections": missing_sections,
         "empty_sections": empty_sections,
+        "duplicate_sections": duplicate_sections,
     }
     return (len(issues) == 0), issues, details

@@ -276,6 +276,7 @@ class Chamber:
             max_bytes=art_max_bytes,
             max_total_bytes=art_max_total,
             per_artifact_max_bytes=per_art_limits,
+            max_history_per_artifact=int(art_cfg_init.get("max_history_per_artifact", 24)),
         )
         self.visible_artifacts: List[str] = []
         self.deliverable_validation = art_cfg_init.get("validation") or self.cfg.get("deliverable_validation")
