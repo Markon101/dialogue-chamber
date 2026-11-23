@@ -54,7 +54,14 @@ from presets import (
     SAMPLING_PARAMS,
     normalize_sampling_param,
 )
-from protocol import ACTION_TYPES, ITEM_KINDS, canonicalize_agent_id, canonicalize_claim_id, parse_reply
+from protocol import (
+    ACTION_TYPES,
+    ITEM_KINDS,
+    canonicalize_agent_id,
+    canonicalize_claim_id,
+    parse_read_offset,
+    parse_reply,
+)
 from server_manager import LlamaServerManager, assert_single_llama_server, resolve_model
 from society import Society, SOCIAL_ACTIONS
 from communication import Communication
@@ -244,6 +251,11 @@ class Chamber:
         self.min_turns_before_end = max(0, int(self.cfg.get("min_turns_before_end", 0)))
         self.board_visible = bool(self.cfg.get("board_visible", True))
         self.dm_visibility = str(self.cfg.get("dm_visibility") or "private")
+        self.prompt_layout = str(self.cfg.get("prompt_layout") or "auto").strip().lower()
+        if self.prompt_layout not in ("auto", "single", "kv_messages"):
+            raise ValueError(
+                f"unknown prompt_layout {self.prompt_layout!r}; expected 'auto', 'single', or 'kv_messages'"
+            )
         self.watch_terms = [t.lower() for t in (self.cfg.get("watch_terms") or [])]
         self.answer_key = self.cfg.get("answer_key")
 
@@ -309,7 +321,10 @@ class Chamber:
             for a in raw_agents
             if isinstance(a.get("endpoint", "local"), str)
         )
-        local_server_info = server_mgr.query_server_info("127.0.0.1", 8080, timeout=0.8) if needs_local_info else {}
+        local_url = urlsplit(str((endpoints_map.get("local") or {}).get("base_url") or "http://127.0.0.1:8080/v1"))
+        local_host = local_url.hostname or "127.0.0.1"
+        local_port = local_url.port or (443 if local_url.scheme == "https" else 8080)
+        local_server_info = server_mgr.query_server_info(local_host, local_port, timeout=0.8) if needs_local_info else {}
         if local_server_info.get("online"):
             server_reported_local_ctx = local_server_info.get("context_window")
 
@@ -600,12 +615,9 @@ class Chamber:
         all_names = ", ".join(self.agent_order)
         other_names = ", ".join(others) if others else agent.name
 
+        # Keep system sections agent-invariant when agents share profile/capabilities so backend KV/prompt cache hits.
         sys_sections = {
-            "preamble": f"You are {agent.name}, participating in an open-ended multi-agent experiment.\n"
-                        f"Participants: {all_names}. Other participants: {other_names}.",
-            "identity": agent.identity.strip() if agent.identity else "",
-            "role": f"Your current angle or role: {agent.focus.strip()}." if agent.focus else "",
-            "style": f"Your chosen speaking style: {agent.style.strip()}." if agent.style else "",
+            "preamble": f"Open-ended multi-agent experiment; participants: {all_names}.",
             "mode": self.mode_text if self.mode_text else "",
             "boundary": "You operate inside a bounded chamber: no external tools, shell, files, or web. "
                         "Respond naturally to the conversation — express curiosity, disagreement, humor, or new ideas. "
@@ -613,34 +625,52 @@ class Chamber:
             "protocol": self._protocol_instructions(agent),
         }
 
-        fixed_sections = {
+        fixed_sections: Dict[str, str] = {
             "topic": f"Topic: {self.topic}",
+        }
+        if self.documents.has_docs():
+            fixed_sections["doc_manifest"] = self.documents.render_manifest()
+
+        id_lines = [f"--- Your Identity & Role ({agent.name}) ---", f"You are {agent.name}. Other participants: {other_names}."]
+        if agent.identity.strip():
+            id_lines.append(agent.identity.strip())
+        if agent.focus.strip():
+            id_lines.append(f"Your current angle or role: {agent.focus.strip()}.")
+        if agent.style.strip():
+            id_lines.append(f"Your chosen speaking style: {agent.style.strip()}.")
+
+        tail_sections: Dict[str, str] = {
+            "agent_identity": "\n".join(id_lines),
             "knowledge": f"--- Your Private Initial Knowledge (visible only to {agent.name}) ---\n{agent.knowledge}" if agent.knowledge else "",
             "scratchpad": f"--- Your Private Scratchpad (visible only to {agent.name}) ---\n{agent.note}" if agent.note else "",
         }
         if "communication" in self.cfg:
-            fixed_sections["communication"] = self.communication.describe(agent.name)
+            tail_sections["communication"] = self.communication.describe(agent.name)
+
+        min_fb_turn = max(0, int(agent.last_turn)) if agent.last_turn else 0
+        recent_rejections = [
+            e for e in self.events
+            if e.status == "rejected" and e.actor == agent.name and e.turn >= min_fb_turn
+        ][-5:]
+        feedback_lines = [
+            f"{e.type}" + (f" [{e.target}]" if e.target else "") + f": REJECTED ({e.detail})"
+            for e in recent_rejections
+        ]
+        if self.pending_validation_feedback:
+            feedback_lines.append("END_RUN BLOCKED — Deliverable validation failed:")
+            feedback_lines.extend(f"  - {issue}" for issue in self.pending_validation_feedback)
+
         if self.society:
-            fixed_sections["society"] = "--- Society ---\n" + self.society.describe(agent.name)
+            tail_sections["society"] = "--- Society ---\n" + self.society.describe(agent.name)
             my_events = [e for e in self.events if e.actor == agent.name and
                          e.type in SOCIAL_ACTIONS | {"PUBLISH", "ARTIFACT_WRITE"}][-8:]
             if my_events:
-                fixed_sections["society_results"] = "--- Results of your recent actions ---\n" + "\n".join(
+                tail_sections["society_results"] = "--- Results of your recent actions ---\n" + "\n".join(
                     f"{e.type} {e.target}: {e.status}" + (f" ({e.detail})" if e.detail else "") for e in my_events)
-        else:
-            recent_rejections = [
-                e for e in self.events
-                if e.status == "rejected" and e.actor == agent.name and e.turn >= max(0, self.turn - 3)
-            ][-5:]
-            feedback_lines = [
-                f"{e.type}" + (f" [{e.target}]" if e.target else "") + f": REJECTED ({e.detail})"
-                for e in recent_rejections
-            ]
             if self.pending_validation_feedback:
-                feedback_lines.append("END_RUN BLOCKED — Deliverable validation failed:")
-                feedback_lines.extend(f"  - {issue}" for issue in self.pending_validation_feedback)
-            if feedback_lines:
-                fixed_sections["action_feedback"] = "--- Action & Deliverable Feedback ---\n" + "\n".join(feedback_lines)
+                tail_sections["action_feedback"] = "--- Action & Deliverable Feedback ---\n" + "\n".join(feedback_lines)
+        elif feedback_lines:
+            tail_sections["action_feedback"] = "--- Action & Deliverable Feedback ---\n" + "\n".join(feedback_lines)
 
         # Artifacts
         art_blocks = []
@@ -667,15 +697,13 @@ class Chamber:
             listing = ", ".join(f"{f} (v{v}, {sz}B)" for f, v, sz in self.artifacts.listing()) or "(none yet)"
             art_blocks.append(f"Available workspace artifacts: {listing}")
         if art_blocks:
-            fixed_sections["artifacts"] = "--- Workspace Artifacts ---\n" + "\n\n".join(art_blocks)
+            tail_sections["artifacts"] = "--- Workspace Artifacts ---\n" + "\n\n".join(art_blocks)
 
-        if self.documents.has_docs():
-            fixed_sections["doc_manifest"] = self.documents.render_manifest()
-            if agent.pending_doc_reads:
-                fixed_sections["doc_excerpts"] = (
-                    "--- Requested Reference Document Excerpts ---\n"
-                    + "\n\n".join(agent.pending_doc_reads)
-                )
+        if self.documents.has_docs() and agent.pending_doc_reads:
+            tail_sections["doc_excerpts"] = (
+                "--- Requested Reference Document Excerpts ---\n"
+                + "\n\n".join(agent.pending_doc_reads)
+            )
 
         # Blackboard
         if self.board and (self.board_visible or any(k in agent.capabilities for k in ("CLAIM", "CHALLENGE", "RETRACT"))):
@@ -691,7 +719,7 @@ class Chamber:
                 b_lines.append(f"- {item.id} [{item.kind} by {item.author}, {tag}]{extra}{votes}: {item.content}")
                 for ch in item.challenges[-2:]:
                     b_lines.append(f"    ↳ challenge by {ch['author']} (turn {ch['turn']}): {ch['content']}")
-            fixed_sections["blackboard"] = "--- Shared Blackboard ---\n" + "\n".join(b_lines)
+            tail_sections["blackboard"] = "--- Shared Blackboard ---\n" + "\n".join(b_lines)
 
         # Subscribed channels
         if agent.subscriptions:
@@ -702,25 +730,66 @@ class Chamber:
                 for m in self.channels.get(cname, [])[-6:]:
                     ch_lines.append(f"[#{cname} | {m.id} | turn {m.turn}] {m.speaker}: {m.content}")
             if ch_lines:
-                fixed_sections["channels"] = "--- Subscribed Channels ---\n" + "\n".join(ch_lines)
+                tail_sections["channels"] = "--- Subscribed Channels ---\n" + "\n".join(ch_lines)
 
-        # Whispers
+        # Whispers (plus whisper notices if enabled, kept in tail so Public Conversation prefix stays cache-stable)
         my_dms = [d for d in self.dms if d.sender == agent.name or d.recipient == agent.name][-8:]
-        if my_dms:
-            dm_lines = [
-                f"[PRIVATE WHISPER {d.id} | turn {d.turn} | {d.sender} → {d.recipient}]: {d.content}"
-                for d in my_dms
-            ]
-            fixed_sections["whispers"] = "--- Private Messages (visible only to sender & recipient) ---\n" + "\n".join(dm_lines)
-
-        # Public messages
-        pub_msgs = [{"id": m.id, "turn": m.turn, "speaker": m.speaker, "content": m.content, "reply_to": m.reply_to}
-                    for m in self.public_messages if m.speaker == agent.name or
-                    self.communication.allows("public", m.speaker, agent.name)]
+        whisper_lines = [
+            f"[PRIVATE WHISPER {d.id} | turn {d.turn} | {d.sender} → {d.recipient}]: {d.content}"
+            for d in my_dms
+        ]
         if self.dm_visibility == "notice":
             for d in self.dms[-6:]:
                 if d.sender != agent.name and d.recipient != agent.name:
-                    pub_msgs.append({"id": f"not_{d.id}", "turn": d.turn, "speaker": "NOTICE", "content": f"(notice: {d.sender} sent a private whisper to {d.recipient})"})
+                    whisper_lines.append(f"[Notice: {d.sender} sent a private whisper to {d.recipient} on turn {d.turn}]")
+        if whisper_lines:
+            tail_sections["whispers"] = "--- Private Messages (visible only to sender & recipient) ---\n" + "\n".join(whisper_lines)
+
+        if self.deliverable_validation or self.end_mode == "agent_decided" or self.documents.has_docs() or self.turn >= 2:
+            status_parts = [f"Turn {self.turn} / {self.limits['max_turns']}"]
+            if self.end_mode == "agent_decided":
+                active_cnt = sum(1 for a in self.agents.values() if a.active)
+                voted_cnt = sum(1 for n, a in self.agents.items() if a.active and n in self.end_votes)
+                status_parts.append(f"End votes ({self.end_policy}): {voted_cnt}/{active_cnt} active")
+            if self.deliverable_validation:
+                deliv_ok, deliv_issues, deliv_det = validate_artifact(self.artifacts, self.deliverable_validation)
+                dname = deliv_det.get("artifact", str(self.deliverable_validation.get("artifact", "")))
+                if deliv_ok:
+                    status_parts.append(f"Deliverable `{dname}`: READY ({deliv_det.get('size_bytes')}B, all required sections present)")
+                else:
+                    status_parts.append(f"Deliverable `{dname}`: INCOMPLETE ({'; '.join(deliv_issues)})")
+            status_lines = [" | ".join(status_parts)]
+            if self.documents.has_docs():
+                all_doc_ids = self.documents.ids()
+                inspected_ids = {
+                    rec.get("target")
+                    for rec in self.doc_access_log
+                    if rec.get("ok") and rec.get("op") in ("read", "toc") and rec.get("target") in all_doc_ids
+                }
+                unread = [d for d in all_doc_ids if d not in inspected_ids]
+                cov = (
+                    f"Ref docs inspected ({len(inspected_ids)}/{len(all_doc_ids)}): unread = {', '.join(unread)}"
+                    if unread
+                    else f"Ref docs inspected ({len(all_doc_ids)}/{len(all_doc_ids)}): all mounted docs inspected"
+                )
+                recent_reads: List[str] = []
+                for rec in reversed(self.doc_access_log):
+                    if rec.get("ok") and rec.get("op") == "read":
+                        tag = f"{rec.get('target')}@{rec.get('offset', 0)}"
+                        if tag not in recent_reads:
+                            recent_reads.append(tag)
+                        if len(recent_reads) >= 6:
+                            break
+                if recent_reads:
+                    recent_reads.reverse()
+                    cov += f" | Recent reads: {', '.join(recent_reads)}"
+                status_lines.append(cov)
+            tail_sections["session_status"] = "--- Session Status ---\n" + "\n".join(status_lines)
+
+        # Public messages (append-only shared prefix across all agents)
+        pub_msgs = [{"id": m.id, "turn": m.turn, "speaker": m.speaker, "content": m.content, "reply_to": m.reply_to}
+                    for m in self.public_messages if m.speaker == agent.name or
+                    self.communication.allows("public", m.speaker, agent.name)]
 
         messages, accounting = self.ctx_intelligence.assemble_and_budget(
             agent_name=agent.name,
@@ -735,6 +804,8 @@ class Chamber:
             context_mode=self.context_mode,
             max_context_chars=int(self.limits["max_context_chars"]),
             agent_context_chars=int(agent.context_chars),
+            tail_sections=tail_sections,
+            prompt_layout=self.prompt_layout,
         )
 
         for diag_msg in accounting.diagnostics:
@@ -772,7 +843,7 @@ class Chamber:
             if "WHISPER" in caps:
                 lines.append("Optional private line: @WHISPER <name>: <secret message>")
             if self.documents.has_docs() and ("DOC_READ" in caps or "DOC_SEARCH" in caps):
-                lines.append("Reference library: @DOC_SEARCH <doc_id|all> <query> | @DOC_READ <doc_id> [offset] | @DOC_LIST")
+                lines.append("Reference library: @DOC_TOC <doc_id> | @DOC_SEARCH <doc_id|all> <query> | @DOC_READ <doc_id> 0 | @DOC_LIST")
             if self.end_mode == "agent_decided" and ("END_RUN" in caps or "FINISH" in caps):
                 lines.append(
                     f"Run ending is agent-decided ({self.end_policy}, safety cap {self.limits['max_turns']} turns): "
@@ -805,7 +876,7 @@ class Chamber:
                 '    {"type": "UPDATE_NOTE", "content": "your private scratchpad note"},\n'
                 '    {"type": "ARTIFACT_WRITE", "name": "world", "mode": "create|append|replace", "content": "markdown"},\n'
                 '    {"type": "ARTIFACT_READ", "name": "world"}'
-                + (',\n    {"type": "DOC_SEARCH", "target": "all", "query": "..."},\n    {"type": "DOC_READ", "doc_id": "...", "offset": 0}' if self.documents.has_docs() else '')
+                + (',\n    {"type": "DOC_TOC", "doc_id": "..."},\n    {"type": "DOC_SEARCH", "target": "all", "query": "..."},\n    {"type": "DOC_READ", "doc_id": "...", "offset": 0}' if self.documents.has_docs() else '')
                 + "\n  ]\n}\n"
                 f"Permitted action types for you: {', '.join(allowed)}.{extra_note}"
             )
@@ -815,7 +886,7 @@ class Chamber:
             f"TEMP: <{lo}..{hi}>",
         ]
         if supports_extra_samplers and "SET_SAMPLING" in caps:
-            cmds.append("@SET_SAMPLING top_p=0.9 top_k=40 min_p=0.05 xtc_prob=0.1 xtc_thresh=0.1 repeat_penalty=1.1 (or one KEY: val per line)")
+            cmds.append("@SET_SAMPLING <key=val ...>  (optional — omit unless changing your sampling; keys: temp, top_p, top_k, min_p, xtc_prob, xtc_thresh, repeat_penalty, dry_multiplier, dynatemp)")
         if "WHISPER" in caps:
             cmds.append("@WHISPER <name>: <private message>")
         if "PUBLISH" in caps and len(self.channels) > 1:
@@ -831,9 +902,9 @@ class Chamber:
         if "UPDATE_NOTE" in caps:
             cmds.append("@NOTE: <private scratchpad note>")
         if "ARTIFACT_WRITE" in caps:
-            cmds.append("@APPEND <artifact_name>: <markdown to append>  |  @REPLACE <artifact_name>: <full consolidated markdown>  (or @READ <artifact_name> [offset])")
-        if self.documents.has_docs() and ("DOC_READ" in caps or "DOC_SEARCH" in caps):
-            cmds.append("@DOC_SEARCH <doc_id|all> <query>  |  @DOC_READ <doc_id> [offset]  |  @DOC_LIST")
+            cmds.append("@APPEND <artifact_name>: <markdown to append>  |  @REPLACE <artifact_name>: <full consolidated markdown>  (or @READ <artifact_name> 0)")
+        if self.documents.has_docs() and ("DOC_READ" in caps or "DOC_SEARCH" in caps or "DOC_TOC" in caps):
+            cmds.append("@DOC_TOC <doc_id>  |  @DOC_SEARCH <doc_id|all> <query>  |  @DOC_READ <doc_id> 0 (use numeric integer offset)  |  @DOC_LIST")
         if self.end_mode == "agent_decided" and ("END_RUN" in caps or "FINISH" in caps):
             cmds.append(f"@END_RUN: <reason> (vote to conclude session; policy: {self.end_policy}, cap: {self.limits['max_turns']} turns) | @FINISH: <reason>")
         max_act = int(self.limits["max_actions_per_response"])
@@ -1074,7 +1145,16 @@ class Chamber:
                 if tgt in self.board and self.board[tgt].votes.get(agent.name) == val:
                     continue
             try:
-                key = json.dumps(act, sort_keys=True)
+                if atype == "DOC_READ":
+                    key = json.dumps({"type": atype, "doc_id": str(act.get("doc_id") or "").lower(), "offset": int(act.get("offset", 0))})
+                elif atype == "DOC_SEARCH":
+                    key = json.dumps({"type": atype, "target": str(act.get("target") or "all").lower(), "query": " ".join(str(act.get("query") or "").lower().split())})
+                elif atype == "DOC_TOC":
+                    key = json.dumps({"type": atype, "doc_id": str(act.get("doc_id") or "").lower()})
+                elif atype == "ARTIFACT_READ":
+                    key = json.dumps({"type": atype, "name": str(act.get("name") or "").lower(), "offset": int(act.get("offset", 0))})
+                else:
+                    key = json.dumps(act, sort_keys=True)
             except TypeError:
                 key = str(act)
             if key in seen_keys:
@@ -1149,16 +1229,22 @@ class Chamber:
                     return
                 staged[ck] = cv
             applied = {}
+            changed_any = False
             for ck, cv in staged.items():
                 old_v = getattr(agent, ck, None)
+                if old_v != cv:
+                    changed_any = True
                 setattr(agent, ck, cv)
                 applied[ck] = {"old": old_v, "new": cv}
-                if ck == "temperature":
+                if ck == "temperature" and old_v != cv:
                     self.temp_changes.append((self.turn, agent.name, float(old_v), float(cv)))
-            self.sampling_changes.append((self.turn, agent.name, {k: v["new"] for k, v in applied.items()}))
             summary = ", ".join(f"{k}={v['new']}" for k, v in applied.items())
-            self._record(agent.name, atype, "accepted", detail=summary)
-            self._emit(f"  ⚙ sampling {agent.name}: {summary}")
+            if changed_any:
+                self.sampling_changes.append((self.turn, agent.name, {k: v["new"] for k, v in applied.items()}))
+                self._record(agent.name, atype, "accepted", detail=summary)
+                self._emit(f"  ⚙ sampling {agent.name}: {summary}")
+            else:
+                self._record(agent.name, atype, "accepted", detail=f"{summary} (unchanged)")
             return
 
         if atype == "PROPOSE_NEXT":
@@ -1209,7 +1295,7 @@ class Chamber:
                 self._record(agent.name, atype, "rejected", target=ch, detail="group membership required")
                 return
             content = str(act.get("content") or "").strip()[: int(lim["max_message_chars"])]
-            if self.society and (not content or sum(len(posts) for posts in self.channels.values()) >= int(lim["max_channel_posts"])):
+            if not content or sum(len(posts) for posts in self.channels.values()) >= int(lim["max_channel_posts"]):
                 self._record(agent.name, atype, "rejected", target=ch, detail="empty message or channel post limit reached")
                 return
             mid = f"ch_{ch}_{len(self.channels[ch]) + 1}"
@@ -1336,11 +1422,10 @@ class Chamber:
                 self._record(agent.name, atype, "rejected", detail="max_pending_reads reached")
                 return
             name = str(act.get("name") or act.get("target") or "")
-            offset = act.get("offset", 0)
-            if isinstance(offset, bool) or not re.fullmatch(r"0|[1-9][0-9]{0,5}", str(offset)):
-                self._record(agent.name, atype, "rejected", target=name, detail="offset must be a nonnegative integer")
+            offset, off_err = parse_read_offset(act.get("offset", 0))
+            if off_err:
+                self._record(agent.name, atype, "rejected", target=name, detail=off_err)
                 return
-            offset = int(offset)
             try:
                 fname, ver, text = self.artifacts.read(agent.name, name, turn=self.turn, mark_seen=False)
             except ArtifactError as e:
@@ -1362,27 +1447,49 @@ class Chamber:
             if not self.documents.has_docs():
                 self._record(agent.name, atype, "rejected", detail="no reference document manifest is mounted")
                 return
-            max_pend = int(lim.get("max_pending_doc_reads", 3))
+            max_pend = int(lim.get("max_pending_doc_reads", 8))
             if len(agent.pending_doc_reads) < max_pend:
                 agent.pending_doc_reads.append(self.documents.render_manifest(max_summary_chars=400))
             self.doc_access_log.append({"turn": self.turn, "agent": agent.name, "op": "list", "target": "all", "ok": True})
             self._record(agent.name, atype, "accepted", detail=f"{len(self.documents.entries)} doc(s)")
             return
 
-        if atype == "DOC_READ":
+        if atype == "DOC_TOC":
             if not self.documents.has_docs():
                 self._record(agent.name, atype, "rejected", detail="no reference document manifest is mounted")
                 return
-            max_pend = int(lim.get("max_pending_doc_reads", 3))
+            max_pend = int(lim.get("max_pending_doc_reads", 8))
             if len(agent.pending_doc_reads) >= max_pend:
                 self._record(agent.name, atype, "rejected", detail=f"max_pending_doc_reads ({max_pend}) reached")
                 return
             raw_doc = act.get("doc_id") or act.get("name") or act.get("target") or ""
-            offset = act.get("offset", 0)
-            if isinstance(offset, bool) or not re.fullmatch(r"0|[1-9][0-9]{0,7}", str(offset)):
-                self._record(agent.name, atype, "rejected", target=str(raw_doc), detail="offset must be a nonnegative integer")
+            try:
+                doc_id, _title, toc_entries, formatted = self.documents.table_of_contents(raw_doc)
+            except DocumentError as exc:
+                self._record(agent.name, atype, "rejected", target=str(raw_doc), detail=str(exc))
                 return
-            offset = int(offset)
+            agent.pending_doc_reads.append(formatted)
+            self.doc_access_log.append({
+                "turn": self.turn, "agent": agent.name, "op": "toc",
+                "target": doc_id, "entries": len(toc_entries), "ok": True,
+            })
+            self._record(agent.name, atype, "accepted", target=doc_id, detail=f"{len(toc_entries)} heading(s)")
+            self._emit(f"  📑 doc toc `{doc_id}` ({len(toc_entries)} headings) queued for {agent.name}")
+            return
+
+        if atype == "DOC_READ":
+            if not self.documents.has_docs():
+                self._record(agent.name, atype, "rejected", detail="no reference document manifest is mounted")
+                return
+            max_pend = int(lim.get("max_pending_doc_reads", 8))
+            if len(agent.pending_doc_reads) >= max_pend:
+                self._record(agent.name, atype, "rejected", detail=f"max_pending_doc_reads ({max_pend}) reached")
+                return
+            raw_doc = act.get("doc_id") or act.get("name") or act.get("target") or ""
+            offset, off_err = parse_read_offset(act.get("offset", 0))
+            if off_err:
+                self._record(agent.name, atype, "rejected", target=str(raw_doc), detail=off_err)
+                return
             read_limit = int(lim.get("doc_read_chars", 12000))
             try:
                 doc_id, title, excerpt, used_off, total = self.documents.read(raw_doc, offset=offset, max_chars=read_limit)
@@ -1404,7 +1511,7 @@ class Chamber:
             if not self.documents.has_docs():
                 self._record(agent.name, atype, "rejected", detail="no reference document manifest is mounted")
                 return
-            max_pend = int(lim.get("max_pending_doc_reads", 3))
+            max_pend = int(lim.get("max_pending_doc_reads", 8))
             if len(agent.pending_doc_reads) >= max_pend:
                 self._record(agent.name, atype, "rejected", detail=f"max_pending_doc_reads ({max_pend}) reached")
                 return
@@ -1470,9 +1577,14 @@ class Chamber:
             if self.turn < self.min_turns_before_end:
                 self._record(agent.name, atype, "rejected", detail=f"cannot end before turn {self.min_turns_before_end}")
                 return
+            already_voted = agent.name in self.end_votes
             self.end_votes[agent.name] = reason
-            self._record(agent.name, atype, "accepted", detail=reason)
-            self._emit(f"  🏁 {agent.name} voted to end run: {reason}")
+            if already_voted:
+                self._record(agent.name, atype, "accepted", detail=f"{reason} (vote reaffirmed)")
+                self._emit(f"  🏁 {agent.name} reaffirmed vote to end run: {reason}")
+            else:
+                self._record(agent.name, atype, "accepted", detail=reason)
+                self._emit(f"  🏁 {agent.name} voted to end run: {reason}")
             self._evaluate_agent_end()
             return
 
@@ -1577,14 +1689,15 @@ class Chamber:
         if starved:
             starved.sort(key=lambda n: (self.agents[n].last_turn, self.agent_order.index(n)))
             chosen = starved[0]
+            self.nominated_next = None
             self._record("SYSTEM", "SCHEDULER", "system", target=chosen, detail="anti-starvation override")
             return chosen
 
         max_consec = int(self.limits["max_consecutive"])
         eligible = [n for n in active if self.agents[n].consecutive_turns < max_consec] or active
 
-        def fair_fallback():
-            cand = list(eligible)
+        def fair_fallback(pool=None):
+            cand = list(eligible if pool is None else pool)
             cand.sort(key=lambda n: (self.agents[n].turns_taken, self.agent_order.index(n)))
             return cand[0]
 
@@ -1614,7 +1727,35 @@ class Chamber:
             chosen = self._ask_moderator(eligible) or fair_fallback()
 
         else:  # self_directed (default)
-            if self.nominated_next and self.nominated_next in eligible:
+            max_dyad = self.limits.get("max_dyad_turns")
+            dyad_set: Optional[Set[str]] = None
+            non_dyad_eligible: List[str] = []
+            if max_dyad is not None and int(max_dyad) >= 2 and len(active) >= 3:
+                dyad_win = int(max_dyad)
+                if len(self.public_messages) >= dyad_win:
+                    recent_set = {m.speaker for m in self.public_messages[-dyad_win:]}
+                    if len(recent_set) <= 2:
+                        cands = [n for n in eligible if n not in recent_set]
+                        if cands:
+                            dyad_set = recent_set
+                            non_dyad_eligible = cands
+
+            if dyad_set is not None:
+                if self.nominated_next and self.nominated_next in non_dyad_eligible:
+                    chosen = self.nominated_next
+                    self._record("SCHEDULER", "SPEAKER_NOMINATION", "accepted", target=chosen)
+                else:
+                    rq_non_dyad = [x for x in self.reactive_queue if x in non_dyad_eligible]
+                    if rq_non_dyad:
+                        chosen = rq_non_dyad[0]
+                        self.reactive_queue.remove(chosen)
+                    else:
+                        chosen = fair_fallback(non_dyad_eligible)
+                    self._record(
+                        "SYSTEM", "SCHEDULER", "system", target=chosen,
+                        detail=f"dyad lock-in breaker ({'/'.join(sorted(dyad_set))})",
+                    )
+            elif self.nominated_next and self.nominated_next in eligible:
                 chosen = self.nominated_next
                 self._record("SCHEDULER", "SPEAKER_NOMINATION", "accepted", target=chosen)
             elif self.reactive_queue:
@@ -1945,6 +2086,16 @@ class Chamber:
         unanswered = [d for d in self.dms if not d.answered]
 
         tok_per_s = round((self.prompt_tokens + self.completion_tokens) / self.elapsed_s, 2) if self.elapsed_s > 0 else 0.0
+        comp_tok_per_s = round(self.completion_tokens / self.elapsed_s, 2) if self.elapsed_s > 0 else 0.0
+        tok_rates = [r["completion_tok_per_s"] for r in self.inference_history if r.get("completion_tok_per_s") is not None]
+        mean_comp_tps = round(sum(tok_rates) / len(tok_rates), 2) if tok_rates else None
+        cache_recs = [r for r in self.inference_history if r.get("cached_tokens") is not None and r.get("prompt_tokens")]
+        total_cached = sum(int(r["cached_tokens"]) for r in cache_recs)
+        total_cache_prompt = sum(int(r["prompt_tokens"]) for r in cache_recs)
+        cache_hit_rate = round(total_cached / total_cache_prompt, 3) if total_cache_prompt > 0 else None
+        doc_searches = [d for d in self.doc_access_log if d.get("op") == "search"]
+        doc_hits = sum(1 for d in doc_searches if int(d.get("hits") or 0) > 0)
+        doc_search_hit_rate = round(doc_hits / len(doc_searches), 3) if doc_searches else None
 
         return dict(
             turns_completed=len(self.public_messages),
@@ -1956,6 +2107,10 @@ class Chamber:
             visible_tokens=self.visible_tokens_total,
             total_tokens=self.prompt_tokens + self.completion_tokens,
             tokens_per_second=tok_per_s,
+            completion_tokens_per_second=comp_tok_per_s,
+            mean_completion_tok_per_s=mean_comp_tps,
+            prompt_cache_hit_rate=cache_hit_rate,
+            prompt_layout=self.prompt_layout,
             remote_cost_usd=round(self.remote_cost_usd, 6),
             remote_calls_without_cost=self.remote_calls_without_cost,
             elapsed_s=round(self.elapsed_s, 2),
@@ -1972,8 +2127,11 @@ class Chamber:
             sampling_changes=list(self.sampling_changes),
             inference_history=list(self.inference_history),
             documents_mounted=len(self.documents.entries),
+            doc_toc_count=sum(1 for d in self.doc_access_log if d.get("op") == "toc"),
             doc_reads_count=sum(1 for d in self.doc_access_log if d.get("op") == "read"),
-            doc_searches_count=sum(1 for d in self.doc_access_log if d.get("op") == "search"),
+            doc_searches_count=len(doc_searches),
+            doc_search_hits=doc_hits,
+            doc_search_hit_rate=doc_search_hit_rate,
             doc_access_log=list(self.doc_access_log),
             stop_reason=self.stop_reason,
             turns_by_agent=turns_by_agent,
@@ -2100,6 +2258,13 @@ class Chamber:
             f"${metrics['remote_cost_usd']:.6f} USD"
             + (f" (+ {metrics['remote_calls_without_cost']} unpriced remote call(s))" if metrics["remote_calls_without_cost"] else "")
         )
+        cache_hit_line = (
+            f"{metrics['prompt_cache_hit_rate']*100:.1f}%"
+            if metrics.get("prompt_cache_hit_rate") is not None
+            else "N/A"
+        )
+        mean_gen_tps = metrics.get("mean_completion_tok_per_s")
+        gen_tps_str = f"{mean_gen_tps} tok/s" if mean_gen_tps is not None else "N/A"
         m_lines = [
             "# Chamber Metrics & Observability",
             "",
@@ -2110,7 +2275,8 @@ class Chamber:
             f"- **Tokens (prompt / completion)**: {metrics['prompt_tokens']} / {metrics['completion_tokens']} (total: {metrics['total_tokens']})",
             f"- **Reasoning tokens (reported)**: {metrics['reasoning_tokens']}",
             f"- **Visible completion tokens**: {metrics['visible_tokens']}",
-            f"- **Throughput**: {metrics['tokens_per_second']} tok/s",
+            f"- **Throughput (total / mean gen)**: {metrics['tokens_per_second']} tok/s / {gen_tps_str}",
+            f"- **Prompt cache hit rate**: {cache_hit_line}",
             f"- **Provider-reported remote cost**: {cost_str}",
             f"- **Duration**: {metrics['elapsed_s']}s",
             f"- **Puzzle answer reached turn**: {metrics['solved_turn'] if metrics['solved_turn'] is not None else 'N/A'}",
@@ -2177,11 +2343,27 @@ class Chamber:
                 )
 
         if self.documents.has_docs():
+            all_doc_ids = self.documents.ids()
+            inspected_docs = [
+                d for d in all_doc_ids
+                if any(
+                    rec.get("ok") and rec.get("op") in ("read", "toc") and rec.get("target") == d
+                    for rec in self.doc_access_log
+                )
+            ]
+            hit_str = (
+                f" ({metrics['doc_search_hits']}/{metrics['doc_searches_count']} hit, "
+                f"{metrics['doc_search_hit_rate'] * 100:.0f}%)"
+                if metrics.get("doc_search_hit_rate") is not None
+                else ""
+            )
             m_lines.extend([
                 "",
                 "### Reference Document Access",
-                f"- **Documents mounted**: {metrics['documents_mounted']} ({', '.join(self.documents.ids())})",
-                f"- **Doc reads / searches**: {metrics['doc_reads_count']} / {metrics['doc_searches_count']}",
+                f"- **Documents mounted**: {metrics['documents_mounted']} ({', '.join(all_doc_ids)})",
+                f"- **Documents inspected (TOC/read)**: {len(inspected_docs)}/{len(all_doc_ids)}"
+                + (f" ({', '.join(inspected_docs)})" if inspected_docs else ""),
+                f"- **Doc TOCs / reads / searches**: {metrics['doc_toc_count']} / {metrics['doc_reads_count']} / {metrics['doc_searches_count']}{hit_str}",
             ])
             for rec in self.doc_access_log:
                 m_lines.append(f"  - Turn {rec.get('turn')} (`{rec.get('agent')}`): `{rec.get('op')}` `{rec.get('target')}`")
@@ -2539,6 +2721,7 @@ def main(argv=None) -> int:
             matches[0][ck] = cv
 
     # Diagnostics execution
+    display_preset = str(preset_cfg.get("name") or args.preset)
     if args.doctor:
         doc = run_doctor(endpoints_map, Path(RUNS_DIR))
         if args.json:
@@ -2549,7 +2732,7 @@ def main(argv=None) -> int:
 
     if args.context_info:
         info = run_context_info(
-            args.preset,
+            display_preset,
             preset_cfg,
             endpoints_map,
             cli_turns=args.turns,
@@ -2576,7 +2759,7 @@ def main(argv=None) -> int:
 
     if args.show_effective_config:
         eff = {
-            "preset": args.preset,
+            "preset": display_preset,
             "config": preset_cfg,
             "endpoints": endpoints_map,
             "turns_override": args.turns,
@@ -2588,7 +2771,7 @@ def main(argv=None) -> int:
 
     if args.dry_run:
         plan = run_dry_run(
-            args.preset,
+            display_preset,
             preset_cfg,
             endpoints_map,
             topic=args.topic,
@@ -2631,19 +2814,22 @@ def main(argv=None) -> int:
             allocated = info.get("allocated_context")
             if isinstance(allocated, int) and allocated > 0:
                 endpoints_map["dory"]["context_tokens"] = min(int(endpoints_map["dory"]["context_tokens"]), allocated)
+        loc_url = urlsplit(str(endpoints_map.get("local", {}).get("base_url") or "http://127.0.0.1:8080/v1"))
+        loc_host = loc_url.hostname or "127.0.0.1"
+        loc_port = loc_url.port or (443 if loc_url.scheme == "https" else 8080)
         if needs_local and not args.mock:
             loc_model = endpoints_map["local"]["model"]
             # If an external llama-server is already running and no model was explicitly requested, adopt it.
-            if not args.model and not os.environ.get("LOCAL_MODEL") and not server_mgr.is_server_owned(8080):
-                if server_mgr.check_health("127.0.0.1", 8080, timeout=1.5):
-                    running_info = server_mgr.query_server_info("127.0.0.1", 8080, timeout=1.5)
+            if not args.model and not os.environ.get("LOCAL_MODEL") and not server_mgr.is_server_owned(loc_port):
+                if server_mgr.check_health(loc_host, loc_port, timeout=1.5):
+                    running_info = server_mgr.query_server_info(loc_host, loc_port, timeout=1.5)
                     if running_info.get("model_name"):
                         loc_model = str(running_info["model_name"])
                         endpoints_map["local"]["model"] = loc_model
             mode, mfile, def_ctx = resolve_model(loc_model)
             res = server_mgr.ensure_server(
-                host="127.0.0.1",
-                port=8080,
+                host=loc_host,
+                port=loc_port,
                 model_mode=mode,
                 model_file=mfile,
                 allow_switch=args.allow_server_switch,
@@ -2732,7 +2918,7 @@ def main(argv=None) -> int:
         chamber.run()
     finally:
         if args.stop and started_server:
-            server_mgr.stop_owned_server(8080)
+            server_mgr.stop_owned_server(loc_port)
         wakelock.release()
         lock.release()
 

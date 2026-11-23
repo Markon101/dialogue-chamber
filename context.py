@@ -27,6 +27,8 @@ class TokenAccounting:
     whispers: int = 0
     shared_artifacts: int = 0
     tool_protocol_instructions: int = 0
+    reference_documents: int = 0
+    other_fixed: int = 0
     reserved_output: int = 4096
     safety_margin: int = 1024
     total_prompt: int = 0
@@ -158,6 +160,29 @@ class ContextIntelligence:
 
         return 8192, "unknown", "unverified"
 
+    def _classify_section(self, accounting: TokenAccounting, sec_name: str, cnt: int) -> None:
+        low = sec_name.lower()
+        if "protocol" in low:
+            accounting.tool_protocol_instructions += cnt
+        elif "preamble" in low or "mode" in low or "boundary" in low or "system" in low:
+            accounting.system_instructions += cnt
+        elif "identity" in low or "role" in low or "style" in low:
+            accounting.agent_personality_rules += cnt
+        elif "topic" in low:
+            accounting.current_topic += cnt
+        elif "scratchpad" in low or "note" in low:
+            accounting.private_notes += cnt
+        elif "blackboard" in low or "claim" in low:
+            accounting.blackboard += cnt
+        elif "whisper" in low or "private" in low or "knowledge" in low:
+            accounting.whispers += cnt
+        elif "artifact" in low or "workspace" in low:
+            accounting.shared_artifacts += cnt
+        elif "doc" in low or "manifest" in low:
+            accounting.reference_documents += cnt
+        else:
+            accounting.other_fixed += cnt
+
     def assemble_and_budget(
         self,
         agent_name: str,
@@ -172,14 +197,26 @@ class ContextIntelligence:
         context_mode: str = "tokens",
         max_context_chars: int = 500000,
         agent_context_chars: int = 300000,
+        tail_sections: Optional[Dict[str, str]] = None,
+        prompt_layout: str = "single",
     ) -> Tuple[List[Dict[str, str]], TokenAccounting]:
         """Assembles prompt messages while enforcing tokenizer-aware context budget.
 
-        Protects system instructions, agent identity, topic, scratchpad, active claims,
-        and visible artifacts, preferentially omitting older dialogue under context pressure.
-        Preserves backwards-compatible character limits when configured.
+        Protects system instructions, fixed prefix sections (topic, doc manifest), and
+        per-agent tail sections (identity, scratchpad, blackboard, whispers, artifacts),
+        preferentially omitting older public dialogue under context pressure while
+        preserving a stable shared prefix for backend KV/prompt caching.
+
+        When ``prompt_layout`` is ``"kv_messages"`` (or ``"auto"`` on a ``llamacpp``
+        endpoint), public turns are emitted as separate user messages before a final
+        user message containing the mutable per-agent tail, allowing SWA checkpoint
+        backends to cache the growing shared conversation prefix across turns.
         """
         margin = safety_margin if safety_margin is not None else self.default_safety_margin
+        layout = (prompt_layout or "single").strip().lower()
+        use_kv_messages = (layout == "kv_messages") or (
+            layout == "auto" and endpoint.get("provider") == "llamacpp"
+        )
 
         # Adjust reserved output if context window is tight
         actual_reserved = min(reserved_output, max(128, effective_context // 2))
@@ -203,16 +240,11 @@ class ContextIntelligence:
             if method != "exact":
                 all_exact = False
             sys_tokens += cnt
-            if "protocol" in sec_name.lower():
-                accounting.tool_protocol_instructions += cnt
-            elif "identity" in sec_name.lower() or "role" in sec_name.lower():
-                accounting.agent_personality_rules += cnt
-            else:
-                accounting.system_instructions += cnt
+            self._classify_section(accounting, sec_name, cnt)
 
         system_content = "\n\n".join(t.strip() for t in system_sections.values() if t.strip())
 
-        # Tokenize fixed sections
+        # Tokenize fixed prefix sections
         fixed_tokens = 0
         fixed_blocks = []
         for sec_name, text in fixed_sections.items():
@@ -223,30 +255,35 @@ class ContextIntelligence:
                 all_exact = False
             fixed_tokens += cnt
             fixed_blocks.append(text)
-
-            if "topic" in sec_name.lower():
-                accounting.current_topic += cnt
-            elif "scratchpad" in sec_name.lower() or "note" in sec_name.lower():
-                accounting.private_notes += cnt
-            elif "blackboard" in sec_name.lower() or "claim" in sec_name.lower():
-                accounting.blackboard += cnt
-            elif "whisper" in sec_name.lower() or "private" in sec_name.lower():
-                accounting.whispers += cnt
-            elif "artifact" in sec_name.lower() or "workspace" in sec_name.lower():
-                accounting.shared_artifacts += cnt
+            self._classify_section(accounting, sec_name, cnt)
 
         fixed_prompt_text = "\n\n".join(fixed_blocks)
+
+        # Tokenize optional per-agent / mutable tail sections (kept after public transcript for KV-cache sharing)
+        tail_tokens = 0
+        tail_blocks = []
+        for sec_name, text in (tail_sections or {}).items():
+            if not text or not text.strip():
+                continue
+            cnt, method = self.tokenizer.count_tokens(text, endpoint)
+            if method != "exact":
+                all_exact = False
+            tail_tokens += cnt
+            tail_blocks.append(text)
+            self._classify_section(accounting, sec_name, cnt)
+
+        tail_prompt_text = "\n\n".join(tail_blocks)
 
         # Calculate prompt headroom available for public transcript
         available_prompt_budget = max(0, effective_context - (actual_reserved + margin))
         accounting.available_prompt_budget = available_prompt_budget
 
-        essential_tokens = sys_tokens + fixed_tokens + 40
+        essential_tokens = sys_tokens + fixed_tokens + tail_tokens + 40
         transcript_token_budget = max(0, available_prompt_budget - essential_tokens)
 
         # Backwards-compatible character budget
         char_budget = min(int(agent_context_chars), int(max_context_chars))
-        pub_char_budget = max(200, char_budget - len(fixed_prompt_text) - 160)
+        pub_char_budget = max(200, char_budget - len(fixed_prompt_text) - len(tail_prompt_text) - 160)
 
         # Format public messages
         formatted_msgs = []
@@ -261,21 +298,23 @@ class ContextIntelligence:
         used_tokens = 0
 
         # Traverse from newest to oldest
+        msg_overhead = 4 if use_kv_messages else 0
         for line in reversed(formatted_msgs):
             line_tok, line_method = self.tokenizer.count_tokens(line, endpoint)
             if line_method != "exact":
                 all_exact = False
+            effective_line_tok = line_tok + msg_overhead
 
             # Check both char limit and token limit
             char_overflow = (used_chars + len(line) + 2 > pub_char_budget)
-            token_overflow = (used_tokens + line_tok > transcript_token_budget)
+            token_overflow = (used_tokens + effective_line_tok > transcript_token_budget)
 
             if (char_overflow or token_overflow) and kept_lines:
                 omitted += 1
             else:
                 kept_lines.append(line)
                 used_chars += len(line) + 2
-                used_tokens += line_tok
+                used_tokens += effective_line_tok
 
         accounting.omitted_messages_count = omitted
         kept_lines.reverse()
@@ -291,14 +330,43 @@ class ContextIntelligence:
             all_exact = False
         accounting.public_transcript = tr_tokens
 
-        user_content = f"{fixed_prompt_text}\n\n--- Public Conversation ---\n{transcript_block}\n\nYour turn ({agent_name}):"
+        framing_overhead = 0
+        if use_kv_messages:
+            messages = [{"role": "system", "content": system_content}]
+            if fixed_prompt_text:
+                messages.append({"role": "user", "content": fixed_prompt_text})
+            if kept_lines:
+                first_body = "--- Public Conversation ---\n" + (f"{notice[0]}\n\n" if notice else "") + kept_lines[0]
+                messages.append({"role": "user", "content": first_body})
+                for ln in kept_lines[1:]:
+                    messages.append({"role": "user", "content": ln})
+                final_parts = ([tail_prompt_text] if tail_prompt_text else []) + [f"Your turn ({agent_name}):"]
+                messages.append({"role": "user", "content": "\n\n".join(final_parts)})
+            else:
+                # On turn 1 (no public messages yet), keep empty notice inside the mutable final user
+                # message so Turn 2's prefix before [m1 | turn 1] stays identical.
+                final_parts = ["--- Public Conversation ---\n(No public messages yet — you are opening the conversation.)"]
+                if tail_prompt_text:
+                    final_parts.append(tail_prompt_text)
+                final_parts.append(f"Your turn ({agent_name}):")
+                messages.append({"role": "user", "content": "\n\n".join(final_parts)})
+            framing_overhead = 4 * max(0, len(messages) - 2)
+        else:
+            user_parts = []
+            if fixed_prompt_text:
+                user_parts.append(fixed_prompt_text)
+            user_parts.append(f"--- Public Conversation ---\n{transcript_block}")
+            if tail_prompt_text:
+                user_parts.append(tail_prompt_text)
+            user_parts.append(f"Your turn ({agent_name}):")
+            user_content = "\n\n".join(user_parts)
 
-        messages = [
-            {"role": "system", "content": system_content},
-            {"role": "user", "content": user_content},
-        ]
+            messages = [
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": user_content},
+            ]
 
-        total_prompt_tokens = sys_tokens + fixed_tokens + tr_tokens
+        total_prompt_tokens = sys_tokens + fixed_tokens + tail_tokens + tr_tokens + framing_overhead
         accounting.total_prompt = total_prompt_tokens
         accounting.remaining_context = max(0, effective_context - (total_prompt_tokens + actual_reserved + margin))
         accounting.counting_method = "exact" if all_exact else "estimated"

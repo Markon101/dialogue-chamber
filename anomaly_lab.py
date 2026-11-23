@@ -136,19 +136,25 @@ class AnomalyLaboratory:
             if header_models:
                 models = sorted(set(header_models))
 
+        ck_state = checkpoint.get("state") if isinstance(checkpoint.get("state"), dict) else checkpoint
+        ck_cfg = ck_state.get("config") if isinstance(ck_state.get("config"), dict) else {}
         scheduler = (
             checkpoint.get("scheduler_mode")
+            or ck_state.get("scheduler_mode")
+            or ck_cfg.get("scheduler")
             or manifest.get("effective_config", {}).get("scheduler")
             or "unknown"
         )
         agents = [str(r.get("name", "")).upper() for r in roster if r.get("name")]
         if not agents:
-            raw_cfg_agents = manifest.get("effective_config", {}).get("agents") or []
+            raw_cfg_agents = manifest.get("effective_config", {}).get("agents") or ck_cfg.get("agents") or []
             agents = [str(a.get("name", "")).upper() for a in raw_cfg_agents if isinstance(a, dict) and a.get("name")]
-        if not agents and checkpoint.get("agent_order"):
-            agents = [str(a).upper() for a in checkpoint["agent_order"]]
+        if not agents and (checkpoint.get("agent_order") or ck_state.get("agent_order")):
+            agents = [str(a).upper() for a in (checkpoint.get("agent_order") or ck_state.get("agent_order"))]
         if not agents and metrics.get("participation"):
             agents = [str(k).upper() for k in metrics["participation"].keys()]
+        if not agents and metrics.get("turns_by_agent"):
+            agents = [str(k).upper() for k in metrics["turns_by_agent"].keys()]
 
         return {
             "run_dir": run_dir,
@@ -176,6 +182,7 @@ class AnomalyLaboratory:
         events = bundle["events"]
         metrics = bundle["metrics"]
         checkpoint = bundle["checkpoint"]
+        ck_state = checkpoint.get("state") if isinstance(checkpoint.get("state"), dict) else checkpoint
         manifest = bundle["manifest"]
         transcript = bundle["transcript"]
         models = bundle["models"]
@@ -306,7 +313,7 @@ class AnomalyLaboratory:
         leak_flags = [
             ev for ev in events
             if ev.get("type") == "ATTRIBUTION_FLAG"
-            and any(k in str(ev.get("detail", "")) for k in ("leaked prompt section", "hallucinated subsequent transcript turn", "wrote a line as"))
+            and any(k in str(ev.get("detail", "")) for k in ("leaked prompt section", "hallucinated subsequent transcript turn"))
         ]
         if leaked_sections or embedded_turn_tags or paranoia_quotes or leak_flags:
             cats = ["model_behavior"]
@@ -366,7 +373,7 @@ class AnomalyLaboratory:
         if solved_turn is not None and solved_turn < max(2, clue_agent_count):
             # Extract turn 1 message
             t1_msg = ""
-            for m in (checkpoint.get("public_messages") or []):
+            for m in (checkpoint.get("public_messages") or ck_state.get("public_messages") or []):
                 if m.get("turn") == solved_turn:
                     t1_msg = m.get("content", "")
                     break
@@ -409,7 +416,7 @@ class AnomalyLaboratory:
             ))
 
         # 5. Dyadic Floor Starvation in Multi-Party Self-Directed Runs
-        pub_msgs = checkpoint.get("public_messages") or []
+        pub_msgs = checkpoint.get("public_messages") or ck_state.get("public_messages") or []
         if len(agents_set) >= 3 and len(pub_msgs) >= 5:
             speaker_seq = [str(m.get("speaker", "")).upper() for m in pub_msgs if m.get("speaker")]
             for idx in range(len(speaker_seq) - 4):
@@ -464,7 +471,7 @@ class AnomalyLaboratory:
         for ev in events:
             if ev.get("status") == "rejected" and ev.get("type") in ("VOTE", "CHALLENGE", "RETRACT"):
                 tgt = str(ev.get("target", "")).upper()
-                if tgt in agents_set and "target item not on board" in str(ev.get("detail", "")):
+                if tgt in agents_set and re.search(r"target item\b.*not on board", str(ev.get("detail", ""))):
                     board_cat_errors.append({
                         "turn": ev.get("turn", 0),
                         "actor": ev.get("actor", ""),

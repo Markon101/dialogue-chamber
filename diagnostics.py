@@ -13,9 +13,11 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlsplit
 
 from context import ContextIntelligence, TokenizerEngine
 from models import get_catalog
+from presets import LIMITS
 from platform_adapter import (
     IS_LINUX,
     IS_TERMUX,
@@ -115,11 +117,13 @@ def run_doctor(endpoints: Dict[str, Any], runs_dir: Path) -> Dict[str, Any]:
         prov = ep.get("provider", "unknown")
         url = ep.get("base_url", "")
         if prov == "llamacpp":
-            # Check local port
+            ep_url = urlsplit(url or "http://127.0.0.1:8080/v1")
+            ep_host = ep_url.hostname or "127.0.0.1"
+            ep_port = ep_url.port or (443 if ep_url.scheme == "https" else 8080)
             try:
-                healthy = sm.check_health("127.0.0.1", 8080, timeout=1.0)
+                healthy = sm.check_health(ep_host, ep_port, timeout=1.0)
                 if healthy:
-                    info = sm.query_server_info("127.0.0.1", 8080, timeout=1.0)
+                    info = sm.query_server_info(ep_host, ep_port, timeout=1.0)
                     add_check("Endpoints", f"Local Endpoint ({ep_name})", "PASS", f"Online ({info.get('model_name')})")
                 else:
                     add_check("Endpoints", f"Local Endpoint ({ep_name})", "INFO", "Offline (will start on experiment launch)")
@@ -177,7 +181,10 @@ def run_context_info(
 
     # 1. Local Llama.cpp Endpoint Inspection
     local_ep = endpoints.get("local", {})
-    local_info = sm.query_server_info("127.0.0.1", 8080, timeout=1.5)
+    local_url = urlsplit(local_ep.get("base_url", "http://127.0.0.1:8080/v1"))
+    local_host = local_url.hostname or "127.0.0.1"
+    local_port = local_url.port or (443 if local_url.scheme == "https" else 8080)
+    local_info = sm.query_server_info(local_host, local_port, timeout=1.5)
     is_local_online = local_info.get("online", False)
 
     loaded_model = local_info.get("model_name") or local_info.get("model_id") or local_ep.get("model", "unknown")
@@ -196,7 +203,7 @@ def run_context_info(
         _, method = tok_engine.count_tokens("test", local_ep)
         tok_available = (method == "exact")
 
-    raw_out_budget = cli_max_output or 1024
+    raw_out_budget = cli_max_output or int(LIMITS.get("max_tokens_per_response", 16384))
     out_budget = min(raw_out_budget, max(128, eff_local_ctx // 2))
     safety_reserve = min(ctx_intel.default_safety_margin, max(64, eff_local_ctx // 4))
     avail_prompt = max(0, eff_local_ctx - (out_budget + safety_reserve))

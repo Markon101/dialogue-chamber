@@ -1,0 +1,192 @@
+{
+  "name": "rh_2026_deep_proof_v2_7a",
+  "description": "Adversarial v2 7-agent stress-test around the Nov 2026 Alpoge-Claude RH/GRH proof: separating nanoda Lean kernel decls from external literature census, unreduced prose gaps (H1-H13), cross-paradigm comparison (Stepanov/F_q vs iterated theta lifts vs Connes Weil form), proof compression from 17.4M lines to a textbook core, and quantitative post-GRH vs ERH/pair-correlation boundaries.",
+  "prompt_layout": "kv_messages",
+  "doc_manifest": "docs/rh_2026_deep/manifest.json",
+  "topic": "ADVERSARIAL PROOF-COMPRESSION, CROSS-PARADIGM ANATOMY & QUANTITATIVE BOUNDARY STRESS-TEST OF THE NOVEMBER 2026 RH/GRH PROOF:\nIn an earlier symposium, models verified Main Inequality `(M)`, the worked lemniscate case, and the 175,187-module Lean release, BUT conflated the `1,484,729` Rust `nanoda` Lean-kernel declarations with arithmetic conductors, and left 8 of the 13 primary/companion documents unread.\n\nTHIS RUN ATTACKS FOUR SHARPER SUB-PROBLEMS ACROSS ALL 13 MOUNTED SOURCES (`docs/rh_2026_deep/manifest.json`):\n1) **Formal-vs-Prose & Verification Hygiene**: Explicitly distinguish (a) the `1,484,729` Lean/Mathlib kernel declarations checked by `nanoda` in `rubinstein_2026_lean_audit`, (b) Rubinstein's external-theorem census & the 4 prose-unreduced hypotheses in Section I.12 of `rubinstein_2026_zeta_guide` (`H2`, `H3`, `H5`, `H9` or whichever hypotheses remain unreduced to classical prose), and (c) Adriazola's `PC-1..PC-7` and `R1-R5` (`adriazola_2026_dep_map`, `naskrecki_2026_riemann_rev`). Identify which missing prose bridge is genuinely hardest to humanize.\n2) **Cross-Paradigm Comparative Anatomy**: Compare three concrete zero-confinement mechanisms directly from the primary texts: Bombieri-Stepanov Hasse-Schmidt differentiation over `F_q` (`stepanov_2008_ff`), Connes' truncated Weil quadratic form extremization (`connes_2026_letter`), and Alpoge-Claude's `sqrt(X)` iterated unitary theta lifts `U(X_0)->...->U(X_m)` + Rallis seesaw (`gan_ichino_2014_ggp`) + Bost slope + Vandiver/Iwasawa weakening (`alpoge_2026_remark`). Pinpoint what breaks when trying to transfer Stepanov or Connes vs why iterated theta lifts succeeded.\n3) **Minimum Viable Proof Compression Blueprint**: Perform a load-bearing vs compressible ablation across `adriazola_2026_dep_map` (Stages 1-10, `LinkDIV`, sixfold cover of `GL_5`, `PC-1..PC-7`) and `adriazola_2026_route_notes` + `rubinstein_2026_zeta_guide`: which scaffolding in the 17.4M-line formalization is essential arithmetic geometry vs disposable Lean library bloat that can be stripped into a concise textbook proof?\n4) **Quantitative Post-GRH Sharpness & ERH Boundaries**: Ground directly in `lamzouri_2013_grh` (exact constants for least quadratic non-residue `n_p` and `L(1, chi)`), `grenie_molteni_2022_classgroup` (the `(4 - 1/(2n)) log^2 Delta` class-group generator bound & Buchmann speedup), `siegel_brauer_2026` (Landau-Siegel zeros over base fields `k` vs Dedekind ERH), and `pair_corr_2026` (why Montgomery pair-correlation strictly sharpens horizontal GRH bounds for primes in APs and non-residues). Map the exact cryptographic boundary (why RSA/GNFS/ECDLP survive while class-group VDFs and deterministic witness bounds tighten).",
+  "mode_text": "ADVERSARIAL PROOF-COMPRESSION & PRIMARY-SOURCE STRESS-TEST PROTOCOL:\n1) **PRIMARY-SOURCE GROUNDING FIRST**: Notice which docs remain unread in Session Status! Run `@DOC_TOC <doc_id>` or `@DOC_SEARCH <doc_id|all> <keywords>` FIRST on large papers, then `@DOC_READ <doc_id> <offset>` before making numerical or theorem claims. Avoid re-reading an already-inspected `(doc @ offset)` shown in `Recent reads` unless verifying a dispute. Cite `[doc_id @ offset]` or exact theorem/section numbers.\n2) **NO SLOPPY CONFLATIONS**: Never conflate Lean/Mathlib `nanoda` kernel declarations (`1,484,729`) with arithmetic conductors, prime bounds, or external-theorem citations.\n3) **COLLABORATION & DIALECTIC**: Use `@CLAIM`, `@CHALLENGE <c1|c2|...>`, `@VOTE <c1|c2|...> yes|no`, `@RETRACT`, `@WHISPER <name>: ...`, and channels `#proof_core` / `#algo_bridge`. Pass turns across ALL 7 specialists (`NEXT: <name>`) rather than locking two speakers together. Only use `@SET_SAMPLING` if intentionally shifting sampling regime.\n4) **ARTIFACTS TO BUILD & VERIFY**:\n- `@APPEND debate_notes: ...` for verified excerpts, exact constants, and cross-document discrepancies.\n- `@APPEND` / `@REPLACE compression_matrix: ...` tracking each component (`Stage 1..10`, `PC-1..PC-7`, `R1-R5`, `H1..H13`, and classical comparators): `Component | Load-Bearing Mechanism | Compressibility / Prose Gap | Primary Citation`.\n- `@REPLACE rh_2026_stress_test_report: ...` to lock ONE rigorous, primary-source-cited technical report (`>= 10000` bytes, ZERO placeholders) with all 8 required sections:\n  `[Executive Synthesis & Adversarial Audit Verdict]`, `[Formal Soundness vs Human Prose Gaps (H1-H13 & External Census)]`, `[Cross-Paradigm Anatomy: Stepanov Over F_q vs Iterated Theta Lifts vs Connes Spectral Program]`, `[GGP Seesaw, LinkDIV & Sixfold GL_5 Load-Bearing Ablation]`, `[Minimum Viable Proof Compression Blueprint (17.4M Lines to Textbook Core)]`, `[ERH, Siegel Zeros Over Base Fields & Higher GL_n Obstructions]`, `[Quantitative Post-GRH Sharpness: Lamzouri, Class Groups, Pair Correlation & Cryptography]`, and `[Open Verification & Compression Research Agenda]`.\nFrom turn 22 onward, vote `@END_RUN: <reason>` once `compression_matrix.md` and `rh_2026_stress_test_report.md` are complete and verified (4 of 7 majority concludes cleanly). Always end with `NEXT: <name>`.",
+  "scheduler": "self_directed",
+  "end_mode": "agent_decided",
+  "end_policy": "majority",
+  "min_turns_before_end": 22,
+  "board_visible": true,
+  "dm_visibility": "notice",
+  "channels": {
+    "proof_core": {},
+    "algo_bridge": {}
+  },
+  "artifacts": {
+    "max_bytes": 1048576,
+    "max_workspace_bytes": 8388608,
+    "max_count": 24,
+    "seed": {
+      "debate_notes": "# Adversarial Proof Stress-Test Notes — Verified Constants, Excerpts & Challenges\n\nRecord exact theorem statements, `nanoda`/axiom counts, unreduced hypotheses, Lamzouri/Grenie-Molteni/Siegel constants, and Stepanov/Connes/GGP comparisons with `[doc_id @ offset]` citations.\n",
+      "compression_matrix": "# Nov 2026 RH/GRH Proof Ablation & Compression Matrix\n\n| Component / Stage / Hypothesis | Load-Bearing Mechanism | Compressibility / Prose Gap / Generalization Barrier | Primary Citation |\n|---|---|---|---|\n",
+      "rh_2026_stress_test_report": "# Adversarial Proof-Compression & Quantitative Boundary Stress-Test of the Nov 2026 RH/GRH Proof\n\nConsolidate ONE definitive, primary-source-cited technical report here via `@REPLACE rh_2026_stress_test_report:` with all 8 required sections:\n- [Executive Synthesis & Adversarial Audit Verdict]\n- [Formal Soundness vs Human Prose Gaps (H1-H13 & External Census)]\n- [Cross-Paradigm Anatomy: Stepanov Over F_q vs Iterated Theta Lifts vs Connes Spectral Program]\n- [GGP Seesaw, LinkDIV & Sixfold GL_5 Load-Bearing Ablation]\n- [Minimum Viable Proof Compression Blueprint (17.4M Lines to Textbook Core)]\n- [ERH, Siegel Zeros Over Base Fields & Higher GL_n Obstructions]\n- [Quantitative Post-GRH Sharpness: Lamzouri, Class Groups, Pair Correlation & Cryptography]\n- [Open Verification & Compression Research Agenda]\n"
+    },
+    "visible": [
+      "rh_2026_stress_test_report",
+      "compression_matrix",
+      "debate_notes"
+    ],
+    "validation": {
+      "artifact": "rh_2026_stress_test_report",
+      "require_modified": true,
+      "min_bytes": 10000,
+      "disallow_placeholders": true,
+      "required_sections": [
+        "[Executive Synthesis & Adversarial Audit Verdict]",
+        "[Formal Soundness vs Human Prose Gaps (H1-H13 & External Census)]",
+        "[Cross-Paradigm Anatomy: Stepanov Over F_q vs Iterated Theta Lifts vs Connes Spectral Program]",
+        "[GGP Seesaw, LinkDIV & Sixfold GL_5 Load-Bearing Ablation]",
+        "[Minimum Viable Proof Compression Blueprint (17.4M Lines to Textbook Core)]",
+        "[ERH, Siegel Zeros Over Base Fields & Higher GL_n Obstructions]",
+        "[Quantitative Post-GRH Sharpness: Lamzouri, Class Groups, Pair Correlation & Cryptography]",
+        "[Open Verification & Compression Research Agenda]"
+      ]
+    }
+  },
+  "limits": {
+    "max_agents": 8,
+    "max_turns": 50,
+    "max_requests": 140,
+    "max_consecutive": 1,
+    "max_dyad_turns": 4,
+    "starvation_turns": 9,
+    "max_tokens_per_response": 16384,
+    "max_total_tokens": 5000000,
+    "max_context_chars": 600000,
+    "max_message_chars": 49152,
+    "max_actions_per_response": 24,
+    "max_dms": 200,
+    "max_channel_posts": 200,
+    "max_board_items": 300,
+    "max_note_chars": 16000,
+    "max_artifacts": 24,
+    "max_artifact_bytes": 1048576,
+    "max_workspace_bytes": 8388608,
+    "artifact_preview_chars": 16000,
+    "artifact_read_chars": 16000,
+    "doc_read_chars": 14000,
+    "max_pending_doc_reads": 8,
+    "max_duration_s": 14400
+  },
+  "endpoints": {
+    "local": {
+      "provider": "llamacpp",
+      "remote": false,
+      "api_key_env": "",
+      "base_url": "http://127.0.0.1:8080/v1",
+      "model": "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
+      "request_timeout_s": 600
+    }
+  },
+  "agents": [
+    {
+      "name": "PROSE_GAP_AUDITOR",
+      "endpoint": "local",
+      "identity": "You are PROSE_GAP_AUDITOR. Inspect `rubinstein_2026_zeta_guide` (especially Section I.12, Hypotheses 1-13, and the external-theorem census) and `adriazola_2026_route_notes`. Distinguish which of H1-H13 already have complete classical prose proofs vs which remain formal-only gaps, and analyze how `adriazola_2026_route_notes` bridges one-sided window bounds and Stepanov determinants.",
+      "focus": "Section I.12 prose gaps across H1-H13, Rubinstein external census, route-notes bridge",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["proof_core"],
+      "temperature": 0.76,
+      "min_p": 0.06,
+      "top_k": 40,
+      "max_tokens": 16384,
+      "context_chars": 450000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "STEPANOV_CONNES_CMP",
+      "endpoint": "local",
+      "identity": "You are STEPANOV_CONNES_CMP. Ground directly in the previously unread papers `stepanov_2008_ff`, `connes_2026_letter`, and `alpoge_2026_remark`. Compare Bombieri-Stepanov's F_q auxiliary polynomial & Hasse-Schmidt hyperderivatives against Connes' truncated Weil quadratic form extremization and Alpoge-Claude's 20-point iterated theta-lift architecture, pinpointing why F_q differentiation and spectral extremization stalled where theta lifts succeeded.",
+      "focus": "Stepanov F_q hyperderivatives vs Connes Weil quadratic form vs Alpoge 20-point theta lifts",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["proof_core"],
+      "temperature": 0.80,
+      "min_p": 0.05,
+      "top_k": 40,
+      "max_tokens": 16384,
+      "context_chars": 450000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "GGP_COMPRESSION_ARC",
+      "endpoint": "local",
+      "identity": "You are GGP_COMPRESSION_ARC. Ground directly in `gan_ichino_2014_ggp` and `adriazola_2026_dep_map` (Stages 3-8, `LinkDIV`, `PC-1..PC-7`, and `R1-R5`). Trace how local theta / Bessel / Fourier-Jacobi seesaw results enter `LinkDIV`, why the sixfold cover of `GL_5` (`mu` period integral & Poincare bound) is needed, and design the load-bearing vs compressible ablation of the 17.4M-line Lean proof.",
+      "focus": "Gan-Ichino GGP seesaw, LinkDIV, sixfold GL_5 cover & Stage 1-10 proof compression",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["proof_core"],
+      "temperature": 0.80,
+      "min_p": 0.05,
+      "top_k": 45,
+      "max_tokens": 16384,
+      "context_chars": 450000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "ERH_SIEGEL_FRONTIER",
+      "endpoint": "local",
+      "identity": "You are ERH_SIEGEL_FRONTIER. Ground directly in `siegel_brauer_2026` and `alpoge_2026_remark` (Stages 7 & 9: Bost slope inequality, Chowla-Selberg/Siegel mass, Behrend-choice Iwasawa tower, Vandiver K-group weakening). Diagnose why Dedekind/Artin ERH over general number fields k and higher GL_n Grand RH remain open despite Q-GRH falling, and what Siegel-zero / Brauer-Siegel bounds (`c(k)`) illustrate about base-field barriers.",
+      "focus": "Arakelov/Iwasawa/Vandiver core plus ERH, base-field Siegel-Brauer & GL_n barriers",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["proof_core", "algo_bridge"],
+      "temperature": 0.82,
+      "min_p": 0.05,
+      "top_k": 45,
+      "max_tokens": 16384,
+      "context_chars": 450000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "LEAN_KERNEL_AUDIT",
+      "endpoint": "local",
+      "identity": "You are LEAN_KERNEL_AUDIT (verify every trusted-computing claim against `rubinstein_2026_lean_audit`, `naskrecki_2026_riemann_rev`, and `adriazola_2026_dep_map`). Inspect the 5 Lean theorems, `#print axioms` (`propext`, `Classical.choice`, `Quot.sound`), and explicitly guard against conflating the 1,484,729 Lean/Mathlib `nanoda` kernel declarations with arithmetic conductors or external literature. Track formal statement fidelity vs human compression targets.",
+      "focus": "Lean/nanoda kernel TCB hygiene, 5 exact theorems, R1-R5 census vs declaration counts",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["proof_core", "algo_bridge"],
+      "temperature": 0.72,
+      "min_p": 0.06,
+      "top_k": 35,
+      "max_tokens": 16384,
+      "context_chars": 450000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "POST_GRH_ALGO_QUANT",
+      "endpoint": "local",
+      "identity": "You are POST_GRH_ALGO_QUANT. Ground directly in the previously unread analytic/algorithmic papers: `lamzouri_2013_grh`, `grenie_molteni_2022_classgroup`, and `pair_corr_2026`. Extract exact explicit constants (`n_p`, `L(1, chi)`, `(4 - 1/(2n)) log^2 Delta` class-group generators, primes in APs), show where vertical pair-correlation STILL beats horizontal GRH, and map exact crypto impacts (RSA/GNFS/ECDLP vs class-group VDFs & witness algorithms).",
+      "focus": "Lamzouri explicit bounds, Grenie-Molteni class groups, pair-correlation & crypto limits",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["algo_bridge"],
+      "temperature": 0.82,
+      "min_p": 0.05,
+      "top_k": 50,
+      "max_tokens": 16384,
+      "context_chars": 450000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "SYNTHESIS_CHAIR",
+      "endpoint": "local",
+      "identity": "You are SYNTHESIS_CHAIR, editor-in-chief of the adversarial stress-test. Push specialists to read unread primary docs (`stepanov_2008_ff`, `gan_ichino_2014_ggp`, `connes_2026_letter`, `alpoge_2026_remark`, `lamzouri_2013_grh`, `grenie_molteni_2022_classgroup`, `siegel_brauer_2026`, `pair_corr_2026`), audit `compression_matrix.md`, and consolidate & lock the 8-section `rh_2026_stress_test_report.md` (`>= 10000` bytes, zero placeholders) before calling for `@END_RUN`.",
+      "focus": "curating compression_matrix.md and locking the 8-section rh_2026_stress_test_report.md",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["proof_core", "algo_bridge"],
+      "temperature": 0.78,
+      "min_p": 0.06,
+      "top_k": 40,
+      "repeat_penalty": 1.06,
+      "max_tokens": 16384,
+      "context_chars": 450000,
+      "reasoning": "medium"
+    }
+  ]
+}

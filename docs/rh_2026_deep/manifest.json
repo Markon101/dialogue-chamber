@@ -1,0 +1,136 @@
+{
+  "manifest_version": 1,
+  "description": "Deep Proof-Architecture & Verification Corpus for the November 2026 Alpoge-Claude RH/GRH Proof: human-readable LaTeX reconstructions, Lean/nanoda kernel audits, finite-field Stepanov, local/global GGP theta correspondence, and analytic/algorithmic consequences.",
+  "documents": [
+    {
+      "id": "alpoge_2026_remark",
+      "title": "Remark on the Formalized Proofs of the Riemann Hypothesis and Generalized Riemann Hypothesis",
+      "authors": "Levent Alpöge (with Claude)",
+      "year": "2026",
+      "source_url": "https://alpo.ge/remark.pdf",
+      "tags": ["RH", "GRH", "Lean4", "theta-lifts", "Stepanov", "timeline"],
+      "summary": "Alpöge's 4-page Nov 20, 2026 announcement and 20-point chronological map: Stepanov determinant, CM curve invariant derivation divisibility, qN=Mk+R quadric, Guinand-Weil sign trick, sqrt(X)-length iterated unitary theta lifts U(X_0)->...->U(X_m), Chowla-Selberg/Siegel mass, Bessel/GGP periods, Rallis seesaw, sixfold cover of GL_5, Bost slope inequality, Vandiver weakening, Behrend Iwasawa tower, ERH pending.",
+      "path": "text/alpoge_2026_remark.txt"
+    },
+    {
+      "id": "rubinstein_2026_zeta_guide",
+      "title": "The Alpöge–Claude proof of the Riemann hypothesis explained for the Riemann zeta function (v2, 265p)",
+      "authors": "Michael Rubinstein (aided by Claude, Codex, Gemini)",
+      "year": "2026",
+      "source_url": "https://math.uwaterloo.ca/~mrubinst/alpoge_claude_grh/zeta-paper_v2.pdf",
+      "tags": ["RH", "main-inequality-M", "13-hypotheses", "lemniscate", "census"],
+      "summary": "265-page classical-ANT reconstruction (v2, Nov 22, 2026): derives RH from Main Inequality (M) and Dirichlet character estimates; reduces (M) to 13 numbered hypotheses; works the lemniscate Gaussian-lattice case in full; provides an Alpöge-remark dictionary and complete census of external theorems used in the Lean codebase.",
+      "path": "text/rubinstein_2026_zeta_guide.tex"
+    },
+    {
+      "id": "rubinstein_2026_lean_audit",
+      "title": "Independent Waterloo Verification of the Alpöge–Claude Lean 4 RH/GRH Release",
+      "authors": "Michael Rubinstein (Waterloo Compute Check)",
+      "year": "2026",
+      "source_url": "https://mrubinst.github.io/grh-lean-verification/",
+      "tags": ["Lean4", "nanoda", "axioms", "statement-fidelity", "TCB"],
+      "summary": "Verification log covering exact SHA-256 of lean.tar.gz (239.3MB), Lean v4.33.1 + Mathlib 0df444a3, static scan for axioms/sorry/native_decide, exact 5 theorem statements (RH + GRH forms), #print axioms (only propext, Classical.choice, Quot.sound), 175,187-module kernel replay, and Rust nanoda check of 1,484,729 declarations.",
+      "path": "text/rubinstein_2026_lean_audit.txt"
+    },
+    {
+      "id": "adriazola_2026_dep_map",
+      "title": "End-to-End Proof Dependency Map & External Theorems Audit of the Alpöge–Claude Proof",
+      "authors": "Jimmie Adriazola (ASU)",
+      "year": "2026",
+      "source_url": "https://github.com/jimjamzola/RH-Alpoge-Reconstruction",
+      "tags": ["dependency-DAG", "stages-1-to-10", "LinkDIV", "external-theorems"],
+      "summary": "Organizes the formalization into 10 reconstructed stages (Stages 1-10: analytic criterion, explicit formula, arithmetic Stepanov, theta-lift divisibility, p-adic gain/Hecke loss, LinkDIV period map, Bost slope/covolume, automorphic/Galois lifting, host field records, positive prime sum) plus catalog of internal packages PC-1..PC-7 and external theorems R1-R5.",
+      "path": "text/adriazola_2026_dep_map.md"
+    },
+    {
+      "id": "adriazola_2026_route_notes",
+      "title": "An End-to-End Mathematical Reconstruction of the Alpöge–Claude Route to the Riemann Hypothesis",
+      "authors": "Jimmie Adriazola (ASU)",
+      "year": "2026",
+      "source_url": "https://github.com/jimjamzola/RH-Alpoge-Reconstruction/blob/main/RH_Route_Notes.pdf",
+      "tags": ["route-notes", "window-bounds", "Stepanov", "Iwasawa", "theta-lifts"],
+      "summary": "Full LaTeX mathematical companion detailing one-sided window theorems, zeros against poles, sampled prime-power sums, numerical experiments, and the bridge from classical explicit formulas to the arithmetic Stepanov and theta-lift machinery.",
+      "path": "text/adriazola_2026_route_notes.tex"
+    },
+    {
+      "id": "naskrecki_2026_riemann_rev",
+      "title": "The Announced Proof of the Riemann Hypothesis: Route Guide & Community Verification Dashboard",
+      "authors": "Bartosz Naskręcki",
+      "year": "2026",
+      "source_url": "https://nasqret.github.io/riemann-rev/",
+      "tags": ["verification-dashboard", "localized-Landau", "slope-inequality", "roadmap"],
+      "summary": "Synthesis of independent verifications (Sutherland, Arledge, DeDeo, Rubinstein), theorem formalization caveats, and a 4-step proof roadmap covering reflection, prime statistics, localized Landau theorem, and slope inequality for iterated theta lifts.",
+      "path": "text/naskrecki_2026_riemann_rev.md"
+    },
+    {
+      "id": "stepanov_2008_ff",
+      "title": "The Riemann Hypothesis for Function Fields over a Finite Field (Stepanov-Bombieri Method)",
+      "authors": "ArXiv Exposition",
+      "year": "2008",
+      "source_url": "https://arxiv.org/abs/0806.0044",
+      "tags": ["Stepanov", "function-fields", "multiplicity", "Bombieri", "Frobenius"],
+      "summary": "Reference exposition of Stepanov's elementary method and Bombieri's simplification over F_q, illustrating how Hasse-Schmidt hyperderivatives force high-order zero multiplicity — the exact obstruction Alpöge and Claude replaced over Z via iterated theta lifts.",
+      "path": "text/stepanov_2008_ff.txt"
+    },
+    {
+      "id": "gan_ichino_2014_ggp",
+      "title": "The Gross–Prasad Conjecture and Local Theta Correspondence",
+      "authors": "Wee Teck Gan, Atsushi Ichino",
+      "year": "2014",
+      "source_url": "https://arxiv.org/abs/1409.6824",
+      "tags": ["GGP", "theta-correspondence", "seesaw", "Bessel-models", "unitary-groups"],
+      "summary": "Foundational Annals/arXiv memoir connecting local unitary/symplectic Gan-Gross-Prasad conjectures for Bessel and Fourier-Jacobi periods directly to the theta correspondence and seesaw dual pairs.",
+      "path": "text/gan_ichino_2014_ggp.txt"
+    },
+    {
+      "id": "connes_2026_letter",
+      "title": "The Riemann Hypothesis: Past, Present and a Letter Through Time",
+      "authors": "Alain Connes",
+      "year": "2026",
+      "source_url": "https://arxiv.org/abs/2602.04022",
+      "tags": ["RH", "Weil-quadratic-form", "trace-formula"],
+      "summary": "Feb 2026 monograph contrasting spectral/noncommutative Weil-form extremization with Alpöge-Claude's arithmetical Stepanov/theta-lift proof.",
+      "path": "text/connes_2026_letter.txt"
+    },
+    {
+      "id": "lamzouri_2013_grh",
+      "title": "Conditional bounds for the least quadratic non-residue and related problems",
+      "authors": "Youness Lamzouri, Xiannan Li, Kannan Soundararajan",
+      "year": "2013/2016",
+      "source_url": "https://arxiv.org/abs/1309.3595",
+      "tags": ["GRH", "n_p", "L(1,chi)", "explicit-bounds", "algorithms"],
+      "summary": "Now-unconditional explicit computable GRH bounds on least quadratic non-residues n_p < (ln p)^2, primes in APs, and L(1, chi).",
+      "path": "text/lamzouri_2013_grh.txt"
+    },
+    {
+      "id": "pair_corr_2026",
+      "title": "Beyond the Riemann Hypothesis bounds: A pair-correlation approach to the least prime in AP and smallest non-residue",
+      "authors": "Neelam Kandhil, Alessandro Languasco, Pieter Moree",
+      "year": "2026",
+      "source_url": "https://arxiv.org/abs/2607.14515",
+      "tags": ["GRH", "pair-correlation", "post-RH-frontiers"],
+      "summary": "Shows what remains conditional even AFTER GRH falls: vertical pair-correlation conjectures on L-function zeros still strictly sharpen horizontal GRH bounds.",
+      "path": "text/pair_corr_2026.txt"
+    },
+    {
+      "id": "siegel_brauer_2026",
+      "title": "Landau–Siegel zeros over a base field and effective Brauer–Siegel",
+      "authors": "William D. Banks",
+      "year": "2026",
+      "source_url": "https://arxiv.org/abs/2610.31402",
+      "tags": ["Siegel-zeros", "Brauer-Siegel", "effective-constants", "ERH-vs-GRH"],
+      "summary": "Quantifies Landau-Siegel lower bounds over general base fields k vs Dedekind/Artin ERH boundaries that Alpöge's Lean formalization has not yet proved.",
+      "path": "text/siegel_brauer_2026.txt"
+    },
+    {
+      "id": "grenie_molteni_2022_classgroup",
+      "title": "Breaking the 4 barrier for the bound of a generating set of the class group",
+      "authors": "Loïc Grenié, Giuseppe Molteni",
+      "year": "2025",
+      "source_url": "https://arxiv.org/abs/2212.09461",
+      "tags": ["GRH", "class-group", "Buchmann-algorithm", "cryptography"],
+      "summary": "Turns unconditional GRH into sub-(4 log^2 Delta) ideal class group generator bounds improving Buchmann's algorithm (vs ERH requirements for non-abelian fields).",
+      "path": "text/grenie_molteni_2022_classgroup.txt"
+    }
+  ]
+}

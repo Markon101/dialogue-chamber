@@ -18,14 +18,15 @@ from presets import SAMPLING_ALIASES, SAMPLING_PARAMS, normalize_sampling_param
 ACTION_TYPES = (
     "SAY", "WHISPER", "PUBLISH", "SUBSCRIBE", "CLAIM", "CHALLENGE", "RETRACT", "VOTE",
     "PROPOSE_NEXT", "SET_TEMPERATURE", "SET_SAMPLING", "SET_STYLE", "PROPOSE_TOPIC", "ARTIFACT_WRITE",
-    "ARTIFACT_READ", "ARTIFACT_LIST", "DOC_LIST", "DOC_READ", "DOC_SEARCH", "UPDATE_NOTE", "FINISH", "END_RUN",
+    "ARTIFACT_READ", "ARTIFACT_LIST", "DOC_LIST", "DOC_TOC", "DOC_READ", "DOC_SEARCH", "UPDATE_NOTE", "FINISH", "END_RUN",
     "CREATE_GROUP", "INVITE_GROUP", "JOIN_GROUP", "LEAVE_GROUP", "COMPEL_GROUP", "RELEASE_GROUP"
 )
 
 ALIASES = {
     "DM": "WHISPER", "PM": "WHISPER", "POST": "PUBLISH", "WRITE": "ARTIFACT_WRITE",
     "APPEND": "ARTIFACT_WRITE", "REPLACE": "ARTIFACT_WRITE", "CREATE": "ARTIFACT_WRITE", "WORLD": "ARTIFACT_WRITE",
-    "READ": "ARTIFACT_READ", "LIST": "ARTIFACT_LIST", "DOCS": "DOC_LIST", "READ_DOC": "DOC_READ",
+    "READ": "ARTIFACT_READ", "LIST": "ARTIFACT_LIST", "DOCS": "DOC_LIST", "TOC": "DOC_TOC",
+    "DOC_INDEX": "DOC_TOC", "DOC_OUTLINE": "DOC_TOC", "READ_DOC": "DOC_READ",
     "SEARCH_DOC": "DOC_SEARCH", "NOTE": "UPDATE_NOTE", "NEXT": "PROPOSE_NEXT",
     "WITHDRAW": "RETRACT", "OBJECT": "CHALLENGE", "TOPIC": "PROPOSE_TOPIC", "STYLE": "SET_STYLE",
     "TEMP": "SET_TEMPERATURE", "TEMPERATURE": "SET_TEMPERATURE",
@@ -41,11 +42,18 @@ JSON_KEYS = {"message", "actions", "next_speaker", "temperature_request", "sampl
 _SAMPLING_CTRL_KEYS = "|".join(sorted((k.upper() for k in SAMPLING_ALIASES if k not in ("temp", "temperature")), key=len, reverse=True))
 CMD_RE = re.compile(r"^\s*[@/]([A-Za-z_]+)\b[ \t]*(.*)$")
 CTRL_RE = re.compile(rf"^\W*(NEXT(?:_SPEAKER)?|TEMP(?:ERATURE)?|{_SAMPLING_CTRL_KEYS})\W*:\s*(.*)$", re.I)
-TAIL_NEXT_RE = re.compile(r"\bNEXT\s*:\s*([A-Za-z][\w]{0,15})\W*$", re.I)
-LABEL_RE = re.compile(r"^\s*[*_]*\[?([A-Za-z][A-Za-z0-9_]{0,15})\]?[*_]*\s*:[*_]*\s*")
+TAIL_NEXT_RE = re.compile(r"\bNEXT\s*:\s*([A-Za-z][\w]{0,23})\W*$", re.I)
+LABEL_RE = re.compile(r"^\s*[*_]*\[?([A-Za-z][A-Za-z0-9_]{0,23})\]?[*_]*\s*:[*_]*\s*")
 TRANSCRIPT_TAG_RE = re.compile(r"^\s*[*_]*(?:[@\[]\s*(?:m\d+|[A-Za-z0-9_]+)\s*\|\s*turn\s*\d+\s*\]\s*)+", re.I)
 PROMPT_SECTION_LEAK_RE = re.compile(
     r"^\s*---\s*(?:Workspace Artifacts|Shared Blackboard|Your Private Scratchpad|Private Whispers|Public Conversation|Channel\b).*---\s*$",
+    re.I,
+)
+_PEER_DIRECTIVE_RE = re.compile(
+    r"^(?:you|your|please|can\s+you|could\s+you|would\s+you|will\s+you|"
+    r"verify|check|confirm|audit|provide|extract|read|draft|focus|pull|run|"
+    r"search|compare|inspect|map|address|clarify|reconcile|quantify|report|"
+    r"update|review|summarize|explain|detail|we\s+need)\b",
     re.I,
 )
 
@@ -74,6 +82,41 @@ def canonicalize_claim_id(raw_target: Any) -> str:
     if re.fullmatch(r"c\d+", cleaned, re.I):
         return cleaned.lower()
     return s
+
+
+def parse_read_offset(raw_offset: Any) -> Tuple[Optional[int], Optional[str]]:
+    """Parse a nonnegative character offset (tolerating brackets, commas, and 'start-end' ranges).
+
+    Returns (offset, None) on success or (None, error_detail) on invalid input.
+    """
+    if isinstance(raw_offset, bool):
+        return None, "offset must be a nonnegative integer (got boolean; e.g. 0 or 12000)"
+    if isinstance(raw_offset, int):
+        if 0 <= raw_offset < 100_000_000:
+            return raw_offset, None
+        return None, f"offset must be a nonnegative integer < 100000000 (got {raw_offset}; e.g. 0 or 12000)"
+    s = str(raw_offset if raw_offset is not None else "").strip()
+    if not s:
+        return 0, None
+    cleaned = re.sub(r"^(?:offset\s*[:=]\s*)", "", s, flags=re.I).strip()
+    cleaned = cleaned.strip("[]()<>`\"'")
+    cleaned = re.sub(r"^(?:offset\s*[:=]\s*)", "", cleaned, flags=re.I).strip()
+    cleaned = cleaned.rstrip(".,;:!?").strip()
+    if not cleaned:
+        return None, f"offset must be a nonnegative integer (got {raw_offset!r}; e.g. 0 or 12000)"
+    if re.fullmatch(r"\d{1,3}(?:,\d{3})+|\d{1,8}", cleaned):
+        val = int(cleaned.replace(",", ""))
+        if val < 100_000_000:
+            return val, None
+    m_range = re.fullmatch(
+        r"(\d{1,3}(?:,\d{3})+|\d{1,8})\s*(?:-|–|—|\.\.)\s*(\d{1,3}(?:,\d{3})+|\d{1,8})",
+        cleaned,
+    )
+    if m_range:
+        start_val = int(m_range.group(1).replace(",", ""))
+        if start_val < 100_000_000:
+            return start_val, None
+    return None, f"offset must be a nonnegative integer (got {raw_offset!r}; e.g. 0 or 12000)"
 
 
 def _strip_trailing_sampling_commentary(raw_spec: str) -> str:
@@ -157,23 +200,38 @@ def canonicalize_agent_id(raw_id: Any, known_names: Optional[Set[str]] = None) -
     if "(" in s and not s.startswith("("):
         s = s.split("(", 1)[0].strip()
     # Strip markdown wrappers, quotes, brackets, @, colons
-    s = re.sub(r"^[@<\[\(\"\'`*]+|[@>\]\)\"\'`*:.,!]+$", "", s).strip()
+    s_outer = re.sub(r"^[@<\[\(\"\'`*]+|[@>\]\)\"\'`*:.,!]+$", "", s).strip()
+    if not s_outer:
+        return None
     # Replace hyphens or spaces with underscores
-    s = re.sub(r"[\s-]+", "_", s)
-    s = re.sub(r"[^A-Za-z0-9_]", "", s).upper()[:16]
+    s_full = re.sub(r"[\s-]+", "_", s_outer)
+    s_full = re.sub(r"[^A-Za-z0-9_]", "", s_full).upper()[:24]
 
-    if not s:
+    if not s_full:
         return None
 
     if known_names:
         upper_names = {k.upper(): k for k in known_names}
-        if s in upper_names:
-            return upper_names[s]
-        # Check if known name is substring or close match
+        if s_full in upper_names:
+            return upper_names[s_full]
+        if s_full in _NO_NOMINATION_TOKENS:
+            return s_full
         for uname, orig in upper_names.items():
-            if s == uname or s == uname.replace("_", ""):
+            if s_full == uname or s_full == uname.replace("_", ""):
                 return orig
-    return s
+        parts = [p for p in re.split(r"[\s,/|—–]+", s_outer) if p]
+        if len(parts) > 1:
+            first = re.sub(r"^[@<\[\(\"\'`*]+|[@>\]\)\"\'`*:.,!]+$", "", parts[0]).strip()
+            first = re.sub(r"-+", "_", first)
+            first = re.sub(r"[^A-Za-z0-9_]", "", first).upper()[:24]
+            if first in upper_names:
+                return upper_names[first]
+            if first in _NO_NOMINATION_TOKENS:
+                return first
+            for uname, orig in upper_names.items():
+                if first == uname or first == uname.replace("_", ""):
+                    return orig
+    return s_full
 
 
 def split_thinking(raw: str, api_reasoning: str = "") -> Tuple[str, str]:
@@ -286,7 +344,7 @@ def _salvage_json(text: str) -> Dict[str, Any]:
         except ValueError:
             out["message"] = s.replace('\\"', '"').replace("\\n", "\n")
 
-    m = re.search(r'"next_speaker"\s*:\s*"([^"]{1,20})"', text)
+    m = re.search(r'"next_speaker"\s*:\s*"([^"]{1,28})"', text)
     if m:
         out["next_speaker"] = m.group(1)
 
@@ -375,11 +433,18 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
             issues.append("ARTIFACT_READ missing artifact name")
             return None
         res["name"] = name
-        offset = res.get("offset", 0)
-        if isinstance(offset, bool) or not re.fullmatch(r"0|[1-9][0-9]{0,7}", str(offset)):
-            issues.append("ARTIFACT_READ offset must be a nonnegative integer")
+        off_val, off_err = parse_read_offset(res.get("offset", 0))
+        if off_err:
+            issues.append(f"ARTIFACT_READ {off_err}")
             return None
-        res["offset"] = int(offset)
+        res["offset"] = off_val
+
+    elif act_type == "DOC_TOC":
+        doc_id = str(res.get("doc_id") or res.get("name") or res.get("target") or "").strip()
+        if not doc_id:
+            issues.append("DOC_TOC missing document id")
+            return None
+        res["doc_id"] = doc_id
 
     elif act_type == "DOC_READ":
         doc_id = str(res.get("doc_id") or res.get("name") or res.get("target") or "").strip()
@@ -387,11 +452,11 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
             issues.append("DOC_READ missing document id")
             return None
         res["doc_id"] = doc_id
-        offset = res.get("offset", 0)
-        if isinstance(offset, bool) or not re.fullmatch(r"0|[1-9][0-9]{0,7}", str(offset)):
-            issues.append("DOC_READ offset must be a nonnegative integer")
+        off_val, off_err = parse_read_offset(res.get("offset", 0))
+        if off_err:
+            issues.append(f"DOC_READ {off_err}")
             return None
-        res["offset"] = int(offset)
+        res["offset"] = off_val
 
     elif act_type == "DOC_SEARCH":
         tgt = str(res.get("target") or res.get("doc_id") or "all").strip() or "all"
@@ -443,6 +508,67 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
 
 def normalize_action(a: Any, issues: List[str], known_names: Optional[Set[str]] = None) -> Optional[Dict[str, Any]]:
     return validate_action_schema(a, issues, known_names)
+
+
+def _split_target_and_offset(raw_rest: str) -> Tuple[str, Any, bool]:
+    """Parse '<target> [offset] [harmless trailing commentary]' for @READ / @DOC_READ.
+
+    Returns (target, offset_or_token, wants_toc).
+    """
+    text = (raw_rest or "").strip()
+    if not text:
+        return "", 0, False
+    text = re.sub(r"\boffset\s*[:=]\s*", "", text, flags=re.I)
+    text = re.sub(r"^([A-Za-z0-9_.-]+)\s*:\s*", r"\1 ", text)
+    text = re.sub(r"(\d)\s*(?:-|–|—|\.\.)\s*(\d)", r"\1-\2", text)
+    parts = text.split()
+    if not parts:
+        return "", 0, False
+    target = parts[0]
+    if len(parts) == 1:
+        return target, 0, False
+    second_clean = parts[1].strip("[]()<>`\"'.,;:!?").lower()
+    if second_clean in ("toc", "index", "outline"):
+        return target, 0, True
+    if len(parts) == 2:
+        return target, parts[1], False
+    off_val, off_err = parse_read_offset(parts[1])
+    if off_err is None and parts[2].startswith(("(", "#", "//", "—", "–", "-", ";", ":")):
+        return target, off_val, False
+    return target, " ".join(parts[1:]), False
+
+
+def _is_chamber_command_line(line: str) -> bool:
+    """True only when line begins with a genuine '@ACTION' or '/ACTION' chamber command."""
+    m = CMD_RE.match(line)
+    if not m:
+        return False
+    w = m.group(1)
+    return w.upper() in ALIASES or w.upper() in ACTION_TYPES or w.lower() in ITEM_KINDS
+
+
+def _is_valid_ctrl_line(line: str, known_names: Optional[Set[str]] = None) -> bool:
+    """True only when line is a well-formed NEXT/TEMP/sampling control line (not prose)."""
+    c = CTRL_RE.match(line.strip())
+    if not c:
+        return False
+    key = c.group(1).upper()
+    val = c.group(2).strip().strip("*`<>[]\"'. ")
+    if not val:
+        return False
+    if key.startswith("NEXT"):
+        if known_names:
+            cand = canonicalize_agent_id(val, known_names)
+            return bool(cand and (cand in known_names or cand in _NO_NOMINATION_TOKENS))
+        return bool(re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,24}", val.split()[0]))
+    if key.startswith("TEMP") and not re.search(r"[|;]", val):
+        try:
+            float(val)
+            return True
+        except ValueError:
+            return False
+    params, err = _parse_sampling_spec(f"{key}: {val}")
+    return bool(params and not err)
 
 
 def _command(word: str, rest: str, lines_after: List[str], known_names: Optional[Set[str]] = None) -> Optional[Dict[str, Any]]:
@@ -518,9 +644,8 @@ def _command(word: str, rest: str, lines_after: List[str], known_names: Optional
         return {"type": "PROPOSE_TOPIC", "content": body or head}
 
     if w == "ARTIFACT_READ":
-        parts = head.split()
-        return {"type": "ARTIFACT_READ", "name": parts[0] if parts else "",
-                "offset": parts[1] if len(parts) == 2 else (0 if len(parts) == 1 else "invalid")}
+        tgt, off_tok, _ = _split_target_and_offset(rest)
+        return {"type": "ARTIFACT_READ", "name": tgt, "offset": off_tok}
 
     if w == "ARTIFACT_LIST":
         return {"type": "ARTIFACT_LIST"}
@@ -528,10 +653,15 @@ def _command(word: str, rest: str, lines_after: List[str], known_names: Optional
     if w == "DOC_LIST":
         return {"type": "DOC_LIST"}
 
+    if w == "DOC_TOC":
+        doc_tok = re.sub(r"^[:\s]+", "", rest).split()[0] if re.sub(r"^[:\s]+", "", rest).strip() else ""
+        return {"type": "DOC_TOC", "doc_id": doc_tok}
+
     if w == "DOC_READ":
-        parts = (head + (" " + body if body else "")).split()
-        return {"type": "DOC_READ", "doc_id": parts[0] if parts else "",
-                "offset": parts[1] if len(parts) == 2 else (0 if len(parts) == 1 else "invalid")}
+        tgt, off_tok, wants_toc = _split_target_and_offset(rest)
+        if wants_toc:
+            return {"type": "DOC_TOC", "doc_id": tgt}
+        return {"type": "DOC_READ", "doc_id": tgt, "offset": off_tok}
 
     if w == "DOC_SEARCH":
         if sep and body:
@@ -601,7 +731,7 @@ def _extract_commands(text: str, p: Parsed, known_names: Optional[Set[str]] = No
             after = []
             if ALIASES.get(word.upper(), word.upper()) == "ARTIFACT_WRITE" and word.upper() != "WORLD":
                 j = i + 1
-                while j < len(lines) and not CMD_RE.match(lines[j]) and not CTRL_RE.match(lines[j].strip()):
+                while j < len(lines) and not _is_chamber_command_line(lines[j]) and not _is_valid_ctrl_line(lines[j], known_names):
                     after.append(lines[j])
                     j += 1
                 i = j
@@ -646,6 +776,12 @@ def sanitize_speaker(text: str, me: str, names: Set[str], flags: List[str]) -> s
             cand = canonicalize_agent_id(m.group(1), names)
             if cand and cand in names:
                 if cand != me:
+                    # Preserve legitimate markdown-bold peer addressing (e.g. after a colon or leading a directive)
+                    if not has_turn_tag and line.lstrip().startswith(("**", "__")):
+                        rest = line[m.end():].strip()
+                        prev_nonempty = next((x.strip() for x in reversed(out) if x.strip()), "")
+                        if prev_nonempty.endswith(":") or _PEER_DIRECTIVE_RE.match(rest):
+                            break
                     flags.append(f"wrote a line as {cand}; reply cut there")
                     line = None
                     break

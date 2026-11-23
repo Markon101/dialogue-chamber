@@ -1,0 +1,1625 @@
+                                                         THE RIEMANN HYPOTHESIS
+                                                  FOR FUNCTION FIELDS OVER A FINITE FIELD
+
+
+
+
+arXiv:0806.0044v2 [math.NT] 9 Jun 2008
+                                                                     MACHIEL VAN FRANKENHUIJSEN
+
+
+                                                 Abstract. The Riemann hypothesis, formulated in 1859 by Bernhard Rie-
+                                                 mann, states that the Riemann zeta function ζ(s) has all its nonreal zeros on
+                                                 the line Re s = 1/2. Despite over a hundred years of considerable effort by
+                                                 numerous mathematicians, this conjecture remains one of the most intriguing
+                                                 unsolved problems in mathematics. On the other hand, several analogues of
+                                                 the Riemann hypothesis have been formulated and proved.
+                                                     In this chapter, we discuss Enrico Bombieri’s proof of the Riemann hy-
+                                                 pothesis for a curve over a finite field. This problem was formulated as a
+                                                 conjecture by Emil Artin in his thesis of 1924. Reformulated, it states that
+                                                 the number of points on a curve C defined over the finite field with q ele-
+                                                                                  √
+                                                 ments is of the order q + O( q). The first proof was given by André Weil
+                                                 in 1942. This proof uses the intersection of divisors on C × C, making the
+                                                 application to the original Riemann hypothesis so far unsuccessful, because
+                                                 spec Z × spec Z = spec Z is one-dimensional. A new method of proof was found
+                                                 in 1969 by S. A. Stepanov. This method was greatly simplified and generalized
+                                                 by Bombieri in 1973.
+                                                     Bombieri’s proof uses functions on C × C, again precluding a direct transla-
+                                                 tion to a proof of the Riemann hypothesis itself. However, the two coordinates
+                                                 on C × C play different roles, one coordinate playing the geometric role of the
+                                                 variable of a polynomial, and the other coordinate the arithmetic role of the
+                                                 coefficients of this polynomial. The Frobenius automorphism of C acts on the
+                                                 geometric coordinate of C × C. In the last section, we make some suggestions
+                                                 how Nevanlinna theory could provide a model for spec Z × spec Z that is two-
+                                                 dimensional and carries an action of Frobenius on the geometric coordinate.
+                                                     The plan of this chapter is as follows. We first give a historical introduction
+                                                 to the Riemann hypothesis for a curve over a finite field and discuss some of
+                                                 the proofs that have been given. In Section 2, we define the zeta function of the
+                                                 curve. To prove the functional equation, we take a brief excursion to the two-
+                                                 variable zeta function of Pellikaan. In Section 3, we reformulate the Riemann
+                                                 hypothesis for ζC (s), and give Bombieri’s proof. In the last section, we compare
+                                                 ζC (s) with the Riemann zeta function ζ(s), and describe the formalism of
+                                                 Nevanlinna theory that might be a candidate for the framework of a translation
+                                                 of Bombieri’s proof to the original Riemann hypothesis.
+                                                     Keywords: zeta function of a curve over a finite field, Riemann hypothesis
+                                                 for a curve over a finite field, Frobenius flow, Nevanlinna theory.
+
+
+
+
+                                                                              1. Introduction
+                                            The Riemann zeta function is the function ζ(s), defined for Re s > 1 by the
+                                         infinite series
+                                                                            1    1    1
+                                         (1.1)                  ζ(s) = 1 + s + s + s + . . . .
+                                                                           2    3     4
+
+                                           2000 Mathematics Subject Classification. Primary 11G20; Secondary 11R58, 14G15, 30D35.
+                                                                                         1
+2                               MACHIEL VAN FRANKENHUIJSEN
+
+
+This function has a meromorphic continuation to the complex plane, with a simple
+pole at s = 1 with residue 1. One can complete this function with the factor ‘at
+infinity’ (related to the archimedean valuation on the real numbers),
+                                      ζR (s) = π −s/2 Γ(s/2),
+to define the function ζZ (s) = ζR (s)ζ(s). This function is meromorphic on C with
+simple poles at s = 0 and 1. It satisfies the functional equation
+                                        ζZ (1 − s) = ζZ (s).
+This is proved by Riemann [26] using the ‘Riemann–Roch’1 formula
+(1.2)                                     θ(t−1 ) = tθ(t),
+              P∞           2 2
+where θ(t) = n=−∞ e−πn t is closely related to the classical theta-function. For
+Re s > 1, the zeta function satisfies the Euler product
+                                             Y    1
+(1.3)                        ζZ (s) = ζR (s)           ,
+                                             p
+                                               1 − p−s
+
+where the product is taken over all prime numbers. It follows that the zeros of ζZ
+all lie in the vertical strip 0 ≤ Re s ≤ 1.2 The Riemann hypothesis states that these
+zeros all lie on the line Re s = 1/2:
+                  Riemann hypothesis: ζZ (s) = 0 implies Re s = 1/2.
+See [26] and [10,13,22–24,28,35] for more information about the Riemann and other
+zeta functions.
+   In this exposition, we prove the Riemann hypothesis for the zeta function of a
+curve over a finite field. Let q be a power of a prime number p, and let m(T, X) be
+a polynomial in two variables with coefficients in Fq , the finite field with q elements.
+The equation
+                                    C : m(T, X) = 0
+defines a curve C over Fq , which we assume to be nonsingular. Let NC (n) be the
+number of solutions of the equation m(t, x) = 0 in the finite set Fqn × Fqn . Thus
+NC (n) is the number of points on C with coordinates in Fqn . A famous theorem of
+F. K. Schmidt of 1931 (see [31], [15, 16, 36], and (3.2) below) says that there exist
+an integer g, the genus of C, and algebraic numbers ω1 , . . . , ω2g , such that3
+                                                     2g
+                                                     X
+                                   NC (n) = q n −          ωνn + 1.
+                                                     ν=1
+
+From the formula for NC (n), the Mellin transform (generating function),
+                                                 ∞
+                                                 X
+                                  MNC (s) =            NC (n)q −ns ,
+                                                 n=1
+
+
+  1This formula goes back to Cauchy and is called a Riemann–Roch formula in Tate’s thesis.
+The classical theta function is defined as ϑ(z, τ ) = ∞       πin2 τ e2πiz , so that θ(t) = ϑ(0, it2 ).
+                                                       n=−∞ e
+                                                     P
+  2It is also known that the zeros do not lie on the boundary of this ‘critical strip’, see [19,
+Theorem 19, p. 58] and [37, Theorem 2.4].
+  3In N (n), also the finitely many points ‘at infinity’ need to be counted.
+         C
+        THE RIEMANN HYPOTHESIS FOR FUNCTION FIELDS OVER A FINITE FIELD                            3
+
+
+can be computed as a rational function of q −s ,
+                                            2g
+                                            X
+                                    1              1            1
+(1.4)         MNC (s) + 2 − 2g =          −                +          .
+                                 1 − q 1−s ν=1 1 − ων q −s   1 − q −s
+We define the zeta function of C by
+                                                 Q2g             −s
+                                                   ν=1 (1 − ων q    )
+                            ζC (s) = q s(g−1)                         ,
+                                                (1 − q )(1 − q −s )
+                                                      1−s
+
+so that MNC is recovered as its logarithmic derivative,
+                                    1 ζC′ (s)
+(1.5)                         −                = MNC (s) + 1 − g.
+                                  log q ζC (s)
+The function ζC satisfies the functional equation ζC (1 − s) = ζC (s). This functional
+equation can be proved using the Riemann–Roch formula
+(1.6)                        l(D) = deg D + 1 − g + l(K − D),
+which is the analogue of (1.2) above. We will take a different approach and prove
+the functional equation in Section 2.2.5 using the two-variable zeta function of
+Pellikaan.
+   Clearly, ζC is a rational function in q −s , and hence periodic with period 2πi/ log q.
+It has simple poles at s = 2kπi/ log q and s = 1+2kπi/ log q, and zeros at the points
+s = logq ων + 2kπi/ log q (ν = 1, . . . , 2g, k ∈ Z). It satisfies an Euler product,
+analogous to (1.3), which converges for Re s > 1,
+                                              Y         1
+                            ζC (s) = q s(g−1)           −s deg v
+                                                                 ,
+                                                v
+                                                  1 − q
+where the product is taken over all valuations of the function field of C. It follows
+that 1 ≤ |ων | ≤ q. Artin4 conjectured that ζC (s) has its zeros on the line Re s = 1/2.
+In terms of the exponentials of the zeros, the numbers ων , this means that
+                                                √
+          Riemann hypothesis for C: |ων | = q for every ν = 1, . . . , 2g.
+It is the analogue of the Riemann hypothesis for ζC . It is trivially verified for
+C = P1 , when g = 0 and ζC does not have any zeros. It was proved by H. Hasse in
+the case of elliptic curves (g = 1), and first in full generality by A. Weil,5 using the
+intersection of divisors with the graph of Frobenius in C×C, and, in his second proof,
+the action of Frobenius on the embedding of C in its Jacobian (see [30, Appendix]).
+Later proofs, based on one of Weil’s proofs, have been given by P. Roquette [29]
+and others. There have been some attempts to translate the first and second proof
+to the situation of the Riemann zeta function, when C is the ‘curve’ spec Z, but
+so far without success, one of the obstacles being that in the category of schemes,
+spec Z × spec Z = spec Z is one-dimensional and not two-dimensional like C × C
+(see [12]).
+
+    4In his thesis [1], Artin only considers quadratic extensions of F (T ), that is, hyperelliptic
+                                                                       p
+curves over Fp . Moreover, in his zeta functions the Euler factors corresponding to the points at
+infinity are missing. Later, F. K. Schmidt [31] introduced the zeta function of a general projective
+curve over an arbitrary finite field.
+    5Weil announced his ideas in 1940 [39, 40] and explained them in 1942 in a letter to Artin [41].
+But the complete proof (see [43, 44]) had to await the completion of his ‘Foundations’ [42].
+4                              MACHIEL VAN FRANKENHUIJSEN
+
+
+   A completely new technique was discovered by Stepanov [33] in 1969, initially
+only for hyperelliptic curves. W. M. Schmidt [32] used his method to reprove
+the Riemann hypothesis for ζC ,6 and a simplified proof was given by Bombieri
+in [3] (see also [5]). Bombieri’s proof uses the graph of Frobenius in C × C and
+the Riemann–Roch formula.7 When Bombieri was studying Stepanov’s proof, in
+order to understand the derivations in a geometric way, he used a standard con-
+nection on the curve. The argument worked only over the prime field because of
+the obstruction arising from iterating the connection p times. However, Bombieri
+found that derivatives of order p gave the Cartier operator, which turned out to
+be the same as taking the p-th power of the function. Thus the final proof does
+not mention connections nor the Cartier operator, and fits on a paper napkin [4].
+We present this proof in Section 3. A shorter exposition of Bombieri’s proof has
+appeared in [38].
+   It is interesting to see the development in these proofs. Gradually, more geometry
+that cannot be translated to the number field case has been taken out. The question
+arises as to what exactly is needed to prove the Riemann hypothesis for curves, and
+what we can learn from this about the Riemann hypothesis for spec Z.
+   Weil’s first proof uses the geometry of C × C, and in particular the intersection
+of the graph of Frobenius with the diagonal. There is some reason to believe that
+no analogue will ever exist for number fields, or else, that constructing an analogue
+is harder than establishing the Riemann hypothesis. His second proof uses the
+Jacobian of C, and again, no analogue may ever be constructed for the integers.
+   Bombieri’s proof uses very little of the geometry of C ×C, but it uses the action of
+Frobenius and Riemann–Roch. Since Tate’s thesis, it is known that the Riemann–
+Roch equality (1.6) translates into formula (1.2). Bombieri’s proof naturally divides
+into two steps. In the first step, he uses the action of Frobenius to obtain a discrete
+flow on the curve (here called the Frobenius flow ), which he analyzes to obtain an
+upper bound for the number of points on the curve, which is a weak form of the
+prime number theorem for the curve (see Table 4.1). One sees that the horizontal
+coordinate of C × C plays an ‘arithmetic’ role, and the vertical coordinate plays
+a ‘geometric’ role (see Remark 3.3). In the second step, he uses the Riemann
+hypothesis for P1 , and the fact that the Frobenius automorphism generates the
+local Galois group (decomposition group) at a point on the curve, to obtain a lower
+bound for the number of points on the curve. Combining the two steps, he first
+obtains the analogue of the prime number theorem with a good error term, and
+from this it is a small step to deduce the Riemann hypothesis (see Lemma 3.1).
+Therefore, one might conclude that the right approach to the Riemann hypothesis
+is to first prove the prime number theorem with a good bound for the error term.
+Looking at the first step of Bombieri’s proof, one might even believe that the key
+to a prime number theorem with a good error bound is to construct a function
+(possibly a Fourier or Dirichlet polynomial, in the spirit of the methods of Baker,
+Gelfond and Schneider) that vanishes at the first N primes to a high order. If one
+could bound the degree of this polynomial, one would obtain an upper bound for
+the number of primes. This would already imply the Riemann hypothesis, so the
+second step becomes unnecessary. In Section 4 we make some speculations about
+how to translate Bombieri’s proof to number theory.
+    6The extension of Stepanov’s proof to a general F by W. M. Schmidt uses hyperderivations.
+                                                     q
+    7Bombieri does not mention C × C, but he uses F̄ (C) ⊗ F̄ (C), i.e., functions on C × C.
+                                                     p        p
+        THE RIEMANN HYPOTHESIS FOR FUNCTION FIELDS OVER A FINITE FIELD                5
+
+
+Remark 1.1. Recently, Alain Connes found a completely new method again [6],
+based on the work of Shai Haran [13, 14], using harmonic analysis on the ring of
+adeles. Connes conjectures that Weil’s explicit formula is obtained as the trace
+of a certain shift operator, and then establishes the positivity of this trace, thus
+proving the Riemann hypothesis for spec Z and for all L-functions associated with
+a Grössencharakter, up to a ‘lemma’ about special functions. He does not use the
+action of Frobenius. (See however Remark 4.1.)
+
+           2. The Zeta Function of a Curve over a Finite Field
+    Throughout, we fix a function field K of transcendence degree one over a finite
+field of characteristic p. We assume that the algebraic closure of Fp in K, i.e., the
+field of constants of K, is Fq , and we choose a function T ∈ K such that K is a
+finite separable extension of the field of rational functions Fq (T ), which we denote
+by q,
+                                      q = Fq (T ).
+Thus,
+                                  K = q[X]/(m(T, X))
+for some polynomial m, irreducible over the algebraic closure F̄p .
+
+The Frobenius Flow. Geometrically, K is the field of functions on a curve C given
+by m(T, X) = 0, and the choice of T corresponds to the choice of a projection
+of C onto P1 . Adding extra coordinates T, X, Y, . . . if necessary, we can obtain a
+nonsingular model for C.
+   Valuations of K correspond to orbits of points on C in the following way. The
+Frobenius automorphism acts on algebraic points in C(F̄p ) by raising each coordi-
+nate of a point to the q-th power,
+                         φq : (t, x, y, . . . ) 7→ (tq , xq , y q , . . . ).
+This action of Frobenius induces a discrete dynamical system on C(F̄p ), which we
+call the Frobenius flow on C (see Figure 3.1). So a point in C(Fqn ) that is not defined
+over a smaller field of constants gives an orbit of this flow of n points. We normalize
+the corresponding valuation of K so that v(f ) equals the order of vanishing of f at
+any one of the points in this orbit.
+
+2.1. The Local Theory. For the local theory of the zeta function, our exposi-
+tion closely follows Tate’s thesis [35]. The completion of K at a valuation v is
+denoted Kv . As is well known, Kv is locally compact. It contains the ring Ov of
+function elements regular at v, which has a single prime ideal
+                                              πv Ov
+of functions vanishing at v. Here, πv is any function that has a simple zero at v.
+The residue class field
+                                K(v) = Ov /πv Ov
+is a finite extension of Fq . We denote its degree over Fq by deg v. This is also the
+length of the corresponding orbit of the Frobenius flow. We write
+                                   qv = q deg v = |K(v)|
+6                             MACHIEL VAN FRANKENHUIJSEN
+
+
+for the cardinality of K(v). By our normalization of the valuations of K, we
+have v(πv ) = 1. The associated norm is
+                                         |α|v = qv−v(α) .
+2.1.1. Additive Characters and Measure. Denote by Kv+ the additive group of Kv ,
+as a locally compact commutative group, and by ξ its general element. The char-
+acter group of Kv+ is determined by the following lemma:
+Lemma 2.1 ([35, Lemma 2.2.1]). If ξ 7→ χ(ξ) is one nontrivial character of Kv+ ,
+then for each η ∈ Kv+ , ξ 7→ χ(ηξ) is also a character of Kv+ . The correspondence
+η ←→ χ(ηξ) is an isomorphism, both topological and algebraic, between Kv+ and its
+character group.
+   To fix the identification of Kv+ with its character group promised by this lemma,
+we must construct a special nontrivial character. We first construct additive char-
+acters for q = Fq (T ). The restriction of v to q is either a multiple of a P -adic
+valuation, for an irreducible polynomial P , or a multiple of v∞ , the valuation at
+infinity, corresponding to P (T ) = 1/T . Let qP be the completion of q at P . Thus
+each element of qP is a Laurent series of terms aT k P n , for a ∈ Fq , 0 ≤ k < deg P
+(k = 0 if P = 1/T ), with only finitely many terms with a negative power of P .
+   Recall that the characteristic of q is p. We identify Fp with Z/pZ, so that for
+t ∈ Fp , the rational number t/p is well defined modulo Z. Define a character χP
+on qP as follows: If P (T ) = 1/T , then
+                                (
+                          n
+                                  1                    if n 6= −1
+(2.1)             χ∞ (aT ) =            2πi
+                                  exp − p TrFq /Fp (a)    if n = −1,
+where TrFq /Fp (a) denotes the trace of a ∈ Fq over Fp = Z/pZ. If P (T ) is an
+irreducible monic polynomial of degree d with coefficients in Fq , then we put for
+0 ≤ k ≤ d − 1 and a ∈ Fq ,
+                            (
+                              1                 if n 6= −1 or 0 ≤ k ≤ d − 2
+(2.2)      χP (aT k P n ) =       2πi
+                              exp p TrFq /Fp (a)  if n = −1 and k = d − 1.
+See [35, Lemma 2.2.2] for a proof of the following lemma.
+Lemma 2.2. ξ 7→ χP (ξ) is a nontrivial, continuous additive map of qP into the
+unit circle group.
+   Unlike in the number field case, it is not true that χP (ξ) = 1 if and only if ξ is a
+P -adic integer. In fact, χP depends only on the coefficient of 1/P (or of 1/T at the
+infinite valuation). We will see the geometric meaning of χP and χ∞ by relating it
+to a residue.
+Lemma 2.3. Let P be an irreducible monic polynomial of degree d with coefficients
+in Fq . Let q(P ) be the residue class field Fq [T ]/(P ). Then
+                                           (
+                               Tk                 0 if 0 ≤ k ≤ d − 2
+                 Trq(P )/Fq    ′
+                                     + (P ) =
+                              P (T )              1 if k = d − 1.
+Proof. Let t1 , . . . , td be the roots of P in q(P ). Then,
+                                                       X d
+                                         Tk                     tki
+                           Trq(P )/Fq            + (P ) =               .
+                                        P ′ (T )          i=1
+                                                              P ′ (ti )
+      THE RIEMANN HYPOTHESIS FOR FUNCTION FIELDS OVER A FINITE FIELD                       7
+
+
+We can lift P to a polynomial Pe over a number field F that reduces to P modulo a
+prime ideal p of F above p with residue class field Fq . The roots of Pe then reduce to
+the roots ti modulo a prime ideal above p in the splitting field of Pe . Since the roots
+of P are all distinct, so are those of Pe . The lemma now follows from the following
+more general lemma, which asserts that the required equality already holds without
+taking the class in Fq .                                                              
+Lemma 2.4. Let m(X) be a monic polynomial over C of degree d without repeated
+roots. Let a1 , . . . , ad ∈ C be the roots of m. Then
+                             d
+                                          (
+                            X     aki       0 for 0 ≤ k ≤ d − 2,
+                                  ′
+                                        =
+                            i=1
+                                m (ai )     1 for k = d − 1.
+Proof. Consider the contour integral
+                                    Z
+                                              z k dz
+                                I=
+                                          Γr m(z) 2πi
+over the circle of radius r, large enough so that it encloses all the roots a1 , . . . , ad .
+By the residue theorem,
+                                       X d
+                                             aki
+                                    I=               .
+                                        i=1
+                                            m′ (ai )
+On the other hand, for large values of r,
+                                      Z
+                                          z k dz
+                                 I→         d
+                                                 ,
+                                       Γr z 2πi
+so that I = 0 if 0 ≤ k ≤ d − 2 and I = 1 for k = d − 1.                                    
+Remark 2.5. Lemma 2.3 is due to Euler. See [2, p. 90] or the proof of [34, Theorem
+III.5.10, p. 97] for a more elementary proof.
+   Applying Lemma 2.3 to Definition (2.2), we may write for n ≥ −1,
+                                                                    
+                             2πi                       P
+       χP (aT k P n ) = exp      TrFq /Fp Trq(P )/Fq      aT k n
+                                                              P  + (P )    .
+                              p                        P′
+In this formula, we do not need to assume anymore that P is monic. Note that it
+also gives the right value in the case P = 1/T for n ≥ 1, by Definition (2.1).
+                           R
+Remark 2.6. In general, Γr z k mn (z) dz/2πi vanishes for n 6= −1, if Γr encircles
+every root of m. This follows for n ≤ −2 by the same limit argument as in the
+proof of Lemma 2.4, and for n ≥ 0, it follows since the integrand is holomorphic.
+Therefore, we could write the character symbolically as
+                                                 I        
+                                     2πi                dT
+                      χP (ξ) = exp       TrFq /Fp     ξ       ,
+                                       p            P   2πi
+where the notation indicates that all the roots of the polynomial P are to be
+encircled. This motivates the following definition.
+Definition 2.7. For a Laurent series ξ = xn P n + xn+1 P n+1 + . . . , with xi ∈ Fq [T ]
+of degree deg xi < deg P , the sum of the residues of ξ at the points where P vanishes
+is
+                          resP (ξ) = Trq(P )/Fq (x−1 /P ′ + (P )).
+8                           MACHIEL VAN FRANKENHUIJSEN
+
+
+   And for a Laurent series ξ = an T −n + an+1 T −n−1 + . . . with coefficients ai ∈ Fq ,
+the residue at infinity is
+                                     res∞ (ξ) = −a1 .
+   With these definitions, we can simply write, for an irreducible polynomial P
+or P = 1/T ,
+                                                           
+                                     2πi
+                       χP (ξ) = exp      TrFq /Fp (resP (ξ)) .
+                                      p
+Note that for P 6= 1/T , χP is trivial on OP . On the other hand, χ∞ is trivial on
+the ideal T −2 O∞ of O∞ .
+   After these preliminaries for q = Fq (T ), it is easy to construct a character on Kv+ .
+Recall that we have chosen a function T such that K is a finite separable extension
+of q. Define for ξ ∈ Kv+ ,
+                                 χv (ξ) = χP (Trv/P (ξ)),
+where vP is the restriction of v to q and Trv/P denotes the trace from Kv to qP .
+Recalling that Trv/P is an additive continuous map of Kv onto qP , we see that χv
+is a nontrivial character of Kv+ . By Lemma 2.1, we have proved:
+Theorem 2.8. Kv+ is naturally its own character group if we identify the character
+ξ 7→ χv (ηξ) with the element η ∈ Kv+ .
+    The different of Kv over qP is defined by
+                 d−1
+                  v/P = {η ∈ Kv : Trv/P (ηξ) ∈ OP for all ξ ∈ Ov }.
+
+The different is clearly an Ov -module that contains Ov . Moreover, by separability,
+it is not all of Kv . Therefore,
+                                   dv/P = πvd(v/P ) Ov
+for some exponent d(v/P ) ≥ 0.
+Lemma 2.9. Let v be a finite valuation. The character ξ 7→ χv (ηξ) associated
+with η is trivial on Ov if and only if η ∈ d−1v/P .
+   For an infinite valuation, that is, v(T ) < 0, the character ξ 7→ χv (ηξ) associated
+with η is trivial on Ov if and only if η ∈ T −2 d−1v/∞ .
+
+Proof. We only prove this for a valuation above infinity. Let η ∈ T −2 d−1    v/∞ . Then
+T 2 η lies in the inverse different, hence for ξ ∈ Ov , we have Trv/∞ (T 2 ηξ) ∈ O∞ . By
+linearity of the trace, Trv/∞ (ηξ) ∈ T −2 O∞ , so that the character value χv (ηξ) is 1.
+    If η 6∈ T −2 d−1                                                   2
+                  v/∞ , then we can find ξ ∈ Ov such that Trv/∞ (T ηξ) 6∈ O∞ . This
+                                                              −n−2
+means that Trv/∞ (ηξ) has an expansion of the form an T             + an+1 T −n−3 + .. . ,
+where an 6= 0 and n ≤ −1. Then T        n+1
+                                            ξ ∈ Ov , and χv (ηT n+1
+                                                                    ξ) = exp − 2πi
+                                                                                 p an is
+nontrivial.                                                                             
+   The ramification index of a valuation v that restricts to v∞ on q (i.e., v(T ) < 0)
+is denoted by e(v/∞) (also see (3.9)). The canonical exponent is defined by
+                (
+                  d(v/P )              if v(T ) ≥ 0 and v restricts to vP ,
+(2.3)     kv =
+                  d(v/∞) − 2e(v/∞) if v(T ) < 0.
+      THE RIEMANN HYPOTHESIS FOR FUNCTION FIELDS OVER A FINITE FIELD                   9
+
+
+In particular, kP = 0 for every finite valuation of q, and k∞ = −2. The last lemma
+can be summarized as follows: the character χv (ηξ) is trivial on ξ ∈ Ov if and only
+if η ∈ πv−kv Ov . In general, kv ≥ 0, but above infinity, the canonical exponent
+may be negative. Moreover, itPdepends on the choice of the function T in K. In
+Section 2.2.2 we will see that v kv v is a canonical divisor of the curve C.
+  Let µ be a Haar measure for Kv+ . As in [35, Lemmas 2.2.4 and 2.2.5], for a
+measurable set M in Kv+ and α 6= 0 in Kv ,
+                                    µ(αM ) = |α|v µ(M ).
+This explains our choice of normalization for the absolute value: the norm |α|v is
+the factor by which the additive group Kv+ is stretched under the transformation
+ξ 7→ αξ. For the integral, this means that
+                      Z                        Z
+                            f (ξ) µ(dξ) = |α|v   f (αξ) µ(dξ).
+                        Kv+                      Kv+
+
+   Let us now select a fixed Haar measure for the additive group Kv+ . Theorem 2.8
+enables us to do this in an invariant way by selecting the measure which is its own
+Fourier transform under the interpretation of Kv+ as its own character group estab-
+lished in that theorem. We state the choice of measure which does this, writing dv ξ
+instead of µ(dξ) and qv = q deg v . Define
+              dv ξ = that measure for which Ov gets measure qv−kv /2 .
+   The Fourier transform is defined for integrable functions, and the inversion for-
+mula holds for integrable continuous functions for which the Fourier transform is
+also integrable. See [35, Theorem 2.2.2] for details.
+Theorem 2.10. If we define the Fourier transform Fv f of an integrable continuous
+function f by
+                                   Z
+(2.4)                   Fv f (η) =     f (ξ)χv (ηξ) dv ξ,
+                                          Kv+
+
+then with our choice of measure, the following inversion formula holds:
+                          Z
+                  f (ξ) =    Fv f (η)χv (−ξη) dv η = Fv Fv f (−ξ)
+                              Kv+
+
+Example 2.11. For the field q = Fq (T ) of rational functions, the indicator   Pfunction
+p0P of the set OP is self-dual for every finite valuation vP
+                                                           P . Indeed, for ξ =         n
+                                                                                 n xn P ,
+                                                             ∞          n
+we have χP (ξ) = χP (x−1 /P ). Given η 6∈ OP , say η = n=−N yn P for some N > 0
+and y−N 6= 0, we can find an elementR       ξ = xP N −1 ∈ OP such that χP (ηξ) is not
+trivial. Therefore, the integral OP χP (ηξ) dP ξ vanishes for η 6∈ OP , and by our
+choice of Haar measure, it equals 1 for η ∈ OP . Therefore, p0P is its own Fourier
+transform.
+   For the valuation at infinity, we find similarly that the indicator function p1∞ of
+the maximal ideal T −1 O∞ is its own Fourier transform.
+2.1.2. Multiplicative Characters and Measure. Our first insight into the structure
+of the multiplicative group Kv∗ of Kv is given by the continuous homomorphism
+α 7→ |α|v of Kv∗ into the multiplicative group of powers of qv = q deg v . The kernel
+of this homomorphism, the subgroup of all α with |α|v = 1, is denoted by Ov∗ . This
+group is compact and open.
+10                               MACHIEL VAN FRANKENHUIJSEN
+
+
+  Concerning the characters of Kv∗ , the situation is different from that of Kv+ .
+Indeed, we are interested in all continuous multiplicative maps of Kv∗ into the
+complex numbers, not only the bounded ones, and shall call such a map a quasi-
+character. We call a quasi-character unramified if it is trivial on Ov∗ . The reader
+may find in [35, Section 2.3] a (partial) description of the characters of Ov∗ . We will
+only be concerned with unramified characters.
+
+Lemma 2.12. The unramified quasi-characters are the maps of the form
+
+                                                |α|sv = qv−sv(α) ,
+
+where s is determined modulo 2πi/ log qv .
+
+   As in [35, Section 2.3], we will be able to select a Haar measure d∗v α on Kv∗ by
+relating it to the measure dv ξ on Kv+ . We will need a multiplicative Haar measure
+that gives the subgroup Ov∗ unit measure.8 To this effect we choose as our standard
+Haar measure on Kv∗ :
+                                                        k /2
+                                                      qv v    dv α
+                                           d∗v α =         −1 |α| .
+                                                     1 − qv      v
+
+Since Ov = Ov∗ ∪ πv Ov is a disjoint union, we obtain
+
+Lemma 2.13. The measure d∗v α gives Ov∗ unit volume.
+
+2.1.3. The Local Zeta Function. The computations are as in [35, Section 2.5, p. 319],
+the p-adic case. We present here only the case when the multiplicative character is
+unramified.
+   We use the notation pnv to denote the indicator function of the set πvn Ov . We
+have the Fourier transform
+
+(2.5)                                  Fv pnv = qv−n−kv /2 pv−n−kv .
+
+The local zeta function is the Mellin transform,
+                                       Z                        ∞
+                                                                X                 qv−ns
+(2.6)                 ζv (pnv , s) =            |α|sv d∗v α =         qv−ks =            .
+                                       πvn Ov                   k=n
+                                                                                1 − qv−s
+
+Its dual is
+                                                                      (n+k )s
+                                                                     qv v
+                                ζv (Fv pnv , s) = qv−n−kv /2                  .
+                                                                     1 − qv−s
+The local zeta function is periodic with period 2πi/ log qv , hence also with period
+2πi/log q, independent of v.
+
+2.2. The Global Theory. We refer to [35, Section 3] for the theory of abstract
+restricted direct products.
+
+
+     8This choice is different from Tate’s, who does not include the factor q kv /2 .
+                                                                                      v
+        THE RIEMANN HYPOTHESIS FOR FUNCTION FIELDS OVER A FINITE FIELD                 11
+
+
+2.2.1. Additive Theory. Write AK for the ring of adeles of K with measure
+                                      Y
+                                 dx =     dv xv .
+                                                       v
+We define a character on AK by
+                                                      Y
+                                          χ(x) =            χv (xv )
+                                                        v
+for an adele x = (xv )v . Since the different dv/P is nontrivial for only finitely many v,
+it follows that AK is its own character group via the identification x 7→ χ(yx) of an
+adele y with a character on the adeles.
+    The Fourier transform of an integrable function f on the adeles is defined by
+                                          Z
+                                F f (y) =      χ(yx)f (x)dx.
+                                                    AK
+Note that the Fourier transform is almost an involution: F Ff (x) = f (−x) for every
+continuous integrable function for which the Fourier transform is also integrable.
+   We get an additive fundamental domain AK /K of unit volume. Note that AK /K
+can be identified with a subgroup of AK , unlike in the number field case (see
+also [35, Lemma 4.1.4]).
+Example 2.14. We compute A/q for q = Fq (T ) by a procedure reminiscent of the
+computation of the partial fraction decomposition (see Lemma 2.15 below). Let x
+be an adele. For each finite P -adic valuation, substract a rational function of the
+form f /P k to cancel the denominator of x. Thus we can substract an element
+of q so that each finite component of x becomes a regular function in OP . Then
+we can still substract a polynomial from the infinite component of x, so that this
+component can be brought into T −1 O∞ . We find
+                                                Y
+                           A/q = T −1 O∞ ×          OP .
+                                                              P 6=1/T
+          −1
+Since T        O∞ and each OP have unit volume, A/q has unit volume.
+    The character χ on the adeles has the global property that χ(ξ) = 1 for every
+ξ ∈ K. This explains our particular choice of local characters. To show this, we
+first need a lemma.
+Lemma 2.15. A rational function f has a partial fraction decomposition,
+                                                 −vP (f )
+                                     X            X
+(2.7)                 f (T ) =                              fP,n (T )P −n + f∞ (T ),
+                                 P : vP (f )<0    n=1
+
+where each fP,n is a polynomial in T of degree less than deg P, and f∞ is a poly-
+nomial in T .
+Proof. Let P be an irreducible polynomial such that vP (f ) < 0. Thus, P is a factor
+of the denominator of f . Let n be the exponent of P in the denominator. Compute
+the class of P n f modulo P . Thus we find a polynomial fP,n of degree less than
+deg P such that f − fP,n P −n has the same factors in its denominator as f , to the
+same power, except that P occurs to a lower power. We continue until
+                                      X
+                                  f−     fP,n P −n
+has a trivial denominator, and hence is a polynomial f∞ (T ).                           
+12                          MACHIEL VAN FRANKENHUIJSEN
+
+
+Lemma 2.16. For every ξ ∈ K we have χ(ξ) = 1.
+Proof. We prove this directly for K = q. It then follows in general from the
+definition of χv .
+   Let ξ ∈ q be a rational function, and compute the partial fraction decomposition
+of ξ. We show that each term in (2.7) contributes trivially to χ(ξ).
+   First, for an irreducible polynomial Q, χQ (f∞ ) = 1. Also χ∞ (f∞ ) = 1 since f∞
+does not have a 1/T -term. Hence χ(f∞ ) = 1.
+   Let
+                                      fP,n P −n
+be a term in the partial fraction decomposition of ξ and assume n ≥ 2. Then
+χQ (fP,n P −n ) = 1 for Q 6= P and for Q = P since n ≥ 2. Also χ∞ (fP,n P −n ) = 1,
+since the degree of fP,n P −n is at most deg P − 1 − n deg P ≤ −2.
+   Finally, a term fP,1 /P does not contribute in χQ for every irreducible polynomial
+Q 6= P . Assume that P is monic and write
+                        fP,1 (T ) = a0 + a1 T + · · · + ad−1 T d−1,
+where d = deg P and ai ∈ Fq . The contribution of χP is obtained from the
+trace over Fp of ad−1 . Further, for i ≤ d − 2, χ∞ (ai T i /P ) = 1 because this
+rational function has degree ≤ −2. Also, ad−1 T d−1 /P = ad−1 /T + O(T −2 ), since P
+is monic. Hence the contribution of χ∞ is obtained from the trace over Fp of −ad−1 ,
+which cancels the contribution of χP . It follows that χ(ξ) = 1.                   
+  As in [35, Theorem 4.1.4], it follows that the group of characters that are trivial
+on K is K ⊥ = K.
+2.2.2. The Theorem of Riemann–Roch. From the Poisson Summation Formula [35,
+Lemma 4.2.4], we deduce the theorem of Riemann–Roch [35, Theorem 4.2.1],
+                         X             1 X
+                             f (ξa) =      F f (ξ/a),
+                                      |a|
+                             ξ∈K                ξ∈K
+
+where the norm of the idele a is defined by
+                                        Y
+(2.8)                             |a| =    |av |v .
+                                            v
+
+Definition 2.17. We define the average of f by
+                                   p     X
+                          Ef (a) = |a|       f (αa).
+                                                α∈K ∗
+
+   More precisely, E is the combination of a restriction (to the ideles) and a trace
+(the sum over K ∗ ) [7]. It is not a true average over K ∗ , because this set is infinite.
+In terms of the average, the theorem of Riemann–Roch reads
+(2.9)            Ef (a) + f (0)|a|1/2 = E(F f )(1/a) + F f (0)|a|−1/2 .
+Remark 2.18. Clearly, E(F Ff ) = Ef , so that the Fourier transform induces an
+involution on the image of the averaging map, even though it is not itself an in-
+volution. This is because the averages of f (x) and f (−x) coincide. In general, the
+averages of f (x) and f (αx) coincide, for any α ∈ K ∗ . Thus the average of f only
+depends on the class of the idele a in A∗ /K ∗ . If f only depends on the associated
+divisor, then Ef (D) depends only on the class of D and on its degree.
+      THE RIEMANN HYPOTHESIS FOR FUNCTION FIELDS OVER A FINITE FIELD                          13
+
+                                         P
+   A divisor is a formal sum D =             v Dv v, with Dv      ∈ Z. The divisor is called
+positive,
+                                           D ≥ 0,
+if all coefficients Dv are positive. The degree of D is
+                                          X
+                                  deg D =     Dv deg v.
+                                              v
+An idele a corresponds to a divisor,
+                                             X
+                                    (a) =          v(av )v.
+                                              v
+
+The degree of an idele satisfies |a| = q − deg(a) by (2.8). A function α ∈ K ∗ gives a
+principal divisor                         X
+                                   (α) =      v(α)v.
+                                               v
+
+Remark 2.19. See [45, Theorem IV.4.5] or [20, Lemma 7] for a proof that |α| = 1.
+That is, a function has as many zeros as poles.
+   To see the geometric significance of the theorem of Riemann–Roch, take
+                                         Y
+(2.10)                           f (x) =    p0v (xv ),
+                                               v
+                                                                     P
+where p0v denotes
+               the indicator function of Ov . Let D =                   v Dv v be a divisor and
+let aD = πvDv v be a corresponding idele. Then
+                                                       (
+                              Y                            1   if (ξ) + D ≥ 0
+(2.11)           f (ξaD ) =       p0v (πvv(ξ)+Dv ) =
+                              v
+                                                           0   otherwise.
+The functions ξ ∈ K with (ξ) + D ≥ 0 form a vector space over Fq ,
+                      L(D) = {ξ ∈ K : ξ = 0 or (ξ) + D ≥ 0}.
+It is the vector space of functions having pole divisor bounded by D. We denote
+its dimension over Fq by l(D),
+                                  l(D) = Fq - dim L(D).
+By (2.11),
+                                   X
+(2.12)                                   f (ξaD ) = q l(D) .
+                                   ξ∈K
+
+  Let the canonical divisor of C be the divisor
+                                       X
+                                  K=       kv v.
+                                               v
+
+We define the genus of C (or of the function field K) by
+                               1              1X
+                      g = 1 + deg K = 1 +           kv deg v.
+                               2              2 v
+                                                               −k /2
+Hence deg K = 2g − 2. By Equation (2.5), Fv p0v = qv v p−k
+                                                         v
+                                                           v
+                                                             . Thus we find that
+                                          Y
+                          F f (x) = q 1−g   p−k
+                                             v
+                                                v
+                                                  (xv ).
+                                                   v
+14                        MACHIEL VAN FRANKENHUIJSEN
+
+
+Therefore                             (
+                                          q 1−g       if (ξ) − D ≥ −K
+                       F f (ξ/a) =
+                                          0           otherwise.
+      P
+Hence ξ∈K F f (ξ/a) = q 1−g q l(K−D) . Since 1/|a| = q deg D , we obtain the theorem
+of Riemann–Roch in the classical formulation:
+Theorem 2.20. Let C be a curve of genus g with field of constant functions Fq .
+Let K be a canonical divisor on C and let D be a divisor. The vector space over Fq
+of functions f such that (f ) + D is positive has dimension l(D) given by
+                         l(D) = deg D + 1 − g + l(K − D).
+
+   It follows that g is an integer (hence the degree of K is even). For D = 0 we have
+L(0) = Fq and hence l(0) = 1. Putting D = 0 in the Riemann–Roch formula, we
+find g = l(K), so that g ≥ 0. See [2, 34] for the connection with differentials on C.
+Example 2.21. By the computation of kv for q, we see that the canonical divisor
+of P1 has degree −2, hence P1 has genus 0.
+Example 2.22. A curve of genus 1 always has a rational point. Indeed, by Theo-
+rem 2.27 below, we can find a divisor D of degree 1. By Riemann–Roch, l(D) = 1,
+hence D is linearly equivalent (see Definition 2.23 below) to a positive divisor of
+degree 1, which is a point on C.
+  Similarly, a curve of genus 0 always has a rational point.
+2.2.3. Multiplicative Theory. The multiplicative group of AK is A∗K , the group of
+ideles. It is the multiplicative group of vectors (av ), av ∈ Kv∗ , such that av ∈ Ov∗
+for almost all v. It contains the subgroup
+                                      A∗0 = ker | · |
+of ideles of degree zero. A∗0 is a refinement of the group of divisors of degree zero,
+and A∗0 /K ∗ is a refinement of the ideal class group of K. By Lemma 2.13, the
+measure
+                                            Y
+                                     d∗ a =   d∗v av
+                                                  v
+     ∗
+                           Q    ∗     ∗
+on A gives the subgroup      v Ov of A0 unit measure.
+
+Definition 2.23. Two divisors D and D′ are linearly equivalent if D − D′ is the
+divisor of a function on C.
+   Thus D + (α) gives all divisors equivalent to D, for α ∈ K ∗ . By Remark 2.19,
+linearly equivalent divisors have the same degree. We write Cl(n) for the set of
+linear equivalence classes of divisors of degree n. Thus Cl(0) is a group, the divisor
+class group of C. Let P be a divisor of degree n. Then D 7→ P + D gives a bijection
+between the classes of degree 0 and of degree n. Thus if Cl(n) is not empty, then
+the number of classes in Cl(n) equals that of Cl(0). We will see in Theorem 2.27
+below that there exist divisors of every degree, so Cl(n) is never empty. We write
+                                      h = |Cl(0)|
+for the class number of C over Fq .
+      THE RIEMANN HYPOTHESIS FOR FUNCTION FIELDS OVER A FINITE FIELD                    15
+
+
+Example 2.24. Let C be a curve of genus 0 and let D be a divisor of degree zero.
+By the Riemann–Roch formula, l(D) ≥ 1, hence there exists a function f such that
+(f ) + D ≥ 0. Since the degree of this divisor is zero, we have that D = (1/f ). This
+shows that h = 1.
+    In general, let D be a divisor of degree zero such that l(D) ≥ 1. Then there
+exists a function f such that D + (f ) ≥ 0, so that D is linearly equivalent to the
+trivial divisor. Then l(D) = 1, since nonconstant functions always have poles. On
+the other hand, l(D) = 0 for every nontrivial divisor class of degree zero.
+Theorem 2.25. The number of linear equivalence classes in each degree is finite.
+Proof. For deg D ≥ g we have l(D) ≥ 1 + l(K − D) ≥ 1. Hence there exists
+a function α such that D + (α) ≥ 0. It follows that the class of a divisor of
+degree ≥ g is represented by a positive divisor. Since there are only finitely many
+valuations of each degree, the number of elements of Cl(n) is finite for n ≥ g. But
+|Cl(0)| = |Cl(n)| if Cl(n) is not empty, so h is finite.                          
+    The volume of the group of idele classes A∗0 /K ∗ is found as follows: Choose ideles
+c1 , . . . , ch of degree zero representing each class. Given an idele of degree 0, we can
+first divide by a ci to make its class trivial. Then we can divide by a function to
+make it a unit everywhere, and finally, we can divide by a constant function in F∗q
+to make the value of this unit 1 at one fixed valuation of degree 1, or, if such a
+valuation does    Q not   exist, we can normalize the idele in a similar manner using F∗q .
+The group v Ov has unit volume. Also, F∗q contains q − 1 elements. Hence the
+                       ∗
+
+volume of A∗0 /K ∗ , denoted κ, is given by
+                                                          h
+(2.13)                              κ = vol(A∗0 /K ∗ ) =     .
+                                                         q−1
+Unlike the number field case, A∗0 /K ∗ can be identified with a subgroup of A∗0 , even
+if there is more than one valuation above infinity. (See also [35, Section 4.3].)
+2.2.4. The Zeta Function. As in [35], for a function f on the adeles such that f
+and F f are of fast decay as |a| → ∞, the zeta function is defined for Re s > 1 by
+                                        Z
+(2.14)                      ζC (f, s) =   f (a)|a|s d∗ a.
+                                                  A∗
+   This definition is not natural, since we integrate the additive function f over the
+multiplicative group A∗ . However, by summing over K ∗ , we obtain in terms of the
+average,9
+                                     Z
+(2.15)                   ζC (f, s) =       Ef (a)|a|s−1/2 d∗ a.
+                                         A∗ /K ∗
+
+In this sense, ζQ
+                C (f, s + 1/2) is the Mellin transform of Ef , completely naturally.
+   In case f = v fv is a product of local functions, we find the Euler product of ζC
+by writing the integral over the ideles as a product of local integrals,
+                                             Y
+(2.16)                           ζC (f, s) =   ζv (fv , s).
+                                                     v
+
+   9This formula is the analogue of the expression
+                                              Z ∞
+                                                                   dt
+                                   ζZ (s) =         (θ(t) − 1)ts
+                                              0                    t
+for the Riemann zeta function, where θ(t) is defined after (1.2).
+16                              MACHIEL VAN FRANKENHUIJSEN
+
+
+The local factors have been computed in Section 2.1.3 for fv = pnv . If f (a) only
+dependsQon the divisor associated with a, then we obtain, by summing over cosets
+of A∗ / v Ov∗ ,
+                                       X
+(2.17)                     ζC (f, s) =   f (D)q −s deg D ,
+                                                D
+
+where f (D) = f ((πvDv )v ).
+     We define the zeta function of C by
+                               ζC (s) = q (g−1)s ζC (f, s),
+                               Q
+for the special choice10 f = v p0v as in (2.10). The factor q (g−1)s has been in-
+serted so that the functional equation is self-dual, see Section 2.2.5. By (2.17), this
+function can be written for Re s > 1 as a sum over positive divisors,
+                                             X
+                           ζC (s) = q (g−1)s       q −s deg D .
+                                                    D≥0
+
+This is the analogue of (1.1). By (2.16), we obtain the Euler product over all
+valuations, analogous to (1.3),
+                                              Y    1
+(2.18)                      ζC (s) = q (g−1)s            .
+                                              v
+                                                1 − qv−s
+   To compute this function, we use (2.15). By (2.12), we obtain
+                                      X∞        X q l(D) − 1
+(2.19)              ζC (s) = q (g−1)s     q −ns              .
+                                      n=0
+                                                      q−1
+                                                       D∈Cl(n)
+
+Let µ be the minimal positive degree of a divisor. Then Cl(n) is empty if n is not
+a multiple of µ, hence (2.19) only contains terms with n a multiple of µ. For a
+divisor D of degree n ≥ 2g − 1, l(D) = n + 1 − g. Hence the infinite series (2.19)
+becomes geometric. We thus find that ζC has simple poles at the values for s such
+that q µs = q µ and at values such that q µs = 1. To finish the computation, we first
+show that there exists a divisor of degree 1 (see [34] or [11, V.5.3]).
+Constant Field Extensions. Recall that Fq is the field of constants of K, i.e., Fq is
+algebraically closed in K. We denote the constant field extension of degree n by
+                                        Kn = K[X]/(m),
+where m is an irreducible polynomial over Fq of degree n. The corresponding
+zeta function (without the q (g−1)s factor) is defined by its Euler product over all
+valuations w of Kn ,
+                                           Y      1
+(2.20)                        ζC/Fqn (s) =          −s .
+                                           w
+                                              1 − qw
+   The Frobenius automorphism of Fqn is φnq , hence the Frobenius flow of C/Fqn
+is generated by φnq . Let w be a valuation of Kn . Its restriction to K, say v,
+corresponds to an orbit of φq of deg v points in C(F̄p ). Under φnq , this orbit splits
+into d orbits, each of deg(v)/d points, where
+                                        d = gcd(n, deg v).
+     10By Theorem 2.27, we could also take f = Q pav , where the exponents a are chosen so
+                                                v v                         v
+                                                                                             (g−1)s .
+       P
+that    v av deg v = 1 − g, to define ζC (s) = ζC (f, s), without the need of the factor q
+     THE RIEMANN HYPOTHESIS FOR FUNCTION FIELDS OVER A FINITE FIELD                             17
+
+
+Hence deg w = deg(v)/d, i.e., Kn (w) has degree deg(v)/d over Fqn , and hence
+degree n/d over K(v). This means that
+                                            qw = qvn/d .
+Moreover, there are d different valuations of Kn that restrict to v. We find that
+the local factor corresponding to v in the Euler product for ζC/Fqn (s) is given by
+                           Y      1             1
+                                    −s =             d .
+                               1 − qw           −ns/d
+                           w|v             1 − qv
+
+   Now deg(v)/d is relatively prime to n/d. Hence e2πi deg(v)/n is a primitive n/d-th
+root of unity. We deduce that
+                                                n
+                                                Y
+                                       d                                 
+                        1 − X n/d           =         1 − e2πik deg(v)/n X .
+                                                k=1
+
+For X = qv−s , we obtain the following lemma.
+Lemma 2.26. Let ζC/Fqn (s) be the zeta function of Kn , as in (2.20). Then
+                                Yn                     
+                                                  2πi
+                   ζC/Fqn (s) =     ζC/Fq s + k          .
+                                                n log q
+                                            k=1
+
+   Consider C again over Fq , and let µ be the minimal positive degree of a divisor.
+In particular, the degree of every valuation is a multiple of µ. Hence, by (2.20),
+ζC/Fq (s) has period 2πi / µ log q. By Lemma 2.26, we find that ζC/Fqµ (s) has a pole
+of order µ at s = 1. Since this pole is simple, we find that µ = 1. We have proven
+the following theorem.
+Theorem 2.27. There exists a divisor on C of degree 1.
+Example 2.28. The curve X 2 + Y 2 + 1 = 0 has no point over the rational numbers,
+and every divisor consists of at least two points. Indeed, every divisor defined over
+the rational numbers or the real numbers has an even degree. By the last theorem,
+we cannot have a similar situation over a finite field.
+  We finish the computation of ζC . For C = P1 , i.e., genus zero, l(D) = n + 1 for
+n = deg D ≥ 0. By (2.19), we find
+                                                          1
+                                ζP1 (s) =                             .
+                                                (q s − 1)(1 − q 1−s )
+  For higher genus, we use that
+                            l(D) ≥ max{0, deg D + 1 − g},
+with equality for deg D < 0 or deg D > 2g − 2. We then find
+                                2g−2
+                                X                 X       q l(D) − q max{0,n+1−g}
+(2.21)      ζC (s) = q (g−1)s          q −ns                                      + hζP1 (s),
+                                n=0
+                                                                    q−1
+                                                D∈Cl(n)
+
+where h is the class number of C. We thus obtain
+(2.22)                           ζC (s) = q gs LC (q −s )ζP1 (s),
+18                                MACHIEL VAN FRANKENHUIJSEN
+
+
+where LC (X), for X = q −s , is given by
+                                           2g−2
+                                           X              X        q l(D) − q max{0,n+1−g}
+       LC (X) = (1 − X)(1 − qX)                   Xn                                       + hX g .
+                                           n=0
+                                                                             q−1
+                                                         D∈Cl(n)
+
+It follows that LC is a polynomial of degree 2g. Moreover, LC (0) = 1. We write ων
+for the reciprocal zeros of LC , so that we have
+                                                     2g
+                                                     Y
+(2.23)                                  LC (X) =           (1 − ων X).
+                                                    ν=1
+
+2.2.5. The Two-Variable Zeta Function. In [25] (see also [38]), Pellikaan defines the
+following two-variable zeta function,
+                                                   ∞
+                                         q (g−1)s X −ns                X
+                         ζC (s, t) =                  q                       q tl(D) .
+                                         q t − 1 n=−∞
+                                                                    D∈Cl(n)
+
+This series is convergent for Re t < Re s < 0. Using
+                                   n + 1 − g = l(D) − l(K − D)
+for deg D = n, we obtain
+                                          X∞  X
+                                      1
+                     ζC (s, t) =    t
+                                                                   q (t−s)l(D)+sl(K−D) .
+                                   q − 1 n=−∞
+                                                       D∈Cl(n)
+
+Replacing s by t − s and summing over K − D instead of D, we see that the two-
+variable zeta function satisfies the functional equation
+                                          ζC (s, t) = ζC (t − s, t).
+                1
+   For C = P , we compute this function by using that l(D) = 0 for deg D < 0 and
+l(D) = deg D + 1 for deg D ≥ 0. Also, h = 1 by Example 2.24. We find
+                                                             1
+                                   ζP1 (s, t) =                          .
+                                                   (q s − 1)(1 − q t−s )
+     In general, we have
+                                2g−2
+                                X               X        q tl(D) − q t max{0,n+1−g}
+         ζC (s, t) = q (g−1)s          q −ns                                        + hζP1 (s, t),
+                                n=0
+                                                                   qt − 1
+                                               D∈Cl(n)
+
+where h is the class number of C. By (2.21), it follows that ζC (s, 1) = ζC (s). This
+proves the functional equation for the zeta function of C,
+                                            ζC (1 − s) = ζC (s).
+Remark 2.29. Clearly, by the functional equation, if ζC does not satisfy the Riemann
+hypothesis, it will have zeros on both sides of the line Re s = 1/2. Equivalently, if
+                                              √
+not all the numbers ων have absolute value q, then some of them will be larger
+in absolute value, and some will be smaller.
+Remark 2.30. See [38] for more information about the two-variable zeta function.
+In particular, this function satisfies an expression analogous to (2.22). Remarkably,
+by [25, Example 4.4], it is not true that ζC (s) determines ζC (s, t).
+        THE RIEMANN HYPOTHESIS FOR FUNCTION FIELDS OVER A FINITE FIELD               19
+
+
+                  3. A Proof of the Riemann Hypothesis for C
+3.1. Points on C. Every valuation of K corresponds to deg v points on C defined
+over the finite field K(v). Let NC (n) be the number of points on C with values
+in Fqn . Since K(v) is a subfield of Fqn if and only if deg v | n, we find that
+                                            X
+(3.1)                           NC (n) =        deg v.
+                                              deg v|n
+
+By (2.18), we have
+                                                    X∞
+                               1 ζC′
+                         −            (s) = 1 − g +     q −ns NC (n).
+                             log q ζC               n=1
+On the other hand, taking the logarithmic derivative of the expression (2.22) of ζC
+as a rational function of q −s , we find by (2.23)
+                                        X∞
+                   1 ζC′                                                    
+             −            (s) = 1 − g +     q −ns q n − ω1n − · · · − ω2g
+                                                                       n
+                                                                          +1 .
+                 log q ζC               n=1
+Comparing coefficients, we obtain
+(3.2)                        NC (n) = q n − ω1n − · · · − ω2g
+                                                           n
+                                                              + 1.
+                                                                                 √
+  Recall that the Riemann hypothesis for C can be formulated as |ων | ≤           q for
+ν = 1, . . . , 2g. It follows from the Riemann hypothesis that
+                                 |NC (n) − q n − 1| ≤ 2gq n/2 .
+Conversely, we have the following lemma, which states in particular that it suffices
+to prove (3.3) for all even n.
+Lemma 3.1. If for every ε > 0 there exists a natural number m such that the
+inequality
+(3.3)                      |NC (nm) − q nm − 1| ≤ Bq nm(1/2+ε)
+is satisfied for every n, then the Riemann hypothesis holds for ζC .
+Proof. Let ε > 0. By Diophantine approximation, we can find infinitely many n
+such that Re ωνnm ≥ 21 |ων |nm for ν = 1, . . . , 2g. Then
+                                              1
+                          |NC (nm) − q nm − 1| ≥max |ων |nm .
+                                              2 ν
+Letting n → ∞, we find that |ων | ≤ q 1/2+ε for every ν. Since this holds for every
+ε > 0, we obtain |ων | ≤ q 1/2 . By Remark 2.29, we conclude that |ων | = q 1/2 for
+every ν.                                                                         
+3.2. The Graph of the Frobenius Flow. Figure 3.1 depicts the graph
+                                         Y = φq (X)
+of one step of the Frobenius flow in C × C. The intersection with the diagonal
+                                          ∆: Y = X
+gives the points (x, x) with φq (x) = x. These are the points on C defined over Fq ,
+and their number is NC (1). We assume that there is at least one point on the
+intersection, which we denote by (∞, ∞). We write v∞ for the corresponding
+valuation of degree 1 of K.
+20                         MACHIEL VAN FRANKENHUIJSEN
+
+
+          C
+
+
+
+
+                                                             φq
+
+
+
+                   ∆
+
+
+          ∞                                                        C
+
+        Figure 3.1. The graph of Frobenius intersected with the diagonal.
+
+Remark 3.2. The Frobenius automorphism is smooth, since it is a polynomial map.
+Also, its derivative vanishes, so our intuition says that this map should be constant,
+or at least locally constant. Being a polynomial of degree q, it seems to be a q-to-
+one map, but in fact, it is one-to-one. Figure 3.1 emphasizes the smoothness and
+ignores the injectivity of the Frobenius flow.
+   The functions defined over Fq with a pole of order at most m at ∞ and no other
+poles form an Fq -vector space Lm = L(m(∞)). By Theorem 2.20, the dimension
+of Lm is
+                   lm = l(m(∞)) = m + 1 − g + l(K − m(∞)).
+We find
+(3.4)                         m + 1 − g ≤ lm ≤ m + 1,
+and
+(3.5)                      lm = m + 1 − g for m > 2g − 2.
+   Clearly, Lm+1 contains Lm as a subspace. Also, lm+1 ≤ lm + 1, since for two
+functions f and g in Lm+1 for which f 6∈ Lm , we can find a constant λ ∈ Fq such
+that g − λf ∈ Lm . Let
+                                  s1 , . . . , slm
+be a basis for Lm such that v∞ (si+1 ) < v∞ (si ), i.e., the order of the pole of si at ∞
+increases with i. Given k ≥ 0, we choose coefficients ai ∈ Lk to form
+                                            l
+                                            X m
+
+                              f (X, Y ) =         ai (X)si (Y ).
+                                            i=1
+        THE RIEMANN HYPOTHESIS FOR FUNCTION FIELDS OVER A FINITE FIELD                   21
+
+
+Remark 3.3. For C = P1 , s1 (Y ) = 1, s2 (Y ) = Y , s3 (Y ) = Y 2 , . . . , and f (X, Y ) is
+a polynomial in Y with coefficients in X, which we will assume to be of low degree
+in X. This is analogous to a polynomial in Y with integer coefficients. Therefore,
+we call Y the ‘geometric’ coordinate, and X the ‘arithmetic’ coordinate.
+   We thus obtain a space of functions f (X, Y ) on C × C defined over Fq . The
+restriction of f (X, Y ) to the graph of Frobenius is
+                                 f|φ (X) = f (X, φq (X)).
+The map f 7→ f|φ is Fq -linear. Note that si (φq (X)) = sqi (X), since si is defined
+over Fq . Hence f|φ ∈ Lk+qm .
+Lemma 3.4. For k < q, the map f 7→ f|φ is injective, and hence an isomorphism
+onto its image.
+                                          Pm
+Proof. Assume f 7→ f|φ = 0. That is, li=1       ai sqi = 0. Consider the order of the
+                                       q
+pole at ∞. If ai 6= 0, then v∞ (ai si ) ≤ qv∞ (si ) ≤ −q + qv∞ (sj ) for every j < i.
+Further, v∞ (aj sqj ) ≥ −k + qv∞ (sj ) > −q + qv∞ (sj ). Hence the pole of the nonzero
+term of highest order in f|φ is not cancelled by the pole of any of the other terms.
+It follows that the highest nonzero term vanishes. We conclude that there is no
+highest nonzero term, and hence f = 0.                                              
+  We take the coefficients ai to be pµ -th powers, for pµ < q, so that f|φ is a pµ -th
+power. Hence the coefficients are of the form
+                                                  µ
+                                           ai = bpi .
+We choose bi ∈ Ln , so that ai ∈ Lpµ n . To be able to apply Lemma 3.4, we assume
+that
+(3.6)                                      pµ n < q.
+
+
+   We can also restrict f to the diagonal:
+                                   f|∆ (X) = f (X, X).
+We obtain the two restriction maps, for k < q,
+                                 f −−−−→ f|∆
+
+
+                                     f|φ
+where the vertical equality is the isomorphism of Lemma 3.4.
+   Since f|φ only has a pole at ∞, of order at most pµ n+qm, it also has at most this
+many zeros, counted with multiplicity. If therefore f|∆ = 0 and f|φ 6= 0, then we
+have a function f|φ on C, obtained by restricting a function on C × C that vanishes
+on the diagonal, except at (∞, ∞). Apart from (∞, ∞), the diagonal intersects the
+graph of Frobenius at NC (1) − 1 points. Since f|φ is a pµ -th power, this function
+has at least pµ (NC (1) − 1) zeros, counted with multiplicity. Comparing with the
+pole of f|φ , we find the inequality NC (1) ≤ 1 + n + pqµ m. By (3.6), 1 + n ≤ qp−µ ,
+hence we obtain
+                                            q
+(3.7)                            NC (1) ≤ µ (m + 1).
+                                           p
+22                          MACHIEL VAN FRANKENHUIJSEN
+
+
+In particular, for given µ, the best bound for NC (1) is obtained when m is as small
+as possible.
+Example 3.5. For genus zero, we take
+                                               µ      µ
+                                 f (X, Y ) = X p − Y p .
+                   µ         µ
+Then f|φ (X) = X p − X qp and f|∆ (X) = 0. The function f|φ has a pole at infinity
+of order qpµ , and at least pµ (NC (1) − 1) zeros, counted with multiplicity. Hence the
+number of points on the projective line over Fq satisfies NP1 (1) ≤ q + 1. In fact,
+equality holds.
+  For higher genus, we will not explicitly construct a function f such that f|∆ = 0
+and f|φ 6= 0, but we prove that such a function exists. The space of functions f (X, Y )
+that we have constructed has dimension ln lm . Assume that
+                                       n, m ≥ g.
+Then ln lm ≥ (n + 1 − g)(m + 1 − g) by (3.4). The functions f|∆ lie in Lpµ n+m . To
+assure the existence of a nontrivial function such that f|∆ = 0, we choose n and m
+so that (n + 1 − g)(m + 1 − g) > lpµ n+m , since then the kernel of the map f 7→ f|∆
+is nontrivial. Since pµ n + m > 2g − 2 and by (3.5), this means that we want
+                       (n + 1 − g)(m + 1 − g) > pµ n + m + 1 − g,
+or equivalently,
+(3.8)                       (m + 1 − g − pµ )(n − g) > pµ g.
+Since we want to choose m as small as possible, we choose n as large as possible.
+The largest value for n so that (3.6) is satisfied is
+                                     n = qp−µ − 1.
+We thus obtain from (3.8) a lower bound for m, which we can write as
+                                                                      
+         q                     q          pµ                     q     µ
+           (m +  1) > q + g      +                    > q + g      + p    .
+        pµ                    pµ   1 − (g + 1)pµ /q             pµ
+Thus the upper bound for NC (1) that we can derive from (3.7) is best possible
+if q/pµ = pµ . Therefore, we assume that q is an even power of p, as we may by
+                                            √
+Lemma 3.1, and we choose µ such that pµ = q. Then (3.8) is equivalent to
+                                    √           g(g + 1)
+                           m+1>      q + 2g + √             .
+                                                q − (g + 1)
+For q > (g + 1)4 , this inequality is satisfied for
+                                           √
+                                 m + 1 = q + 2g + 1.
+  With these choices, there exists a nontrivial function f on C×C such that f|∆ = 0.
+By Lemma 3.4, also f|φ is nontrivial, hence we obtain the following theorem.
+Theorem 3.6. For q > (g + 1)4 , a square, we have
+                                                           √
+                           NC (1) = |C(Fq )| ≤ q + (2g + 1) q,
+where g is the genus of C.
+   Note that the above argument depends on the existence of a point ∞ on C(Fq ).
+If such a point does not exist, then NC (1) = 0 and the inequality for NC (1) is
+trivially satisfied.
+        THE RIEMANN HYPOTHESIS FOR FUNCTION FIELDS OVER A FINITE FIELD             23
+
+
+          C′
+                                                           σ
+
+
+
+
+                                                      φq
+
+
+
+
+           ∞                                                   C′
+
+        Figure 3.2. The graph of Frobenius intersected with the graph of σ.
+
+3.3. Galois Covers of C. Let C ′ −→ C be a Galois cover of curves, i.e., the function
+field L of C ′ is a Galois extension of K. The field L can be written as
+                                  K[X]/(m(X)),
+for some irreducible polynomial m. For every automorphism σ of L over K, the
+element σ(X) lies in L, hence we can find a polynomial f with coefficients in K
+such that σ(X) = f (X) + (m). It follows that the action of σ on C ′ is algebraic,
+induced by X 7→ f (X). (See Figure 3.2.)
+   Let w be a valuation of L, and v its restriction to K. The decomposition group
+of w over v,
+                 Z(w/v) = {σ ∈ Gal(L/K) : w(σx) > 0 if w(x) > 0}
+is the group of continuous automorphisms of L over K, and the ramification group
+of w over v is its subgroup
+                T (w/v) = {σ ∈ Z(w/v) : w(x − σx) > 0 if w(x) ≥ 0},
+the group of automorphisms that act trivially modulo the maximal ideal πw Ow .
+We denote the order of T (w/v) by e(w/v),
+(3.9)                           e(w/v) = |T (w/v)|,
+the order of ramification of w over v. The group Z(w/v)/T (w/v) is isomorphic to
+the Galois group of L(w) over K(v). We denote its order by f (w/v), the degree of
+inertia of w over v, so that deg w = f (w/v) deg v. It is generated by the Frobenius
+automorphism of L(w) over K(v), the automorphism that raises an element to the
+power q deg v . There are e(w/v) different automorphisms in Gal(L/K) that induce
+this automorphism modulo πw Ow .
+24                          MACHIEL VAN FRANKENHUIJSEN
+
+
+3.4. Frobenius as Symmetries of a Cover. We also need a generalization of
+Theorem 3.6 to Galois covers. Let
+(3.10)                                  C ′ −→ C −→ P1
+be the Galois cover corresponding to the Galois closure of K over q. Let G be the
+Galois group of the cover C ′ → P1 . For σ ∈ G, we define
+                     
+       NC ′ (1, σ) = x ∈ C ′ (F̄p ) : x projects to P1 (Fq ) and φq (x) = σ(x) .
+Theorem 3.7. For q > (g + 1)4 , a square, we have
+                                                   √
+                       NC ′ (1, σ) ≤ q + (2g ′ + 1) q,
+where g ′ is the genus of C ′ .
+Proof. Let X and Y denote the ‘arithmetic’ and ‘geometric’ coordinates on C ′ × C ′ ;
+see Figure 3.2. As in Section 3.2, we have the restrictions
+                                   f −−−−→ f|σ
+
+
+                                          f|φ
+where f|σ (X) = f (X, σ(X)) is the restriction of f (X, Y ) to the graph of σ and,
+as before, f|φ (X) is the restriction to the graph of the Frobenius flow. Clearly,
+if f|σ vanishes, then f|φ vanishes at the points counted in NC ′ (1, σ). The rest of the
+argument is as before, applied to C ′ and the homomorphism f|φ 7→ f|σ .               
+Theorem 3.8. The curve C satisfies the Riemann hypothesis. That is, if ζC (s) = 0
+then Re s = 1/2.
+Proof. As in (3.10), let C ′ be the Galois closure of the cover C → P1 , with Galois
+group G. Consider the sum           X
+                                       NC ′ (1, σ).
+                                          σ∈G
+Above every point t of P1 (Fq ), we have |G|/e points of C ′ (F̄p ), where e is the
+ramification index of any of the associated valuations in C ′ . Further, for a point t′
+of C ′ above t, we have e different automorphisms in G that induce Frobenius on
+the residue class field. Hence in the sum, each point of P1 (Fq ) is counted |G| times.
+Since P1 (Fq ) has q + 1 points, we obtain
+                              X
+                                  NC ′ (1, σ) = |G|(q + 1).
+                                  σ∈G
+
+By Theorem 3.7, applied to each summand NC ′ (1, σ) for σ 6= τ , we obtain for each
+τ ∈ G,
+                                 X                                      √
+     NC ′ (1, τ ) = |G|(q + 1) −   NC ′ (1, σ) ≥ q − (|G| − 1)(2g ′ + 1) q + |G|.
+                                   σ6=τ
+
+Let H be the subgroup of G of covering transformations that act trivially on C. By
+the same reasoning as above for P1 , we obtain
+                           X
+                                NC ′ (1, σ) = |H|NC (1).
+                                  σ∈H
+It follows that
+                                                       √
+                       NC (1) ≥ q − (|G| − 1)(2g ′ + 1) q + |G|.
+      THE RIEMANN HYPOTHESIS FOR FUNCTION FIELDS OVER A FINITE FIELD                  25
+
+
+Combined with the upper bound of Theorem 3.6, we deduce the Riemann hypothesis
+for C by Lemma 3.1.                                                         
+
+                 4. Comparison with the Riemann Hypothesis
+   The field of functions on a curve is analogous to the field Q of rational numbers.
+However, since Q has no field of constants, there is no analogue of the points
+on C. Therefore there is no Frobenius flow as in Section 3.2 on spec Z, even though
+in every Galois extension of Q there are local Frobenius automorphisms associated
+with every prime number, as in Section 3.4. Moreover, since the numbers log |x|, for
+x ∈ Q, are dense on the real line, we cannot separate the “point counting
+                                                                    P        function”
+in the different degrees. Instead, we have the function ψ(x) = pk ≤x log p. The
+analogue of this function for C is
+                                X                  X
+                     ψC (x) =         NC (n) =              deg v,
+                                   n≤logq x             k deg v≤logq x
+
+which counts the points on C defined over Fqn with multiplicity [(logq x)/n]. To
+obtain an explicit formula for ψC , we use NC (n) = q n − ω1n − · · · − ω2g
+                                                                         n
+                                                                            + 1 to obtain
+                                                 2g [log x]
+                                q [logq x] − 1 X ων q − 1
+                     ψC (x) =                 −              + [logq x].
+                                   1 − q −1     ν=1
+                                                    1 − ων−1
+Using the Fourier series
+                                 X         e2πinx                        1 X e2πinx
+        q −c{x} = (1 − q −c )                            and {x} =         −
+                                       c log q + 2πin                    2    2πin
+                                 n∈Z                                       n6=0
+
+we obtain a formula for ψC (x) as a sum over the zeros and poles of ζC (s),
+                       ∞
+                       X                      2g
+                                              X    ∞
+                                                   X
+               1            x1+2πin/ log q             xρν +2πin/ log q
+  ψC (x) =                                  −
+             log q    n=−∞
+                           1 + 2πin/ log q ν=1 n=−∞ ρν + 2πin/ log q
+                                                   !                    2g
+                            X x2πin/ log q           1        1         X  1
+                         +                  + log x − −              +       ,
+                                2πin/ log q          2 1 − q −1 ν=1 1 − ων−1
+                            n6=0
+
+where ρν = logq ων . This formula should be compared with the explicit formula [19,
+Thm. 29, p. 77],
+                                  X xρ            X∞
+                                           ζ′         x−2n
+                      ψ(x) = x −         − (0) +           ,
+                                   ρ
+                                      ρ     ζ     n=1
+                                                       2n
+which expresses ψ(x) as a sum over the zeros and poles of the Riemann zeta function.
+Indeed, 1 + 2πin/ log q and 2πin/ log q run over all poles of ζC (for n ∈ Z), and the
+numbers ρν + 2πin/ log q run over all zeros of this function. Table 4.1 compares the
+Riemann zeta function with the zeta function of C.
+Remark 4.1. As is pointed out in [6, Remark c, p. 72], even though the Frobenius
+flow for the rational numbers is not known, the dual algebraic picture obtained
+from class field theory is complete. Thus the Frobenius flow on C corresponds to
+the action of q in the idele class group A∗ /K ∗ on the space of adele classes A/K ∗ ,
+and the Frobenius flow on spec Z corresponds to the action of R>0 ⊂ A∗ /Q∗ on the
+space A/Q∗ . In additive language, according to Deninger [8,9], the analogue of the
+Frobenius flow of the first step may be provided by the shift on the real line.
+26                               MACHIEL VAN FRANKENHUIJSEN
+
+                          Table 4.1. Comparison of spec Z and C.
+
+              Rational numbers                         Function fields
+                                    P∞                                  P
+              ζZ (s) = π  −s/2
+                              Γ(s/2) n=1 n−s           ζC (s) = q s(g−1) D≥0 |D|−s
+                                    Q                                   Q
+                     = π −s/2 Γ(s/2) p 1−p1 −s                = q s(g−1) v 1−q1 −s
+                                                                                   v
+
+              Simple poles
+                                                                   2πi            h
+              at 1, residue 1                          at 1 + k log  q , res. (q−1) log q
+                                                             2πi                h
+              at 0, residue −1                         at k log q , res. − (q−1) log q
+              Zeros
+              at ρn = 21 + iγn , n ∈ Z                 at ρν = 12 + iγν + k log
+                                                                             2πi
+                                                                                q
+                                                       (1 ≤ ν ≤ 2g, q ρν = ων )
+              Frobenius as symmetries of a cover
+              For every extension of Q        For every cover of C
+              Frobenius flow
+              See Remark 4.1                           Acting on points of C
+              Point counting function
+              Unknown                                  NC (n) = |C(Fqn )|
+              Prime counting
+                     P       function                             P
+              ψ(x) = pk ≤x log p                       ψC (x) =       k deg v≤logq x deg v
+              Riemann hypothesis: γn is real
+              ⇐⇒ ψ(x) = x + O(x1/2+ε )       ⇐⇒ ψC (x) = 1−q1 −1 q [logq x]
+                                                          +O(x1/2+ε )
+                                             ⇐⇒ NC (n) = q n + O(q n/2 )
+              ⇐⇒ ψ(x) ≤ x + O(x1/2+ε )       =⇒ ψC (x) ≤ 1−q1 −1 q [logq x]
+                                                          +O(x1/2+ε )
+                                             =⇒ NC (n) ≤ q n + O(q n/2 )
+
+   By the last entry of Table 4.1, it is only necessary to prove the upper bound of
+Theorem 3.6 to obtain the Riemann hypothesis, and establishing the lower bound
+of Section 3.4 becomes unnecessary.11 Therefore we need the analogue for spec Z
+of the first inequality,
+                                                 √
+                                NC (1) ≤ q + O( q).
+This means that we only need to translate the part of Bombieri’s proof that depends
+on the Frobenius flow on C, not the part that depends on the Frobenius symmetries
+of covers of C. To translate the argument of Section 3.2, we could try to construct
+a polynomial that vanishes at all prime numbers up to a certain bound. The
+infinitesimal generator of the shift on the real line, which is the counterpart of
+the Frobenius flow by Remark 4.1, is the derivative operator. So we may try to
+construct such a function that vanishes at the prime numbers to a high order. Then
+we want to bound the degree of this polynomial.
+   The “degree” of a rational prime number is log p, so a prime number should
+correspond to log p points on some curve. In Nevanlinna Theory (see, for example,
+     11This is a consequence of the density of log |x|, x ∈ Q, in the real line.
+        THE RIEMANN HYPOTHESIS FOR FUNCTION FIELDS OVER A FINITE FIELD                           27
+
+
+[17, 21]), the counting function of zeros of a meromorphic function f in the disc of
+radius r is
+                                       X                      r
+                        Nf (0, r) =            ordx (f ) log     ,
+                                                             |x|
+                                         |x|<r : f (x)=0
+
+so one could consider a function such as
+                                     Y
+                             f (z) =   (1 − pz)[logp x]
+                                             p≤x
+
+on the unit disc. For this function
+                                         Nf (0, 1) = ψ(x).
+   Trying to copy Bombieri’s proof, we could take si = z 1−i for i ≥ 1 as the basis
+of functions that have only a pole at ‘infinity’, and the coefficients are functions
+on spec Z with a pole at v∞ alone, that is, the coefficients are integers bi . Thus12
+                                                   ∞
+                                                   X
+                                        f (z) =          bi z 1−i .
+                                                   i=1
+
+Note that the coefficients are determined by f , that is, the analogue of Lemma 3.4
+                                                                                   µ
+is automatically satisfied. We do not know what the analogue of the choice bi = api
+could be.
+    The main problem is that the arithmetic coordinate cannot be compared with
+the geometric coordinate: z ∈ C is the geometric coordinate and the coefficients
+of f are integers, i.e., functions on the arithmetic coordinate spec Z. Hence there
+is no diagonal and we have to force the vanishing of f at the primes in an artificial
+manner. As a consequence, we do not know how to bound the Nevanlinna height
+(i.e., the degree) of this function.
+   It is interesting to pursue this idea a little further. For r > 0, let ∆r be the disc
+of radius r with boundary Γr , positively oriented. Let
+(4.1)                                 f (z) = cz ord(f,0) + . . .
+be a meromorphic function with leading coefficient c in its Laurent series at 0.
+Nevanlinna theory starts with the Poisson–Jensen formula, which we interpret as a
+sum over all valuations of the field of meromorphic functions on ∆r ,
+                          X                       Z
+                                             r                 dz
+(4.2)     v0 (f ) log r +       vx (f ) log     +     vz (f )      = − log |c|,
+                                            |x|    Γr         2πiz
+                            0<|x|<r
+
+where the valuations are vz (f ) = − log |f (z)| for each z on the boundary of the disc
+of radius r, and vx (f ) = ord(f, x) for each x inside the disc.13
+   Note that the sum (4.2) of the valuations is constant,P   depending on the function
+but not on r. This should be compared to the fact that v v(α) deg v = 0 for every
+nonzero function in the function field of C. It is a mystery why in Nevanlinna theory,
+the sum over all valuations does not necessarily vanish. However, if we consider the
+
+   12If this series is infinite, it does not converge for |z| ≤ 1, so we may have to require that it
+has an analytic continuation.
+   13Note that v log r is only a valuation for r ≥ 1 and that it is the trivial valuation for r = 1.
+                  0
+28                             MACHIEL VAN FRANKENHUIJSEN
+
+
+subfield of functions for which the Laurent series has rational coefficients, then we
+can write the Poisson–Jensen formula as, with c ∈ Q as in (4.1),
+      X                                  X                   Z
+                                                        r                 dz
+          vp (c) log p + v0 (f ) log r +   vx (f ) log     +     vz (f )      = 0,
+                                                       |x|    Γr         2πiz
+      p6=∞                                0<|x|<r
+
+where the first sum is over all p-adic valuations of Q. It is still puzzling why
+the archimedean valuation v∞ (c) = − log |c| should be excluded from this sum.
+We interpret this as meaning that the arithmetic and geometric coordinates (in the
+sense of Remark 3.3) meet at v0 (geometrically) and v∞ (arithmetically). Since this
+is not a double point, we only see v0 . Note that the archimedean valuations have
+all been pushed to the boundary of the disc, and that they are the only nondiscrete
+valuations.
+Remark 4.2. For large r, the archimedean valuations are essentially nonarchime-
+dean, since for two meromorphic functions f and g that are not a constant multiple
+of each other, |f (z) + g(z)| will be close to max{|f (z)|, |g(z)|} on most of the cir-
+cle Γr , and only on small portions of Γr will f (z) and g(z) be comparable in size.
+More specifically, if the only defects (in the sense of Nevanlinna theory) of f /g are
+among ∞, 0, −1, e2πi/3 and e4πi/3 , then the archimedean valuations behave like
+nonarchimedean valuations for large r.
+   It seems that by Nevanlinna theory we obtain a connection, albeit a rather loose
+one, between the geometric valuations vz and vx , and the arithmetic valuations vp ,
+and seemingly, the geometric and arithmetic coordinates intersect at v0 . We con-
+sider this the point ‘at infinity’, as in the exposition of Bombieri’s proof of the
+Riemann hypothesis for a curve C. We invite the reader to continue this line of
+reasoning.
+
+Acknowledgements. We thank Enrico Bombieri for information about the prepara-
+tion of his Bourbaki seminar talk [3], and Alain Connes for his encouragement.
+
+                                         References
+ [1] Artin, E., Quadratische Körper im Gebiete der höheren Kongruenzen I, II, Math. Zeitschr.
+     19 (1924).
+ [2] Artin, E., Algebraic numbers and algebraic functions, American Mathematical Society, Prov-
+     idence, RI, 2000. (Reprinted from the 1967 edition.)
+ [3] Bombieri, E., Counting points on curves over finite fields, Seminaire Bourbaki, no. 430 (1973).
+ [4] Bombieri, E., personal communication, 2007.
+ [5] Bombieri, E., Hilbert’s 8th problem: an analogue, in: Mathematical developments arising
+     from Hilbert problems, Proceedings of Symposia in Pure Mathematics vol. XXVIII, Ameri-
+     can Mathematical Society, Providence, RI, 1976, pp. 269–274.
+ [6] Connes, A., Trace formula in noncommutative geometry and the zeros of the Riemann zeta
+     function, Sel. Math., New Ser. 5 (1999), 29–106.
+ [7] Connes, A., personal communication, 2007.
+ [8] Deninger, C., Lefschetz trace formulas and explicit formulas in analytic number theory, J.
+     Reine Angew. Math. 441 (1993), 1–15.
+ [9] Deninger, C., Evidence for a cohomological approach to analytic number theory, in: Proc.
+     First European Congress of Mathematics (A. Joseph et al., eds.), vol. I, Paris, July 1992,
+     Birkhäuser-Verlag, Basel, 1994, pp. 491–510.
+[10] Edwards, H. M., Riemann’s Zeta Function, Dover Books, New York, 2001.
+[11] Eichler, M., Introduction to the Theory of Algebraic Numbers and Functions, Pure and Ap-
+     plied Mathematics 23, Academic Press, New York, 1966.
+       THE RIEMANN HYPOTHESIS FOR FUNCTION FIELDS OVER A FINITE FIELD                              29
+
+
+[12] Haran, S., Index theory, potential theory, and the Riemann hypothesis, in: L-Functions
+     and Arithmetic (J. Coates, M. J. Taylor, eds.), London Mathematical Society Lecture Notes
+     Series, vol. 153, 1989, pp. 257–270.
+[13] Haran, S., On Riemann’s zeta function, in: Dynamical, Spectral, and Arithmetic Zeta Func-
+     tions (M. L. Lapidus, M. van Frankenhuijsen, eds.), Contemporary Mathematics vol. 290,
+     American Mathematical Society, R.I., 2001, pp. 93–112.
+[14] Haran, S., The Mysteries of the Real Prime, London Mathematical Society monographs, New
+     Series, vol. 25, Clarendon Press, Oxford, 2001.
+[15] Hasse, H., Ueber Kongruenzzetafunktionen, S. Ber. Preuß. Ak. Wiss. 1934, p. 250.
+[16] Hasse, H., Zahlentheorie, Berlin, 1949.
+[17] Hayman, W. K., Meromorphic Functions, Oxford University Press, London, 1975.
+[18] Higson, N., and Roe, J., Surveys in Noncommutative Geometry, Clay Mathematics Proceed-
+     ings vol. 6, American Mathematical Society, Providence, RI, 2006.
+[19] Ingham, A. E., The distribution of prime numbers, Cambridge University Press, 1932.
+[20] Iwasawa, K., On the rings of valuation vectors, Annals of Math., 2nd Ser., vol. 57 (1953),
+     331–356.
+[21] Lang, S., and Cherry, W., Topics in Nevanlinna Theory, Lecture Notes in Mathematics 1433,
+     Springer-Verlag, 1990.
+[22] Lapidus, M. L., and van Frankenhuijsen, M., Fractal Geometry and Number Theory (Complex
+     dimensions of fractal strings and zeros of zeta functions), Birkhäuser, Boston, 2000.
+[23] Lapidus, M. L., and van Frankenhuijsen, M., Fractal Geometry, Complex Dimensions and
+     Zeta Functions: Geometry and Spectra of Fractal Strings, Springer Monographs in Mathe-
+     matics, 2006.
+[24] Patterson, S. J., An Introduction to the Theory of the Riemann Zeta-Function, Cambridge
+     Studies in Advanced Mathematics 14, Cambridge University Press, 1988.
+[25] Pellikaan, R., On special divisors and the two variable zeta function of algebraic curves over
+     finite fields, in: Arithmetic, Geometry and Coding Theory, Proceedings of the International
+     Conference held at CIRM, Luminy, France, 1993, pp. 175–184.
+[26] Riemann, B., Ueber die Anzahl der Primzahlen unter einer gegebenen Grösse, in [27, p. 145],
+     translated in [10, p. 299] and [28].
+[27] Riemann, B., Gesammelte Werke, Teubner, Leipzig, 1892 (reprinted by Dover Books, New
+     York, 1953, translated in [28]).
+[28] Riemann, B., Collected Papers (translated by R. Baker, C. Christenson and H. Orde),
+     Kendrick Press, 2004.
+[29] Roquette, P., Arithmetischer Beweis der Riemannschen Vermutung in Kongruenzfunktio-
+     nenkörpern beliebigen Geslechts, J. reine und angew. Math. 191 (1953), pp. 199–252.
+[30] Rosen, M., Number Theory in Function Fields, Graduate Texts in Mathematics 210,
+     Springer-Verlag, 2002.
+[31] Schmidt, F. K., Analytische Zahlentheorie in Körpern der Characteristik p, Math. Zeitschr.
+     33 (1931).
+[32] Schmidt, W. M., Equations over Finite Fields: An Elementary Approach, Lecture Notes in
+     Mathematics 536, Springer-Verlag, 1976.
+[33] Stepanov, S. A., On the number of points of a hyperelliptic curve over a finite prime field,
+     Izv. Akad. Nauk SSSR, Ser. Math. 33 (1969), pp. 1103–1114.
+[34] Stichtenoth, H., Algebraic Function Fields and Codes, Springer-Verlag, Berlin, 1993.
+[35] Tate, J., Fourier Analysis in Number Fields and Hecke’s Zeta-Functions, in: Algebraic Number
+     Theory (J. W. S. Cassels, A. Fröhlich, eds.), Academic Press, New York, 1967, pp. 305–347.
+[36] Tretkoff, P., The Riemann Hypothesis: Arithmetic and Geometry, in [18, pp. 143–189].
+[37] van Frankenhuijsen, M., Arithmetic Progressions of Zeros of the Riemann Zeta Function, J.
+     of Number Theory 115, 2005, pp. 360-370.
+[38] van Frankenhuijsen, M., The two-variable zeta function and the Riemann Hypothesis for
+     function fields, to appear in Expositiones Mathematicae, 2007.
+[39] Weil, A., Sur les fonctions algébriques à corps de constantes fini, Comptes rendus des séances
+     de l’Académie des Sciences 210 (1940), 592–594; reprinted in [46, vol. I, pp. 257–259].
+[40] Weil, A., On the Riemann hypothesis in function-fields, Proc. Nat. Acad. Sci. U.S.A. 27
+     (1941), 345–347; reprinted in [46, vol. I, pp. 277–279].
+[41] Weil, A., Letter to Artin, July 10, 1942; reprinted in [46, vol. I, pp. 280–298].
+30                             MACHIEL VAN FRANKENHUIJSEN
+
+
+[42] Weil, A., Foundations of algebraic geometry, Ann. Math. Soc. Coll., vol. XXIX, New York
+     1946; second edition 1962.
+[43] Weil, A., Number of solutions of equations in finite fields, Bull. Amer. Math. Soc. 55 (1949),
+     497–508; reprinted in [46, vol. I, pp. 399–410].
+[44] Weil, A., Courbes algébriques et variétés abéliennes, Hermann, Paris, 1971. (Combines in
+     one volume Sur les courbes algébriques et les variétés qui s’en déduisent, Pub. Inst. Math.
+     Strasbourg VII (1945), pp. 1–85, and Variétés Abéliennes et courbes algébriques, Actualités
+     scientifiques et industrielles 1041, Hermann, Paris, 1948.)
+[45] Weil, A., Basic Number Theory, Springer Classics in Mathematics, 1995.
+[46] Weil, A., André Weil: Oeuvres Scientifiques (Collected Papers), vols. I, II and III, 2nd ed.,
+     Springer-Verlag, Berlin and New York, 1980.
+
+     Department of Mathematics, Utah Valley University, Orem, UT 84058-5999
+     E-mail address: vanframa@uvsc.edu
+

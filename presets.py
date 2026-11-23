@@ -51,9 +51,9 @@ LIMITS = dict(
     max_board_items=100, max_item_chars=1200, max_message_chars=32768,
     max_artifacts=16, max_artifact_bytes=131072, max_workspace_bytes=524288, max_pending_reads=4,
     artifact_preview_chars=8000, artifact_read_chars=8000,
-    doc_read_chars=12000, max_pending_doc_reads=3,
+    doc_read_chars=12000, max_pending_doc_reads=8,
     max_note_chars=8000, max_style_chars=320, max_subscriptions=4,
-    temp_min=0.2, temp_max=1.5, max_empty_streak=3,
+    temp_min=0.2, temp_max=1.5, max_empty_streak=3, max_dyad_turns=None,
 )
 
 # Supported per-agent sampling parameters: name -> (value_type, min_val, max_val, llamacpp_only)
@@ -156,7 +156,7 @@ DEFAULT_AGENT = dict(
 BASELINE = {"SAY", "PROPOSE_NEXT", "SET_TEMPERATURE", "SET_SAMPLING"}
 MINIMAL = BASELINE | {"WHISPER", "CLAIM", "CHALLENGE", "RETRACT", "FINISH", "END_RUN"}
 STANDARD = MINIMAL | {"PUBLISH", "SUBSCRIBE", "VOTE", "UPDATE_NOTE", "SET_STYLE", "PROPOSE_TOPIC",
-                      "ARTIFACT_READ", "ARTIFACT_LIST", "DOC_LIST", "DOC_READ", "DOC_SEARCH"}
+                      "ARTIFACT_READ", "ARTIFACT_LIST", "DOC_LIST", "DOC_TOC", "DOC_READ", "DOC_SEARCH"}
 CAPABILITY_SETS = {"baseline": BASELINE, "minimal": MINIMAL, "standard": STANDARD,
                    "full": STANDARD | {"ARTIFACT_WRITE"}}
 

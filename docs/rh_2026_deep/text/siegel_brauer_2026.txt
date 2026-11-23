@@ -1,0 +1,1790 @@
+LANDAU–SIEGEL ZEROS OVER A BASE FIELD
+AND EFFECTIVE BRAUER–SIEGEL
+WILLIAM D. BANKS
+
+arXiv:2610.31402v2 [math.NT] 26 Oct 2026
+
+Abstract. Let k be a number field. We prove that for every quadratic extension F/k, every
+real zero β ∈ (0, 1) of L(s, χF/k ) satisfies (1 − β) log dF ⩾ c(k) with an effective constant
+c(k) > 0, and we deduce (through a reduction of Stark) that the Brauer–Siegel theorem holds
+effectively and uniformly over all Galois extensions K of k, in the form
+1/2
+
+hK RK ⩾ c(k) dK /((2π)[K:Q] log dK ).
+Stark’s effective cases of the Brauer–Siegel theorem excluded the fields with quadratic subfields,
+since those subfields carried the ineffectivity of Siegel’s theorem; over a base field k, the first
+result removes this obstruction. Both rely on a uniform bound for Chebotarev sums. Let K/k
+be a Galois extension with group G, and suppose S ⊂ G contains the identity. For any prime p
+of k, let δp be the proportion of the primes of K above p whose Frobenius lies in S. Then
+
+X
+log Np  |S|
+δp
+⩽
++ ε log X + O(1)
+Np
+|G|
+Np⩽X
+C
+, with C and the implied constant depending only on
+holds uniformly in K as soon as X ⩾ dK
+ε, C, and the degree [K : Q]. The proof is the argument of OpenAI in the form given by Kerr,
+simple vanishing at the points (ιθ)ι∈S , with θ in a box in OK , and Masser’s zero estimate. The
+field enters only through Masser’s invariant of the lattice of points, which we compute to be
+[K : Q]/|S| by averaging over the Galois group of the normal closure. Over Q, the determinant
+method gives sharper Chebotarev bounds, and we explain the comparison.
+
+Contents
+1. Introduction and statement of results
+2. Quadratic extensions
+3. Landau–Siegel zeros and the Brauer–Siegel theorem
+4. The lattice and the zero estimate
+5. Polynomials vanishing modulo many primes
+6. Proof of Theorems 1.4 and 1.5
+7. Remarks
+Acknowledgments
+References
+
+1
+6
+8
+11
+14
+17
+19
+19
+20
+
+1. Introduction and statement of results
+1.1. Background. Two preprints of October 2026 assert zero-free half-planes for every number
+field. In [3], the Dedekind zeta function ζK (s) of every number field K is shown to have no
+zeros with Re s > 31/32, and the same half-plane is zero-free for the L-function of every finiteorder Hecke character of K where it is holomorphic; the preprint states that its proofs were
+generated and formalized in Lean by AxiomProver. In [11], the L-function of every finiteorder Hecke character over every number field is zero-free for Re s > 0.8749. Both rest on
+Date: October 28, 2026.
+2020 Mathematics Subject Classification. 11R42, 11R29, 11M20, 11R44, 11J81.
+Key words and phrases. Landau–Siegel zeros, Brauer–Siegel theorem, class numbers, Chebotarev density theorem, Hecke L-functions, zero estimates, Masser’s theorem.
+1
+
+2
+
+WILLIAM D. BANKS
+
+recent preprints of OpenAI cited there, and we have not verified them. If they are accepted,
+they settle everything below about real zeros with absolute constants, and more. A zero-free
+region of width w for every ζK (s), Stark’s lower bound for the residue (Lemma 3.3) when
+log dK ⩾ 1/(4w), and Hermite’s theorem below that, give the Brauer–Siegel theorem effectively
+for every number field. The present paper is independent of these results and unconditional.
+Its content is a short argument, with the computation of Masser’s invariant behind it, that
+excludes Landau–Siegel zeros over a base field and makes the Brauer–Siegel theorem effective
+for Galois extensions of that field, and it claims nothing beyond that.
+OpenAI [15] has recently shown that Dirichlet L-functions of quadratic
+√ √ characters have
+no Landau–Siegel zeros via an argument in the biquadratic field Q( d, 2 ); see [1] for an
+overview of the argument with explicit constants and [8] for a simplified adaptation, in which
+the vanishing to high order of [15] is replaced by simple
+√ vanishing at many lattice points and a
+zero estimate of Masser. In [8], the auxiliary number 2 is there to raise the rank of a certain
+lattice to four while retaining three variables, and this is the source of the exponent 34 that
+arises there. Green [7] obtained the sharp constant 12 by a different route, working exclusively
+√
+in Q( d ) and comparing
+the Archimedean and p-adic sizes of a Gram determinant built from
+√
+small integers of Q( d ) and the derivatives of monomials at them. Kominers [9] observed
+that the determinant is not about quadratic characters. Formed from the pairs (α, σα), with α
+running over small integers of a Galois extension K/Q and σ an automorphism, it bounds the
+logarithmic mass of the primes whose Frobenius class is that of σ by the Chebotarev density of
+the class, uniformly in K, with absolute constants and no threshold on the length of the sum.
+The present paper has two aims. The first is the Brauer–Siegel theorem. For a number field
+K with class number hK , regulator RK , and absolute discriminant dK , the theorem asserts
+that log(hK RK ) ∼ 12 log dK as K runs over any sequence of Galois extensions of Q for which
+[K : Q]/ log dK → 0, and its constants have long been ineffective because the proof passes
+through Siegel’s theorem on L(1, χ). Stark [18] located the ineffectivity. If K/k is a normal
+extension and ζK (s) has a real zero β close to one, then β is a zero of ζF (s) for some field F
+with k ⊆ F ⊆ K and [F : k] ⩽ 2. For a field built by a tower of normal steps over Q, an almost
+normal field in the terminology of later authors, the reduction continues down the tower, and
+the only sources of ineffectivity are the quadratic subfields; Stark’s effective cases are the almost
+normal fields without them. Now that Landau–Siegel zeros of quadratic characters over Q are
+excluded [7,9,15] with absolute constants, the theorem is effective for every almost normal field,
+in particular for every Galois extension of Q. That much is immediate from Stark’s reduction,
+and we state it only in passing (Remark 3.4). Theorem 1.3 concerns the Galois extensions K of
+an arbitrary number field k. Such a K need not be almost normal, and Stark’s reduction stops
+at k, where two obstructions remain, the quadratic extensions F/k and the zeta function of k
+itself. The first is removed by Theorem 1.1 and Corollary 1.2, the exclusion of Landau–Siegel
+zeros for the quadratic characters of k, and the second is a constant depending only on k. The
+outcome is the Brauer–Siegel theorem, effective and uniform over all Galois extensions of a
+fixed base field.
+The second aim is the method. The argument of [8], carried out in a Galois extension K/k
+of number fields with group G, with one variable for each element of a subset S ⊂ G containing
+the identity, bounds the logarithmic mass of the primes of k whose Frobenius lies in S by the
+Chebotarev density |S|/|G| of those primes, uniformly in K (Theorem 1.4). The constant is the
+number of variables |S| divided by the rank [K : Q] of the lattice of points, times [k : Q]. In the
+quadratic case K = F (ξ), with ξ a primitive ℓ-th root of unity and S the identity together with
+the coset of Gal(K/F ) occupied by the inert primes, this is 12 + 1/[K : k], which can be made
+as close to 21 as we please by letting ℓ → ∞. The only input from the field itself is Masser’s
+√ √
+invariant of the lattice, and its computation, a Galois-theoretic argument specific to Q( d, 2 )
+in [8], becomes in general an averaging over the Galois group of the normal closure that uses
+only its transitivity on embeddings (Proposition 4.2). Independently, and at the same time,
+Frei and Kai [5] carried the argument of [8] over an arbitrary number field k and obtained
+
+LANDAU–SIEGEL ZEROS AND EFFECTIVE BRAUER–SIEGEL
+
+3
+
+Corollary 1.2 for real Hecke characters of k, with a constant depending on k; their observation
+that a single complex embedding suffices in the computation of Masser’s invariant is explained
+by Proposition 4.2. Over Q the determinant method, as used in [9], gives sharper bounds
+than Theorem 1.4, with the exact density, no threshold in X, and no hypothesis on S; the two
+methods are compared in §7.
+1.2. Results. Throughout the paper, k is a number field of degree nk := [k : Q]. For a quadratic
+extension F/k, let χ = χF/k be its quadratic character, so that χ(p) = 1, −1, 0 according to
+whether p splits, is inert, or ramifies in F , and L(s, χ) = ζF (s)/ζk (s).
+Theorem 1.1. Let k be a number field. For each ε > 0 there is a number C0 = C0 (ε),
+independent of k, such that for every C ⩾ C0 , every quadratic extension F/k, and X := dFC ,
+we have
+
+X log Np  1
+⩽
++ ε log X + Ok,ε,C (1).
+Np
+2
+Np⩽X
+χ(p)=−1
+
+The threshold C0 is independent of k because the field K = F (ξ) in which the proof operates
+1/(2n )
+has a Q-basis of integers of house about dF k (Lemma 2.1), whereas a general field with the
+same discriminant enjoys only Minkowski’s bound. The fact that a bound of the shape of
+Theorem 1.1 rules out Landau–Siegel zeros is a standard piece of analytic number theory; we
+include the deduction in §3 for completeness.
+Corollary 1.2. For every number field k there is an effectively computable constant c(k) > 0
+such that for every quadratic extension F/k, every real zero β ∈ (0, 1) of L(s, χF/k ) satisfies
+(1 − β) log dF ⩾ c(k).
+For k = Q, this is the theorem of [15]; for general k, it is also Theorem 1.1 of [5], stated
+there for real Hecke characters, with a constant that is in principle effective. What is added
+here is the threshold C0 (ε) of Theorem 1.1, which does not depend on k, the argument that c(k)
+is effectively computable, and Theorem 1.3 below. The dependence of c(k) on k enters through
+one analytic input only, Mertens’ theorem for k, and we comment on it in §3.2. Combined with
+Stark’s reduction, Corollary 1.2 yields the effective Brauer–Siegel theorem over k.
+For a number field K, we write hK , RK , and dK for its class number, regulator, and absolute
+discriminant [14, Chapter I, §§5–7].
+Theorem 1.3. For every number field k, there is an effectively computable constant c(k) > 0
+such that for every Galois extension K/k with K ̸= Q the following hold.
+(i) Every real zero β ∈ (0, 1) of ζK (s) satisfies (1 − β) log dK ⩾ c(k).
+
+1/2 
+(ii) hK RK ⩾ c(k) dK
+(2π)[K:Q] log dK .
+In particular,
+log(hK RK ) ⩾ 12 log dK − log log dK − [K : Q] log 2π − Ck ,
+thus the Brauer–Siegel theorem holds effectively, with constants depending only on k, over every
+sequence of Galois extensions K of k with [K : Q]/ log dK → 0.
+The proof is given in §3. The matching upper bound
+log(hK RK ) ⩽ 12 log dK + O([K : Q] log log dK )
+is classical and effective, for instance by Louboutin’s bound
+[K:Q]−1
+κK ⩽ e log dK /(2[K : Q] − 2)
+for the residue [12, Theorem 1]. Thus, the essential content of Theorem 1.3 is the lower bound.
+Stark’s effective cases of the Brauer–Siegel theorem required the field to have no quadratic
+
+4
+
+WILLIAM D. BANKS
+
+subfield; Theorem 1.3 removes this requirement for Galois extensions of k at the cost of a
+constant depending on k, and the dependence is through the real zeros of ζk (s) alone (§3.2).
+Theorem 1.1 is the quadratic case of a uniform upper bound for Chebotarev sums. To
+formulate it, we first introduce some terminology. Let K/k be a Galois extension of number
+fields with group G := Gal(K/k), and put
+nk := [k : Q],
+
+nK := [K : Q],
+
+|G| = nK /nk .
+
+Let S ⊂ G be a subset containing the identity. For a prime p of k unramified in K and a prime P
+of K above p, we use Frob P to denote the Frobenius element in G. The set Cp := {Frob P : P | p}
+is a conjugacy class of G. We put
+δp :=
+
+|S ∩ Cp |
+|Cp |
+
+(p unramified in K),
+
+δp := 0
+
+(p ramified in K).
+
+(1.1)
+
+Since G permutes the primes above p transitively, and Frob gP = g Frob P g −1 for all g ∈ G, the
+weight δp is the proportion of the primes P | p for which Frob P ∈ S. When S is a union of
+conjugacy classes, δp is the indicator of Cp ⊂ S. By the Chebotarev density theorem, for fixed
+K and S, we have
+X
+|S|
+log Np X |S ∩ C| |C|
+δp
+=
+·
+log X + OK (1) =
+log X + OK (1),
+(1.2)
+Np
+|C|
+|G|
+|G|
+Np⩽X
+
+C
+
+where the second sum is taken over the conjugacy classes of G. The underlying result of the
+paper is an upper bound of this strength that is uniform in K.
+Theorem 1.4. For every ε > 0 and nK ⩾ 1, there is a number C0 = C0 (ε, nK ) such that the
+following holds. Let K/k be a Galois extension of number fields with [K : Q] = nK and group G,
+C . Then
+let S ⊂ G contain the identity, let C ⩾ C0 and X := dK
+
+X
+log Np  |S|
+δp
+⩽
++ ε log X + OnK ,ε,C (1).
+Np
+|G|
+Np⩽X
+
+By (1.2) the constant |S|/|G| is best possible. Theorem 1.4 is a consequence of the following
+more precise inequality, in which the dependence on K is isolated in one quantity. Let λK ⩾ 1
+be the least number such that OK contains nK elements, linearly independent over Q, all of
+1/2
+whose conjugates have absolute value at most λK . Minkowski’s theorem gives λK ⩽ dK (see
+(4.1) below).
+Theorem 1.5. Let K/k, G, S, nK , nk be as above and let
+ H ⩾ 2 be an integer. There is
+X0 = X0 (nK , H) such that for all X ⩾ max X0 , (log dK )nK , we have
+
+X
+log Np 
+|S| − 1  |S|
+δp
+⩽ 1+
+log X + nk log λK + OnK ,H (1).
+(1.3)
+Np
+H
+|G|
+Np⩽X
+
+The identity element must belong to S because the argument spends one variable on θ itself,
+to which the Frobenius congruence θNp ≡ σ(θ) ties the variable σ(θ). The hypothesis is a
+normalization, since the argument with ι0 (θ) as the distinguished variable bounds the mass of
+Sι−1
+0 for any ι0 ∈ S; see Remark 7.1.
+Kominers [9] proves, for K/Q Galois of degree nK and a conjugacy class C of size c, that
+
+X log p
+c 
+1
+log X + log dK + log log 3X + O(c)
+(X ⩾ 2)
+⩽
+p
+nK
+2
+p⩽X
+Cp =C
+
+holds with an absolute implied constant. Summed over the classes meeting S with the weights
+(1.1), this result implies our Theorem 1.4 for k = Q with ε replaced by 1/(2C), no threshold,
+and no hypothesis on S. Theorem 1.5 is the analogue produced by the Masser route; its field
+
+LANDAU–SIEGEL ZEROS AND EFFECTIVE BRAUER–SIEGEL
+
+5
+
+term nk log λK plays the part of 2ncK log dK , and its factor 1 + (|S| − 1)/H is the price of simple
+vanishing in |S| variables, which the derivatives in the determinant method avoid. We return
+to the comparison in Remark 7.1.
+1.3. Outline of the proof. Theorem 1.5 is the heart of the paper; Theorems 1.4 and 1.1
+follow from it by choices of the parameters. Its proof compares two counts of polynomials, and
+it has five ingredients.
+The points. Fix ω1 , . . . , ωnK ∈ OK , linearly independent
+P over Q, of house at most λK . For an
+n
+K
+integer N and n ∈ N := {0, . . . , N − 1} put θn := t nt ωt , and attach to θn the point
+
+θnS := ι(θn ) ι∈S ∈ Cs ,
+one coordinate for each element of S read as an embedding of K. These N nK points lie in the
+lattice Γ generated by ω1S , . . . , ωnSK , which has rank nK in Cs , and every coordinate has house
+at most B := nK λK N .
+The zero estimate. A nonzero polynomial in s variables that vanishes at all N nK points has
+degree at least ((N − 1)/s)nK /s (Corollary 4.3). This is Masser’s theorem, whose exponent is his
+invariant µ(Γ), a minimum over the subspaces V ⊂ Cs of (nK − rank(Γ ∩ V ))/(s − dim V ), and
+the only input from the field is the computation µ(Γ) = nK /s (Proposition 4.2). It amounts
+to the statement that any t of the nK embeddings of K see at least the fraction t/nK of every
+rational subspace of K, and it is proved by averaging over the Galois group of the normal
+closure of K. We fix the degree bound D just below Masser’s threshold, so that no nonzero
+polynomial of degree at most D vanishes at all the points.
+The Frobenius congruence. Let p be a prime of k unramified in K with Np ⩾ H, and let
+σ ∈ S ∩ Cp . Then θNp ≡ σ(θ) modulo the product Qp,σ of the primes above p with Frobenius
+σ, an ideal of norm Np |G|/|Cp | (Lemma 5.1). The point is that σ(θn ) is again a coordinate of
+θnS , because σ ∈ S; this is where the hypothesis on S enters, and the norm of Qp,σ is where the
+weight δp comes from. We work in the module PolyD of polynomials over OK in the variables
+zι , ι ∈ S, of weighted degree at most D, where z1 has weight one and every other variable
+∗
+has weight H. The module has a basis of polynomials z1v (z1Np − zσ )b zα (Lemma 5.2), whose
+b with b = ⌊α /Np⌋ (Lemma 5.3); the weights guarantee that
+values at the points lie in Qp,σ
+1
+Np
+the substitution z1 7→ zσ does not leave PolyD . Hence the vector of values of f ∈ PolyD at
+Q m
+Q
+−E
+the points, reduced modulo P := Qp,σp , takes at most NP A NQp,σ p values, where A is the
+rank of PolyD and Ep is the sum of ⌊α1 /Np⌋ over its basis monomials (Lemma 5.4).
+The pigeonhole. The polynomials f ∈ PolyD whose coefficients satisfy ∥cα ∥B |α| ⩽ T number
+at least (T /(nK λK ))nK A B −nK W , where W is the sum of the degrees of the basis monomials.
+When there are more such polynomials than residue vectors, two of them agree modulo P at
+every point, and their difference ℘ takes at every point a value in P of house less than NP 1/nK ,
+which is zero. Taking logarithms, this happens as soon as
+1 X
+δp Ep log Np > W log B + A log(4nK AλK )
+nk p
+(Lemma 5.5), the sum over the admissible primes with Np ⩽ D. The weight arises here, as
+X
+log NQp,σ = |G| δp log Np.
+σ∈S∩Cp
+
+The comparison. The zero estimate forbids ℘, so the inequality fails. Up to lower order
+terms, A, W , and Ep are integrals over a simplex, with W = (1 + (s − 1)/H)I and Ep = I/Np
+for I := Ds+1 /((s + 1)! H s−1 ) (Lemma 6.1), and dividing by I leaves
+X
+
+log Np 
+s − 1
+δp
+⩽ 1+
+nk log N + nk log λK + OnK ,H (1)
+Np
+H
+Np⩽D
+
+6
+
+WILLIAM D. BANKS
+
+(Proposition 6.2). The lattice has rank nK , but there are only s variables, so log D = nsK log N +
+s
+O(1) and nk log N = |G|
+log D + O(1); this is the Chebotarev density. The term nk log λK is the
+price of the field, at most n2K log dK by Minkowski’s theorem and at most 12 log dF + Ck in the
+quadratic case (Lemma 2.1), and ε log X absorbs it once X is a large power of the discriminant.
+The deductions of Corollary 1.2 and Theorem 1.3 are classical. A real zero β of L(s, χF/k )
+depletes the split primes (Lemma 3.1), Mertens’ theorem for k says that all primes carry mass
+log X, and Theorem 1.1 caps the inert primes at ( 21 + ε) log X, which leaves no room unless
+(1 − β) log dF ≫ 1. For K/k Galois, Stark’s reduction places a real zero of ζK (s) near one on a
+field F with k ⊆ F ⊆ K and [F : k] ⩽ 2, where Corollary 1.2 or the zeta function of k bounds
+it away from one, and Stark’s lower bound for the residue of ζK (s) in terms of its real zeros
+gives Theorem 1.3.
+The paper is organized as follows.
+§2
+§3
+§4
+§5
+§6
+§7
+
+Theorem 1.1 from Theorem 1.5
+Corollary 1.2 and Theorem 1.3
+the lattice of points and the zero estimate
+the Frobenius congruence and the pigeonhole step
+Theorems 1.4 and 1.5
+comparison with the determinant method
+
+1.4. Conventions. The letter p always denotes a rational prime, p a prime of k, and P a
+prime of K. We write Ok , OK for the rings of integers, dk , dK for the absolute discriminants,
+and N for the absolute norm of ideals, the ring being clear from context; for x ∈ K × we put
+Nx := |NK/Q (x)|. Constants CnK depend only on nK , constants Ck only on k, and they may
+change from line to line. We use standard asymptotic notation; a subscript on O or ≪ names
+the parameters on which the implied constant depends. For a finite set A, we use |A| to denote
+its cardinality. We fix an embedding of K in C and regard K as a subfield of C; the elements
+of G are then embeddings K → C. For θ ∈ K we write
+∥θ∥ := max |ι(θ)|,
+ι
+
+the maximum over the nK embeddings ι : K → C; for θ ∈ k this is the maximum over the
+embeddings of k. Then ∥·∥ is submultiplicative and subadditive, and any nonzero θ ∈ OK has
+∥θ∥ ⩾ 1 since its norm is a nonzero integer.
+
+2. Quadratic extensions
+Theorem 1.1 is deduced here from Theorem 1.5, which is proved in §6; nothing in this section
+or the next depends on how it is proved.
+Let k be a number field of degree nk , let F/k be a quadratic extension, let ℓ be a prime,
+let ξ be a primitive ℓ-th root of unity, and put K := F (ξ). The field enters Theorem 1.5
+through the term nk log λK , which (4.1) bounds by 12 nK log dK . The threshold in Theorem 1.1
+1/(2n )
+
+is independent of k because K has a Q-basis of house about dF k , and such a basis exists
+once F is generated by the square root of an integer of k all of whose conjugates have size about
+1/n
+dF k . Over Q the fundamental discriminant is such an integer, with Ck = 1 below.
+√
+1/n
+Lemma 2.1. There is τ ∈ Ok with F = k( τ ) and |ι(τ )| ⩽ Ck dF k for every embedding
+1/(2n )
+ι : k → C. Consequently λK ⩽ Ck dF k , that is, nk log λK ⩽ 21 log dF + Ck .
+√
+Proof. Write F = k( τ0 ) with τ0 ∈ Ok , and factor (τ0 ) = ab2 with a squarefree. A prime of
+k dividing a has odd valuation at τ0 , so it ramifies in F . Hence a | dF/k by [14, Chapter III,
+Corollary (2.12)], and Na ⩽ NdF/k = dF /d2k by [14, Chapter III, Corollary (2.10)].
+
+LANDAU–SIEGEL ZEROS AND EFFECTIVE BRAUER–SIEGEL
+
+7
+
+By Minkowski’s theorem [14, Chapter I, Theorem (6.3)], the ideal class of b contains an
+integral ideal c of norm at most Ck . Write b = γc with γ ∈ k × and put τ1 := τ0 γ −2 . Then
+√
+(τ1 ) = ac2 , so τ1 ∈ Ok and Nτ1 ⩽ Ck dF , and F = k( τ1 ).
+Let ι run over the nk embeddings of k. By Dirichlet’s unit theorem [14, Chapter I, Theorems (7.3) and (7.4)], the image of Ok× under u 7→ (log |ι(u)|)ι is a lattice of full rank in
+the subspace of Rnk of vectors with coordinate sum
+ zero and equal coordinates at conjugate
+embeddings. The vector log |ι(τ1 )| − n1k log Nτ1 ι lies in that subspace, so there is a unit u
+with
+1
+2 log |ι(u)| + log |ι(τ1 )| −
+log Nτ1 ⩽ Ck
+nk
+√
+1/n
+for every ι. Put τ := τ1 u2 . Then τ ∈ Ok , F = k( τ ), and |ι(τ )| ⩽ Ck (Nτ1 )1/nk ⩽ Ck dF k for
+every ι.
+√
+For the √
+second claim, fix a Z-basis of Ok and let ω run over it. Since K = k( τ , ξ), the
+a
+elements ω τ ξ j with a ∈ {0, 1} and 0 ⩽ j ⩽ ℓ − 2 lie in OK and span K over Q, so some
+nK of them form a Q-basis of K. Every conjugate of ξ has absolute value one, every conjugate
+√
+1/(2n )
+of τ has absolute value |ι(τ )|1/2 ⩽ Ck dF k for some ι, and the ω have house at most Ck .
+1/(2n )
+Hence λK ⩽ Ck dF k .
+□
+Proof of Theorem 1.1. Let ε ∈ (0, 1], put C0 := ⌈4/ε⌉, and fix a prime ℓ with ℓ − 1 ⩾ 8nk /ε.
+Let F/k be quadratic, and put K := F (ξ), G := Gal(K/k), and GF := Gal(K/F ), a subgroup
+of index 2. Then nK ⩽ 2nk (ℓ − 1), and |G| = [K : k] ⩾ [k(ξ) : k] ⩾ (ℓ − 1)/nk , since k(ξ) ⊃ Q(ξ).
+Put S := {1} ∪ (G \ GF ). Then
+s=
+
+|G|
++1
+2
+
+and
+
+s
+1
+1
+1 ε
+= +
+⩽ + .
+|G|
+2 |G|
+2 8
+
+For a prime p of k unramified in K and P | p, the restriction of Frob P to F is the Frobenius
+of P ∩ F over p, which is nontrivial exactly when p is inert in F . Thus Cp ⊂ G \ GF when
+χ(p) = −1, and δp = 1 for every inert prime unramified in K. An inert prime ramified in K
+is ramified in K/F and so divides ℓ; there are at most nk such primes, and each contributes at
+most log Np/Np ⩽ 1.
+[K:F ]
+Let C ⩾ C0 , X := dFC , and H := ⌈16nk (ℓ − 1)/ε⌉. We have dK = dF
+NdK/F , and dK/F
+divides the discriminant of the minimal polynomial of ξ over F , which divides disc(Φℓ ) = ±ℓℓ−2 ;
+hence
+log dK ⩽ (ℓ − 1) log dF + 2nk (ℓ − 2) log ℓ.
+Since nK takes finitely many values, the conditions
+X ⩾ X0 (nK , H)
+
+and
+
+X ⩾ (log dK )nK
+
+of Theorem 1.5 hold once dF is large in terms of k, ℓ, H, and C; assume that this is the case.
+1
+log X + Ck , and Theorem 1.5
+By Lemma 2.1 and log dF = C1 log X, we have nk log λK ⩽ 2C
+gives
+X log Np
+X
+log Np
+⩽
+δp
++ nk
+Np
+Np
+Np⩽X
+χ(p)=−1
+
+Np⩽X
+
+
+s − 1  1 ε
+1 
+⩽ 1+
++ +
+log X + Ok,ℓ,H,C (1).
+H
+2 8 2C
+Here (s − 1)/H ⩽ nk (ℓ − 1)/H ⩽ ε/16 by the choice of H, and 1/(2C) ⩽ ε/8 by the choice of
+C0 , so the coefficient of log X is at most
+
+ε  1 ε  1
+1+
++
+< + ε.
+16 2 4
+2
+Since ℓ and H depend only on k and ε, the error term is Ok,ε,C (1), and C0 depends on ε
+alone. The remaining fields F have bounded discriminant, so there are finitely many of them
+by Hermite’s theorem, and for each of them the bound holds with the constant 21 by (1.2). □
+
+8
+
+WILLIAM D. BANKS
+
+More precisely, the proof gives, for every prime ℓ, every integer H ⩾ 2, every C ⩾ 2, and dF
+large in terms of k, ℓ, H, C,
+X log Np 
+|G|  1
+1
+1 
+⩽ 1+
++
++
+log X + Ok,ℓ,H,C (1),
+(2.1)
+Np
+2H 2 |G| 2C
+Np⩽X
+χ(p)=−1
+
+√
+∗
+(ℓ−1)/2 ℓ; the case ℓ = 3 over Q
+∗
+with |G| = 2(ℓ − 1) whenever
+ℓ
+∤
+d
+and
+F
+=
+̸
+k(
+k
+√ ℓ ), ℓ := 3(−1)
+√
+is the argument of [8] with −3 in place of 2, and gives 4 + ε.
+
+3. Landau–Siegel zeros and the Brauer–Siegel theorem
+Lemma 3.1. Let β ∈ (0, 1) be a real zero of L(s, χ) and X ⩾ 3. Then
+X log Np
+≪ log dF + (1 − β)(log X)2 ,
+Np
+Np⩽X
+χ(p)=1
+
+with an absolute implied constant.
+Proof. Put s0 := 1 + 1/ log X, so that 1 < s0 ⩽ 2. The Dirichlet series
+X
+ζ′
+ΛF (a)Na−s0 ,
+− F (s0 ) =
+ζF
+a
+the sum over the nonzero ideals of F , has nonnegative coefficients. A prime p of k with χ(p) = 1
+and Np ⩽ X has two primes of F above it, each of norm Np, and Np−1/ log X ⩾ e−1 ; hence
+
+X log Np
+e  ζF′
+⩽
+−
+(s0 ) .
+Np
+2
+ζF
+Np⩽X
+χ(p)=1
+
+On the other hand, β is a zero of ζF (s) = ζk (s)L(s, χ), and the Hadamard product of the
+completed zeta function of F gives, for real s0 with 1 < s0 ⩽ 2,
+ζ′
+1
+1
+1
++ log dF + O([F : Q]) −
+,
+− F (s0 ) ⩽
+ζF
+s0 − 1 2
+s0 − β
+with an absolute implied constant, every other nontrivial zero contributing a negative term;
+see [18, Lemma 3, (9) and (10)] or [10, proof of Lemma 8.1], and [4, Chapter 14] for k = Q.
+Here [F : Q] ≪ log dF by Minkowski’s bound, and
+1
+1
+1−β
+1−β
+−
+=
+⩽
+= (1 − β)(log X)2 ,
+s0 − 1 s0 − β
+(s0 − 1)(s0 − β)
+(s0 − 1)2
+since s0 − β ⩾ s0 − 1. The lemma follows.
+We also need Mertens’ theorem for k, which asserts
+X log Np
+= log x + Ok (1)
+Np
+
+□
+
+(x ⩾ 2);
+
+(3.1)
+
+Np⩽x
+
+see Rosen [17], and Garcia and Lee [6, Theorem 1] for an explicit constant in terms of nk , dk ,
+and the residue κk of ζk (s) at s = 1, for nk ⩾ 2. We also use the trivial bound for the ramified
+primes,
+X log Np
+ω(dF/k )
+⩽
+⩽ log dF ,
+(3.2)
+Np
+e
+χ(p)=0
+
+where ω(dF/k ) ⩽ log2 NdF/k is the number of primes dividing dF/k and (log t)/t ⩽ 1/e for t > 0.
+
+LANDAU–SIEGEL ZEROS AND EFFECTIVE BRAUER–SIEGEL
+
+9
+
+Proof of Corollary 1.2. Let c1 be the implied constant in Lemma 3.1, an absolute constant, and
+apply Theorem 1.1 with ε = 18 and C := max(C0 ( 81 ), 8c1 , 8), so that X = dFC and log dF =
+1
+1
+C log X ⩽ 8 log X. By (3.1), Theorem 1.1, and (3.2), the split primes satisfy
+1 1
+X log Np
+1
+1
+⩾ log X −
++
+log X − log X − Ok (1) = log X − Ok (1).
+Np
+2 8
+8
+4
+
+Np⩽X
+χ(p)=1
+
+Let β ∈ (0, 1) be a real zero of L(s, χ). By Lemma 3.1 and c1 log dF ⩽ 81 log X, the same sum
+is at most c1 (1 − β)(log X)2 + 18 log X. Hence
+1
+log X
+c1 (1 − β)(log X)2 ⩾ 81 log X − Ok (1) ⩾ 16
+
+once dF is large in terms of k, and then (1 − β) log dF ⩾ 1/(16c1 C). The remaining fields F
+have bounded discriminant, so there are finitely many of them by Hermite’s theorem. For each
+of them, L(s, χ) has finitely many real zeros in (0, 1), and the largest of them, βF , satisfies
+βF < 1 because L(1, χ) ̸= 0. The corollary follows on decreasing c(k) to minF (1 − βF ) log dF .
+Every constant is effectively computable. The constants of Theorem 1.1 and Lemma 3.1
+and Mertens’ constant for k are explicit, Hermite’s bound is effective, and for each remaining
+F with βF ⩾ 21 , a positive lower bound for 1 − βF follows from the mean value theorem,
+L(1, χ) = L′ (s1 , χ)(1 − βF ) for some s1 ∈ (βF , 1), since L(1, χ) = κF /κk > 0 is computable
+from the class number formula, and L′ (σ, χ) is bounded on [ 21 , 1] by an explicit function of dF
+and nk , by Rademacher’s explicit convexity bound [16, Theorem 5].
+□
+
+3.1. The Brauer–Siegel theorem over k. For a number field K, let hK , RK , and wK be
+its class number, regulator, and number of roots of unity, let r1 and r2 be its numbers of real
+and complex places, and let
+
+κK := lim (s − 1)ζK (s) =
+s→1
+
+2r1 (2π)r2 hK RK
+1/2
+
+,
+
+wK dK
+
+the residue of ζK (s) at s = 1 [14, Chapter VII, Corollary (5.11)]. We use two results of Stark.
+The first is his generalization of a theorem of Heilbronn, which reduces a real zero near one to
+a subextension of degree at most two.
+Lemma 3.2 (Stark [18, Lemma 3 and Theorem 3]). Let K/k be a Galois extension with K ̸= Q,
+and let β be a real zero of ζK (s) with 1 − β ⩽ 1/(4 log dK ). Then β is a simple zero, and there
+is a field F with k ⊆ F ⊆ K and [F : k] ⩽ 2 such that ζF (β) = 0.
+Stark’s Lemma 3 says that ζK (s) has at most one zero in the region σ ⩾ 1 − 1/(4 log dK ),
+|t| ⩽ 1/(4 log dK ), and that it is real and simple; his Theorem 3 says that a simple real zero of
+ζK (s), for K/k normal, is a zero of ζF (s) for F = k or F quadratic over k.
+The second result is his lower bound for the residue in terms of the real zeros. Let βK be
+the largest real zero of ζK (s) in [1 − 1/(4 log dK ), 1) if there is one, and βK := 1 − 1/(4 log dK )
+otherwise.
+Lemma 3.3 (Stark [18, Lemma 4]). There is an absolute effective constant c2 > 0 such that
+κK ⩾ c2 (1 − βK ) for every number field K ̸= Q.
+
+10
+
+WILLIAM D. BANKS
+
+Now we come to the proof of Theorem 1.3, which traces a real zero β of ζK (s) down the
+tower until it meets one of the two inputs.
+K
+Lemma 3.2 ζK (β)=0, 1−β⩽1/(4 log dK )
+
+F
+L(β,χF/k )=0
+
+ζk (β)=0
+
+(1 − β) log dk ⩾ ηk
+
+(1 − β) log dF ⩾ c(k)
+
+Here k ⊆ F ⊆ K with [F : k] ⩽ 2, and ζF (s) = ζk (s)L(s, χF/k ) when [F : k] = 2; the left
+branch is the only one when F = k, and the right branch is Corollary 1.2. The constant ηk on
+the left is the contribution of the base field,
+
+ηk := min (1 − β ′ ) log dk : β ′ ∈ (0, 1), ζk (β ′ ) = 0 ,
+with ηk := 1 if ζk (s) has no real zero in (0, 1), as for k = Q. Since ζk (s) has finitely many zeros
+in (0, 1) and ζk (1) ̸= 0, we have ηk > 0.
+Proof of Theorem 1.3. Let c(k) be the constant of Corollary 1.2, and let c2 be the constant of
+Lemma 3.3, which we may take to be at most one.
+(i) Let K/k be Galois with K ̸= Q, and let β ∈ (0, 1) be a real zero of ζK (s). We prove
+
+(3.3)
+(1 − β) log dK ⩾ min 41 , c(k), ηk .
+We use dk ⩽ dF ⩽ dK for every F between k and K, which holds since the discriminant of an
+extension is divisible by a power of the discriminant of the base.
+Case 1: 1 − β > 1/(4 log dK ). Then (1 − β) log dK > 14 .
+Otherwise 1 − β ⩽ 1/(4 log dK ), and Lemma 3.2 provides F with k ⊆ F ⊆ K, [F : k] ⩽ 2,
+and ζF (β) = 0. If F = k, then ζk (β) = 0; if [F : k] = 2, then ζF (s) = ζk (s)L(s, χF/k ), so β is a
+zero of one of the two factors.
+Case 2: ζk (β) = 0. Then (1 − β) log dK ⩾ (1 − β) log dk ⩾ ηk by the definition of ηk .
+Case 3: [F : k] = 2 and L(β, χF/k ) = 0. Then (1 − β) log dK ⩾ (1 − β) log dF ⩾ c(k) by
+Corollary 1.2.
+This proves (3.3), and (i) holds with c(k) replaced by c3 (k) := c2 min( 41 , c(k), ηk ).
+(ii) Let βK be as in Lemma 3.3. Either βK is a real zero of ζK (s), and then (3.3) applies to
+it, or βK = 1 − 1/(4 log dK ); in both cases 1 − βK ⩾ min( 14 , c(k), ηk )/ log dK . By Lemma 3.3
+and the residue formula,
+1/2
+
+hK RK =
+
+1/2
+
+1/2
+
+wK dK
+dK
+c3 (k) dK
+κ
+⩾
+·
+c
+(1
+−
+β
+)
+⩾
+,
+2
+K
+K
+r
+r
+n
+2 1 (2π) 2
+(2π) K
+(2π)nK log dK
+
+since wK ⩾ 1 and 2r1 (2π)r2 ⩽ (2π)nK . This is (ii) with the constant c3 (k), and taking logarithms
+gives the displayed inequality of the theorem with Ck := − log c3 (k).
+Finally, c3 (k) is effectively computable. The constants c(k) and c2 are, by Corollary 1.2
+and Stark’s proof of Lemma 3.3, and so is ηk . A real zero β ′ < 12 of ζk (s) contributes at least
+1
+1
+′
+′
+2 log dk , and for β ⩾ 2 the entire function (s −1)ζk (s) vanishes at β and takes the value κk > 0
+at s = 1, so 1 − β ′ is bounded below as in the proof of Corollary 1.2.
+□
+Remark 3.4. If k is almost normal over Q, every Galois extension K of k is as well, and
+Theorem 1.3 holds with an absolute constant in place of c(k). Indeed, Stark’s Lemma 10 [18],
+the tower form of Lemma 3.2, places a real zero β of ζK (s) with 1 − β ⩽ 1/(16 log dK ) on a
+subfield F ⊂ K with [F : Q] ⩽ 2, where the theorem over Q [7, 9, 15] gives (1 − β) log dF ⩾ c0
+with an absolute constant; the rest of the proof is unchanged.
+
+LANDAU–SIEGEL ZEROS AND EFFECTIVE BRAUER–SIEGEL
+
+11
+
+3.2. What is uniform in the field. The proof of (1.3) is uniform in K and k except for the
+term nk log λK , which is at most n2K log dK in general and 12 log dF + Ck in the quadratic case,
+C0
+and which ε log X absorbs once X ⩾ dK
+. The one input to Corollary 1.2 that is not uniform is
+Mertens’ constant in (3.1). By the explicit formula for ζk (s), that constant is governed by the
+real zeros of ζk (s) near s = 1, the phenomenon under study one degree down. The same zeros
+enter Theorem 1.3 a second time, through ηk in the proof. Thus Theorem 1.1 is as uniform
+as the house bound, while its consequences for the zeros and for hK RK are uniform only over
+extensions of a fixed k; the obstruction is the exceptional zero of ζk (s) for a field k that is not
+almost normal, and we do not address it.
+
+4. The lattice and the zero estimate
+4.1. Integers of small house. Recall that nK = [K : Q], and let r1 and r2 be the numbers
+of real and complex places of K, so that nK = r1 + 2r2 . The quantity λK is controlled by
+the discriminant. Under the Minkowski embedding, OK is a lattice in Rr1 × Cr2 of covolume
+1/2
+2−r2 dK , and ∥·∥ is the maximum norm on this space, whose unit ball has volume 2r1 π r2 . Let
+λ1 ⩽ . . . ⩽ λnK be the successive minima of OK with respect to ∥·∥. By Minkowski’s theorem
+on successive minima [2, Chapter VIII, Theorem V], we have
+1/2
+
+1/2
+
+λ1 · · · λnK ⩽ (2/π)r2 dK ⩽ dK .
+A nonzero algebraic integer has house at least one, so λ1 ⩾ 1, and therefore
+1/2
+
+λK ⩽ λnK ⩽ dK .
+
+(4.1)
+
+From now on, we fix ω1 , . . . , ωnK ∈ OK , linearly independent over Q, with
+∥ωt ∥ ⩽ λK
+
+(1 ⩽ t ⩽ nK ).
+
+(4.2)
+
+Such elements exist by the definition of λK ; they need not form a Z-basis of OK .
+4.2. The points. Fix an integer N ⩾ 2 and put
+N := {0, 1, . . . , N − 1}nK ,
+
+B := nK λK N.
+
+For n = (n1 , . . . , nnK ) ∈ N we define
+θn := n1 ω1 + · · · + nnK ωnK ∈ OK ,
+so that ∥θn ∥ ⩽ B by (4.2). Recall that s := |S|. For θ ∈ K and a set T of embeddings K → C
+we write
+
+θT := ι(θ) ι∈T ∈ C|T| ,
+(4.3)
+and for u = (u1 , . . . , ur )∈ K r we write uT for the |T| × r matrix with rows ι(u), ι ∈ T, where
+T
+T
+ι(u) := ι(u1 ), . . . , ι(ur ) ; that is, its columns are uT
+1 , . . . , ur . The map θ 7→ θ is Q-linear, and
+θT determines θ when T ̸= ∅, since each ι is injective. Our points are
+θnS ∈ OKs ⊂ Cs
+
+(n ∈ N ),
+
+every coordinate of which has house at most B, and by linearity
+θnS = n1 ω1S + · · · + nnK ωnSK .
+Let Γ ⊂ Cs be the subgroup generated by ω1S , . . . , ωnSK , and let π : CnK → Cs be the linear map
+with π(et ) = ωtS , so that Γ = π(ZnK ). The objects introduced so far fit into the commutative
+
+12
+
+WILLIAM D. BANKS
+
+diagram
+ZnK
+
+N
+v7→
+
+n7→θn
+
+P
+
+t v t ωt
+
+{θn }
+
+QnK
+v7→
+
+P
+
+t vt ωt
+
+OK
+
+θ7→θS
+
+K
+θ7→θS
+
+θ7→θS
+
+{θnS }
+
+π
+
+Cs
+
+Γ
+
+in which the horizontal arrows are inclusions and the vertical composites are restrictions of π.
+For v ∈ QnK we have π(v) = (v1 ω1 + · · · + vnK ωnK )S , which vanishes only if v = 0, since θS
+determines θ and the ωt are linearly independent over Q. Hence π is injective on QnK , and
+ω1S , . . . , ωnSK is a basis of Γ, which has rank nK .
+4.3. The zero estimate. Let κ ⩾ 1, and let Γ ⊂ Cκ be a nontrivial finitely generated subgroup
+of rank l. For a linear subspace V ⊂ Cκ the group Γ ∩ V has rank at most l, and we define
+l − rank(Γ ∩ V )
+,
+V
+κ − dim V
+the minimum taken over all proper linear subspaces V of Cκ , including V = {0} (and thus,
+µ(Γ) ⩽ l/κ). This is Masser’s generalized Dirichlet exponent, and we use his zero estimate in
+the following form.
+µ(Γ) := min
+
+Theorem 4.1 (Masser [13, Theorem 1]). Let Γ ⊂ Cκ be a nontrivial subgroup of rank l with
+basis v1 , . . . , vl , and let M ⩾ 1. If a nonzero polynomial ℘ ∈ C[z1 , . . . , zκ ] vanishes at every
+point m1 v1 + · · · + ml vl with integers 0 ⩽ mj ⩽ M , then
+deg ℘ ⩾ (M/κ)µ(Γ) .
+The field enters the zero estimate only through the next proposition, which asserts that any
+t of the nK embeddings of K see at least the fraction t/nK of every rational subspace.
+Proposition 4.2. µ(Γ) ⩾ nK /s.
+Proof. Let V ⊂ Cs be a proper subspace of dimension d, and put r := rank(Γ ∩ V ). We must
+show that r ⩽ nK d/s, which is equivalent to (nK − r)/(s − d) ⩾ nK /s.
+Since π is injective on QnK , the set
+U := {v1 ω1 + · · · + vnK ωnK : v ∈ QnK , π(v) ∈ V }
+is a Q-subspace of K of dimension r; in other words, U is the image of π −1 (V ) ∩ QnK in the
+diagram
+π
+
+π −1 (V ) ∩ QnK
+
+QnK
+
+U
+
+∼
+
+K
+
+∼
+
+u 7→uS
+
+θ 7→θS
+
+V
+
+Cs
+
+π
+
+whose bottom row is π restricted to QnK . Fix a Q-basis u1 , . . . , ur of U and put
+u := (u1 , . . . , ur ) ∈ K r .
+
+LANDAU–SIEGEL ZEROS AND EFFECTIVE BRAUER–SIEGEL
+
+13
+
+For u ∈ U the vector uS lies in V , so the columns uS1 , . . . , uSr of the matrix uS lie in V , and its
+rank is at most d. It therefore suffices to show that rank uS ⩾ s r/nK , and we prove this for
+any set T of t distinct embeddings K → C in place of S.
+e ⊂ C be the compositum of the fields
+Let E be the set of all nK embeddings K → C, let K
+e := Gal(K/Q).
+e
+ι(K), ι ∈ E, which is the normal closure of K, and put G
+The fields and groups
+in play are
+e
+K
+
+K
+S⊂G=Gal(K/k)
+
+e
+e
+G=Gal(
+K/Q)
+
+k
+nk
+
+Q
+e
+with K/k and K/Q
+Galois, and K/Q in general not Galois. For ι, ι′ ∈ E the isomorphism
+′
+−1
+′
+ι ◦ ι : ι(K) → ι (K) extends to an element g ∈ e
+G, which is to say that the diagram
+g
+
+e
+K
+
+ι(K)
+
+e
+K
+
+ι′ (K)
+
+ι′ ◦ι−1
+ι
+
+ι′
+
+K
+e acts transitively on E by ι 7→ g ◦ ι, and every fiber {g ∈ G
+e : g ◦ ι = ι′ } is a
+commutes. Hence G
+e K elements. For T′ ⊂ E the matrix uT′
+e : ι(K)] = |G|/n
+coset of the stabilizer of ι and so has [K
+e and our end goal is to show that rank uT ⩾ t r/nK . The idea is to use a double
+has entries in K,
+e the translates
+count. Some r rows of the full matrix uE are independent, and as g runs over G
+gT sweep uniformly over the rows, so on average T meets those r rows in t r/nK places.
+Three facts illuminate the path.
+(a) rank uE = r. Extend u1 , . . . , ur to a Q-basis u1 , . . . , unK of K. The square matrix
+(u1 , . . . , unK )E has nonzero determinant, its square being the discriminant of the basis, so its
+columns uE1 , . . . , uEnK are linearly independent; the first r of them are the columns of uE .
+′
+′
+e Indeed, the diagram
+(b) rank ugT = rank uT for g ∈ G.
+g
+
+e
+K
+ι
+
+e
+K
+
+ι(u)
+
+g entrywise
+
+(g ◦ ι)(u)
+
+g◦ι
+
+K
+′
+
+′
+
+commutes, and therefore ugT is the entrywise image of uT under the field automorphism g,
+which preserves rank.
+(c) In view of (a), there is a set B ⊂ E of r embeddings such that the rows ι(u), ι ∈ B, of
+′
+uE are linearly independent, that is, rank uB = r; hence rank uT ⩾ |T′ ∩ B| for every T′ ⊂ E.
+
+14
+
+WILLIAM D. BANKS
+
+Now, using (b), (c), and the fiber count, we have
+|e
+G| rank uT =
+
+X
+
+rank ugT ⩾
+
+e
+g∈G
+
+X
+
+|gT ∩ B| =
+
+XX
+
+{g ∈ e
+G : g ◦ ι = ι′ } = t r
+
+ι∈T ι′ ∈B
+
+g∈ e
+G
+
+and the proposition follows.
+
+e
+|G|
+,
+nK
+□
+
+Taking V = {0} shows that in fact µ(Γ) = nK /s.
+Corollary 4.3. Let D < ((N − 1)/s)nK /s . Then no nonzero polynomial ℘ ∈ C[zι : ι ∈ S] of
+total degree at most D vanishes at every θnS , n ∈ N .
+Proof. Theorem 4.1 with κ = s, l = nK , M = N − 1, and Proposition 4.2.
+
+□
+
+Corollary 4.3 is the only output of this section used in what follows, and the
+√ ratio
+√ nK /s in its
+exponent is the source of the constant |S|/|G| in Theorem 1.4. For K = Q( d, 2 ) and s = 3
+the exponent is the 43 of [8]; in the quadratic case of §2, where K = F (ξ) and s = 12 [K : k] + 1,
+it is 2nk [K : k]/([K : k] + 2).
+
+5. Polynomials vanishing modulo many primes
+In this section we construct, by the pigeonhole principle, a nonzero polynomial that vanishes
+at every point θnS , provided that the primes with Frobenius in S carry enough logarithmic mass
+(Lemma 5.5). The mechanism is the congruence θNp ≡ σ(θ) modulo the primes above p with
+Frobenius σ, which makes the value at every point of a polynomial divisible by (z1Np − zσ )b lie
+in the b-th power of the product of those primes.
+5.1. The Frobenius congruence. Fix an integer H ⩾ 2. A prime p of k is admissible if it is
+unramified in K and Np ⩾ H. For an admissible p and σ ∈ Cp define the ideal
+Y
+Qp,σ :=
+P ⊂ OK .
+(5.1)
+P|p, Frob P =σ
+
+Since distinct p have distinct primes above them, and distinct σ have disjoint sets of P, the
+ideals (5.1) are pairwise coprime.
+Lemma 5.1 (Frobenius). Let p be admissible and σ ∈ Cp . Then
+θNp ≡ σ(θ) mod Qp,σ
+
+(θ ∈ OK ),
+
+(5.2)
+
+and NQp,σ = Np |G|/|Cp | .
+Proof. By definition of the Frobenius element, θNp ≡ Frob P (θ) mod P for every θ ∈ OK and
+every P | p, and (5.2) follows by the Chinese remainder theorem.
+Let fp be the residue degree of the primes above p, which is the order of the elements of Cp .
+Since p is unramified, there are |G|/fp primes P | p, each of norm Npfp . The map P 7→ Frob P
+from these primes onto Cp is equivariant for the action of G, by transitivity on the primes and
+by Frob gP = g Frob P g −1 , so all its fibers have the same size |G|/(fp |Cp |). Hence Qp,σ is a
+product of |G|/(fp |Cp |) primes of norm Npfp , and NQp,σ = Np |G|/|Cp | .
+□
+5.2. The module of polynomials. We work with s complex variables zι , ι ∈ S, and write z1
+for the variable indexed by the identity of G. Put S∗ := S \ {1}. For a multi-index α = (αι )ι∈S
+of nonnegative integers we write α∗ := (αι )ι∈S∗ for the multi-index with the identity coordinate
+removed, and we put
+X
+Y
+|α| :=
+αι ,
+zα :=
+zιαι ,
+ι∈S
+
+ι∈S
+
+LANDAU–SIEGEL ZEROS AND EFFECTIVE BRAUER–SIEGEL
+∗
+
+15
+∗
+
+and likewise |α∗ | and zα with S∗ in place of S, so that |α| = α1 + |α∗ | and zα = z1α1 zα . Fix
+an integer D ⩾ 1 and define
+X
+A := {α : α1 + H|α∗ | ⩽ D},
+A := |A|,
+W :=
+|α|.
+(5.3)
+α∈A
+α
+Thus A indexes the monomials z of weighted degree at most D, where z1 has weight one and
+
+every other variable has weight H; the reason for the weights appears in Lemma 5.2. For a
+prime p of k put
+X j α1 k
+Ep :=
+.
+(5.4)
+Np
+α∈A
+
+Let PolyD be the free OK -module
+the monomials zα , α ∈ A; every f ∈ PolyD has
+Pwith basis
+α
+total degree at most D. For f = α∈A cα z in PolyD define
+∥f ∥B := max ∥cα ∥B |α| .
+α∈A
+
+Since every coordinate of θnS lies in OK and has house at most B, we have
+f (θnS ) ∈ OK
+and
+∥f (θnS )∥ ⩽ A∥f ∥B
+(n ∈ N ).
+
+(5.5)
+
+Lemma 5.2. Let ν ⩾ H be an integer and σ ∈ S. For α ∈ A write α1 = bν + v with 0 ⩽ v < ν
+and put
+∗
+Gα := z1v (z1ν − zσ )b zα .
+Then the Gα , α ∈ A, form an OK -basis of PolyD .
+Proof. Expanding the binomial,
+ 
+b
+X
+∗
+j b
+Gα = z +
+(−1)
+z1α1 −νj zσj zα .
+j
+α
+
+j=1
+
+∗
+For j ⩾ 1 the monomial z1α1 −νj zσj zα has weighted degree α1 + H|α∗ | − (ν − H)j ⩽ D if σ ̸= 1,
+α −(ν−1)j α∗
+and it is z1 1
+z , of weighted degree α1 + H|α∗ | − (ν − 1)j ⩽ D, if σ = 1. In either case
+it is a basis monomial of PolyD of z1 -degree less than α1 . Hence, when the basis monomials
+
+are ordered by z1 -degree, the matrix expressing the Gα in terms of them is unitriangular.
+
+□
+
+This is the purpose of the weights. The substitution z1ν 7→ zσ lowers the z1 -degree by ν ⩾ H
+and raises |α∗ | by one, so it does not leave PolyD ; with all variables of weight one it would.
+Lemma 5.3. Let p be admissible, let σ ∈ S ∩ Cp be fixed, and let Gα be the basis of Lemma 5.2
+for ν := Np and this σ. Then
+
+⌊α /Np⌋
+Gα (θnS ) ∈ Qp,σ1
+α ∈ A, n ∈ N .
+Proof. The coordinates of θnS indexed by 1 and σ are θn and σ(θn ), and all coordinates lie
+b with
+in OK . By (5.2), θnNp − σ(θn ) ∈ Qp,σ , so the factor (z1Np − zσ )b of Gα contributes Qp,σ
+b = ⌊α1 /Np⌋.
+□
+Lemma 5.4. Let S be a finite set of admissible primes. For p ∈ S put mp := max{1, ⌊D/Np⌋},
+and define
+Y Y
+m
+P :=
+Qp,σp ,
+P := NP.
+(5.6)
+p∈S σ∈S∩Cp
+
+Then the vectors (f (θnS ) mod P)n∈N , f ∈ PolyD , take at most
+Y Y
+−E
+PA
+NQp,σ p
+p∈S σ∈S∩Cp
+distinct values.
+
+16
+
+WILLIAM D. BANKS
+m
+
+Proof. The ideals Qp,σp in (5.6) are pairwise coprime by (5.1), hence by the Chinese remainder
+m
+theorem the vector (f (θnS ) mod P)n is determined by the vectors (f (θnS ) mod Qp,σp )n ; consem A−Ep
+quently, it suffices to show thatP
+for each pair (p, σ) the latter takes at most NQp,σp
+values.
+For fixed (p, σ), write f = α∈A cα Gα in the basis of Lemma 5.2 with ν = Np and this
+m
+choice of σ. By Lemma 5.3, the residue of cα Gα (θnS ) modulo Qp,σp depends only on the residue
+m −⌊α /Np⌋
+
+of cα modulo Qp,σp 1
+, an ideal that has a nonnegative exponent since α1 ⩽ D. Taking
+m
+a
+into account that |OK /Q | = NQa for a ∈ N, the vector (f (θnS ) mod Qp,σp )n takes at most
+Y
+m −⌊α /Np⌋
+m A−Ep
+NQp,σp 1
+= NQp,σp
+α∈A
+
+values, by (5.4), and the result is proved.
+
+□
+
+Lemma 5.5 (Pigeonhole). Let S, P, and P be as in Lemma 5.4, and recall from (1.1) that
+δp = |S ∩ Cp |/|Cp |. If
+1 X
+δp Ep log Np > W log B + A log(4nK AλK ),
+nk
+
+(5.7)
+
+p∈S
+
+then there is a nonzero ℘ ∈ PolyD with ℘(θnS ) = 0 for every n ∈ N .
+Proof. Put T := P 1/nK /(4A). We first count elements f ∈ PolyD that have ∥f ∥B ⩽ T . For
+P
+each α ∈ A, the elements cα = t ut ωt with integers 0 ⩽ ut ⩽ T /(nK λK B |α| ) are pairwise
+distinct, since theP
+ωt are linearly independent, and satisfy ∥cα ∥ ⩽ nK λK maxt ut ⩽ T B −|α| by
+(4.2). Every f = α cα zα formed in this way has ∥f ∥B ⩽ T , hence there are at least
+nK
+Y
+T
+= P A (4nK AλK )−nK A B −nK W
+|α|
+n
+λ
+B
+K K
+α∈A
+Q
+−E
+of them. By Lemma 5.4, these f take at most P A p,σ NQp,σ p distinct residue vectors modulo
+P, the product over p ∈ S and σ ∈ S ∩ Cp . Thus, there are more polynomials than residue
+vectors as soon as
+Y Y
+E
+NQp,σp > (4nK AλK )nK A B nK W .
+(5.8)
+p∈S σ∈S∩Cp
+
+Since NQp,σ = Np |G|/|Cp | by Lemma 5.1, the logarithm of the left side is
+X X
+X
+nK X
+Ep log NQp,σ = |G|
+δp Ep log Np =
+δp Ep log Np,
+nk
+p∈S σ∈S∩Cp
+
+p∈S
+
+p∈S
+
+hence (5.8) is equivalent to (5.7) and so holds by hypothesis. Consequently, there are distinct
+f1 , f2 with ∥fj ∥B ⩽ T and f1 (θnS ) ≡ f2 (θnS ) mod P for all n ∈ N . Put ℘ := f1 − f2 ̸= 0. Then
+∥℘∥B ⩽ 2T , so (5.5) implies that
+℘(θnS ) ∈ P
+
+and
+
+∥℘(θnS )∥ ⩽ A∥℘∥B ⩽ 2AT = 21 P 1/nK
+
+(n ∈ N ).
+
+But a nonzero y ∈ P has ∥y∥nK ⩾ |NK/Q (y)| ⩾ NP = P , since P divides yOK . Hence ℘(θnS ) = 0
+for every n ∈ N .
+□
+The factor nK in the count of polynomials and the factor |G| = nK /nk in the norms of
+Lemma 5.1 have been divided out of (5.7), leaving the factor 1/nk on the left. This is the only
+place where the degree of the base field enters, and it cancels in §6 against the same factor
+in nk log N . From this section, §6 uses Lemma 5.5 and the quantities A, W , and Ep of (5.3)
+and (5.4).
+
+LANDAU–SIEGEL ZEROS AND EFFECTIVE BRAUER–SIEGEL
+
+17
+
+6. Proof of Theorems 1.4 and 1.5
+Recall that nk = [k : Q], nK = [K : Q], and s = |S|. We first record the sizes of the quantities
+attached to A. Put
+Ds+1
+I :=
+.
+(s + 1)! H s−1
+Lemma 6.1. Let s ⩾ 1 and H ⩾ 2 be fixed. As D → ∞,
+
+(s + 1)I
+s − 1
+A=
++ O(Ds−1 ),
+W = 1+
+I + O(Ds ),
+D
+H
+
+Ep =
+
+I
++ O(Ds ),
+Np
+
+the last uniformly in the prime p of k, with implied constants depending only on s and H.
+Proof. The set A consists of the lattice points of the simplex
+△H := {x1 + H(x2 + · · · + xs ) ⩽ D} ⊂ Rs⩾0 ,
+whose volume is Ds /(s! H s−1 ) = (s + 1)I/D; this gives the estimate for A. The substitution
+y1 = x1 , yj = Hxj for
+R j ⩾ 2 maps △H onto the standard simplex {y1 + · · · + ys ⩽ D} with
+Jacobian H s−1 , and y1 = Ds+1 /(s + 1)! over the standard simplex; hence
+Z
+Z
+I
+(2 ⩽ j ⩽ s).
+x1 = I
+and
+xj =
+H
+△H
+△H
+A coordinate function is O(D) on △H and varies by O(1) on a unit cube, and the unit cubes at
+the points of A cover △H up to a set of volume O(Ds−1 ), so the sum of a coordinate
+over
+P
+P A differs
+s
+∗
+from its integral over △P
+α
++
+1
+H by O(D ). This gives the estimate for W =
+α∈A
+α∈A |α |.
+s
+Finally, Ep differs from α∈A α1 /Np by at most A = O(D ).
+□
+We also use the analogue of Chebyshev’s bound,
+X
+log Np ⩽ 2nk x
+
+(x ⩾ 1),
+
+(6.1)
+
+Np⩽x
+
+which holds because the primes of k above a rational prime p contribute at most nk log p.
+Proposition 6.2. Let K/k, G, S, nK , nk , s be as in §1, with s < nK , and let H ⩾ 2 be an
+integer. Let N be large in terms of nK and H, with log λK ⩽ N , and put
+
+
+D := ((N − 1)/s)nK /s − 1.
+Then
+X
+
+δp
+
+Np⩽D
+p admissible
+
+
+log Np 
+s − 1
+⩽ 1+
+nk log N + nk log λK + OnK ,H (1).
+Np
+H
+
+Proof. Every implied constant in this proof depends only on nK and H, as s ⩽ nK . Let S be
+the set of admissible primes with Np ⩽ D. Every element of PolyD has degree at most D,
+so by Corollary 4.3 no nonzero element of PolyD vanishes at every θnS , and by Lemma 5.5 the
+inequality (5.7) fails for S, that is,
+1 X
+δp Ep log Np ⩽ W log B + A log(4nK AλK ).
+nk
+p∈S
+
+We divide by I and estimate both sides by Lemma 6.1. On the left, Ep ⩾ I/Np + O(Ds )
+uniformly in p and 0 ⩽ δp ⩽ 1, so
+
+
+X
+X log Np
+X
+δp Ep log Np ⩾ I
+δp
++ O Ds
+log Np ,
+Np
+p∈S
+
+p∈S
+
+Np⩽D
+
+18
+
+WILLIAM D. BANKS
+
+and the error is O(nk Ds+1 ) = O(nk I) by (6.1) and Ds+1 /I = (s + 1)! H s−1 . On the right,
+W/I = 1 + (s − 1)/H + O(D−1 )
+
+A log(4nK AλK ) = O(Ds log(DλK )),
+
+and
+
+therefore
+ log B + log(Dλ ) 
+s − 1
+W log B + A log(4nK AλK ) 
+K
+= 1+
+log B + O
+,
+I
+H
+D
+in which log B = log N + log λK + log nK , log λK ⩽ N by hypothesis, and D ≫ N nK /s with
+nK /s > 1; the error is therefore O(1). Altogether,
+
+1 X log Np 
+s − 1
+δp
+⩽ 1+
+log N + log λK + O(1),
+nk
+Np
+H
+p∈S
+
+and multiplying by nk ⩽ nK finishes the proof.
+
+□
+
+Proof of Theorem 1.5. Every implied constant in this proof depends only on nK and H. If
+s = nK , then
+Pk = Q and S = G, so δp = 1 for every p unramified in K, and the left side of (1.3)
+is at most p⩽X log p/p ⩽ log X + O(1) by Mertens’ theorem; this is at most the right side,
+since λK ⩾ 1. Now assume s < nK and put
+N := 2 + ⌈s(2X)s/nK ⌉.
+Then ((N − 1)/s)nK /s > 2X, so D ⩾ X in the notation of Proposition 6.2, and
+nk s
+s
+nk log N =
+log X + O(1) =
+log X + O(1).
+nK
+|G|
+We check the hypotheses of Proposition 6.2. Since N ⩾ X 1/nK , the hypothesis on X gives
+1/nK
+
+N ⩾ X0
+
+and
+
+N ⩾ log dK ⩾ log λK ,
+
+the last by (4.1); the first bound makes N large in terms of nK and H once X0 is. The
+proposition therefore bounds the sum over the admissible primes with Np ⩽ X, as D ⩾ X.
+The ramified primes contribute nothing to the left side of (1.3). The unramified primes with
+Np < H lie above the rational primes p < H, at most nk above each, and contribute at most
+nk log p/p for each such p, which is O(1) in all. This proves (1.3).
+□
+Proof of Theorem 1.4. Let ε ∈ (0, 1], and define
+ln m
+l 4n m
+K
+K
+,
+C0 :=
++ 1.
+H :=
+ε
+ε
+C . Theorem 1.5 with this H applies as soon as
+Let C ⩾ C0 and X := dK
+X ⩾ X0 (nK , H)
+
+and
+
+X ⩾ (log dK )nK ,
+
+C , both hold once d is large in terms of n , ε, and C; assume that this is the
+and since X = dK
+K
+K
+case. By (4.1), we have
+nK
+nK
+nk log λK ⩽
+log dK =
+log X,
+2
+2C
+and s − 1 ⩽ nK , hence Theorem 1.5 gives
+X
+log Np 
+nK  s
+nK 
+δp
+⩽ 1+
++
+log X + OnK ,ε,C (1).
+Np
+H
+|G| 2C
+Np⩽X
+
+It remains to bound the coefficient of log X. We have nK /H ⩽ ε/4 and nK /(2C) < ε/2 by the
+choice of H and C0 , and s ⩽ |G|, so
+
+nK  s
+nK  
+ε  s
+ε
+s
+ε ε 3
+s
+1+
++
+⩽ 1+
++
+⩽
++ + · <
++ ε.
+H
+|G| 2C
+4 |G| 2
+|G| 2 4 2
+|G|
+The remaining fields K have bounded discriminant, so there are finitely many of them by
+Hermite’s theorem, and for each of them the bound holds with the constant s/|G| and an
+OK (1) by (1.2). This completes the proof.
+□
+
+LANDAU–SIEGEL ZEROS AND EFFECTIVE BRAUER–SIEGEL
+
+19
+
+7. Remarks
+Remark 7.1. The bound of Theorem 1.4 is one-sided, and the identity decides the side. The
+hypothesis 1 ∈ S is a normalization, since the argument with ι0 (θ) as the distinguished variable,
+ι0 ∈ S, bounds the mass of Sι−1
+for k,
+0 , which contains
+ the identity. By Mertens’ theorem
+Theorem 1.4 gives the lower bound |S′ |/|G| − ε log X for every S′ ⊂ G with 1 ∈
+/ S′ , but no
+upper bound for such an S′ . This is a limitation of the method and not of the problem. The
+determinant method, as used for example in [7, 9], imposes vanishing to high order in one
+variable at the pairs (α, σα), with α running over about 2X small integers of K; the derivatives
+supply the multiplicity that our box of N nK points supplies, the second variable carries degree
+only X/ log X, and the identity plays no part. The bound of [9] therefore holds for every
+conjugacy class, with the exact density, for every X ⩾ 2, and with absolute constants, where
+C0
+Theorem 1.4 needs X ⩾ dK
+and gives the density only up to ε. The theorem of [9] is stated
+for K/Q Galois, but its proof uses only that σ is an automorphism of K and that the α are
+integers of K. Run over a base field k, with Np in place of p in the congruence and in the row
+operation, the norm of the determinant still taken to Q, and Chebyshev’s bound for k in place
+c
+(log X + 12 log dK )
+of ϑ(X) ≪ X, it gives for K/k Galois and a class C of size c the bound |G|
+up to O(c nk + nk log log X), which contains Theorem 1.1 with K = F in place of F (ξ). In our
+method the identity is the cost. With K = F and S = G the constant is one, and the root of
+unity dilutes it to 12 + 1/[K : k].
+Remark 7.2. Nothing is used about Q(ξ) beyond its being a Galois extension of Q of degree
+ℓ − 1 in which ξ is an integer of house one. For any field E Galois over k with E ∩ F = k and
+[E : k] = g, and K = F E with S the identity together with√the coset of Gal(K/F ), the same
+proof gives the constant (g + 1)/(2g); the case g = 2 is the 2 of [8] and gives 34 .
+Remark 7.3. The weights (1.1) are forced by the mechanism. The congruence θNp ≡ σ(θ) holds
+modulo the primes above p whose Frobenius is σ itself, of combined norm Np |G|/|Cp | , so a class
+of size c meeting S in one element contributes with weight 1/c. For S = {1, σ} with σ in a class
+C of size c, Theorem 1.4 reads
+
+X log Np 1 X log Np  2
++
+⩽
++ ε log X + O(1),
+Np
+c
+Np
+|G|
+Cp ={1}
+
+Cp =C
+
+sharp by (1.2), whereas the unweighted sum over {1} ∪ C has density (1 + c)/|G|.
+Remark 7.4. Everything is effective. A large |S| costs a large dK , since the error terms in
+Proposition 6.2 carry constants of size s! H s ; an explicit c(k) in Corollary 1.2 would fix a small ℓ
+and proceed as in [1]. An explicit constant in Theorem 1.3 needs in addition the constant of
+Lemma 3.3, which Stark’s proof makes explicit, and numerical values of κk and of the real zeros
+of ζk (s) in (0, 1) for the given k.
+
+Acknowledgments
+The author thanks the Max Planck Institute for Mathematics in Bonn for its support and
+excellent working conditions during the preparation of this paper, Bryce Kerr for many helpful
+discussions, Ben Green for comments on an earlier version, and Christopher Frei, Wataru Kai,
+and Jesse Thorner for correspondence about their work.
+The large language model Claude (Anthropic) was used throughout the preparation of this
+paper. The key ideas came from the author, who prompted Claude with the question considered
+here and with the papers [1] and [8]; from these inputs Claude produced an initial argument.
+The author then worked through every line of the mathematics by hand, verifying the arguments
+in their entirety, and wrote the final version of the paper, supplying its notation, elaborations of
+the underlying arguments, and the diagrams. Claude was also used for polishing the wording,
+
+20
+
+WILLIAM D. BANKS
+
+for literature searches, and for proof checking. The author takes full responsibility for the
+content.
+
+References
+[1] W. D. Banks, On the OpenAI proof that Landau–Siegel zeros do not exist. arXiv:2610.15483. (pp. 2 and 19)
+[2] J. W. S. Cassels, An introduction to the geometry of numbers. Grundlehren der mathematischen Wissenschaften, vol. 99, Springer, Berlin, 1959. (p. 11)
+[3] D. Cureton and J. Thorner, A quasi-Riemann hypothesis for Dedekind zeta functions. Hexagon preprint
+hexagon:2610.00200v2, 2026. (p. 1)
+[4] H. Davenport, Multiplicative number theory. 2nd ed., revised by H. L. Montgomery, Graduate Texts in
+Mathematics, vol. 74, Springer, New York, 1980. (p. 8)
+[5] C. Frei and W. Kai, Exceptional zeros of Hecke L-functions. Hexagon preprint hexagon:2610.00466v1, 2026.
+(pp. 2 and 3)
+[6] S. R. Garcia and E. S. Lee, Unconditional explicit Mertens’ theorems for number fields and Dedekind zeta
+residue bounds. Ramanujan J. 57 (2022), 1169–1191. (p. 8)
+[7] B. Green, On Landau–Siegel zeros. Hexagon preprint hexagon:2610.00311v2, 2026. (pp. 2, 10, and 19)
+[8] B. Kerr, A simpler proof that there are no Landau–Siegel zeros. arXiv:2610.21099. (pp. 2, 8, 14, and 19)
+[9] S. D. Kominers, Small algebraic integers and Frobenius prime sums. Preprint, October 2026. (pp. 2, 3, 4,
+10, and 19)
+[10] J. C. Lagarias and A. M. Odlyzko, Effective versions of the Chebotarev density theorem. In Algebraic number
+fields (Durham, 1975), A. Fröhlich, ed., Academic Press, 1977, 409–464. (p. 8)
+[11] B. Liu, Zero-free half-planes for Hecke L-functions over number fields. arXiv:2610.26835. (p. 1)
+[12] S. Louboutin, Explicit bounds for residues of Dedekind zeta functions, values of L-functions at s = 1, and
+relative class numbers. J. Number Theory 85 (2000), 263–282. (p. 3)
+[13] D. W. Masser, On polynomials and exponential polynomials in several complex variables. Invent. Math. 63
+(1981), 81–95. (p. 12)
+[14] J. Neukirch, Algebraic number theory. Grundlehren der mathematischen Wissenschaften, vol. 322, Springer,
+Berlin, 1999. (pp. 3, 6, 7, and 9)
+[15] OpenAI, Uniform exclusion of Landau–Siegel zeros. Preprint, 1 October 2026. (pp. 2, 3, and 10)
+[16] H. Rademacher, On the Phragmén–Lindelöf theorem and some applications. Math. Z. 72 (1959), 192–204.
+(p. 9)
+[17] M. Rosen, A generalization of Mertens’ theorem. J. Ramanujan Math. Soc. 14 (1999), 1–19. (p. 8)
+[18] H. M. Stark, Some effective cases of the Brauer–Siegel theorem. Invent. Math. 23 (1974), 135–152. (pp. 2, 8,
+9, and 10)
+Department of Mathematics, University of Missouri, Columbia, MO 65211, USA
+Email address: bankswd@missouri.edu
+
+

@@ -1,0 +1,191 @@
+{
+  "name": "rh_2026_deep_proof_7a",
+  "description": "Deep 7-agent proof-architecture, kernel-audit, and algorithmic/NT-consequence symposium grounded in 13 mounted primary sources & human-readable reconstructions of the Nov 2026 Alpoge-Claude RH/GRH proof.",
+  "doc_manifest": "docs/rh_2026_deep/manifest.json",
+  "topic": "DEEP PROOF RECONSTRUCTION & FORMAL-VERIFICATION AUDIT OF THE NOVEMBER 2026 RH/GRH PROOF:\nTwo days after Levent Alpöge and Claude released `remark.pdf` and 175,187 Lean 4 modules proving RH & GRH, independent researchers verified the formal proof (Michael Rubinstein's Waterloo audit, MIT's Andrew Sutherland, Bartosz Naskręcki's `riemann-rev`) AND published detailed human-readable reconstructions reducing the 17.4M-line formalization to classical analytic, automorphic, and Arakelov mathematics (`rubinstein_2026_zeta_guide`, `adriazola_2026_dep_map`, `adriazola_2026_route_notes`).\n\nTHIRTEEN PRIMARY & RECONSTRUCTION DOCUMENTS ARE MOUNTED (`docs/rh_2026_deep/manifest.json`):\n- Proof core & reconstructions: `alpoge_2026_remark`, `rubinstein_2026_zeta_guide` (1.13 MB, 265p v2: Main Inequality (M), 13 numbered hypotheses, worked lemniscate case, remark dictionary, external census), `adriazola_2026_dep_map` (Stages 1-10 DAG, `PC-1..PC-7`, `LinkDIV`, `R1-R5`), `adriazola_2026_route_notes`, `naskrecki_2026_riemann_rev`, `rubinstein_2026_lean_audit` (5 Lean theorems, axioms, 1,484,729 `nanoda` declarations).\n- Classical ancestors & machinery: `stepanov_2008_ff` (Stepanov-Bombieri over F_q), `gan_ichino_2014_ggp` (GGP conjecture & local theta correspondence/seesaw), `connes_2026_letter` (Weil quadratic form).\n- Analytic/algorithmic/NT consequences: `lamzouri_2013_grh` (explicit `n_p < (ln p)^2`, `L(1, chi)`), `pair_corr_2026` (post-GRH vertical spacing limits), `siegel_brauer_2026` (Siegel zeros & uniform Brauer-Siegel `c(k)`), `grenie_molteni_2022_classgroup` (sub-`4 log^2 Delta` class-group generators).\n\nRESEARCH MANDATE — GO BEYOND HAND-WAVING INTO THE ACTUAL PROOF MECHANISMS:\n1) **Main Inequality (M) & 13 Hypotheses**: What exactly is `(M)` in `rubinstein_2026_zeta_guide`, how do Chebyshev/explicit-formula windows (`adriazola_2026_route_notes`) and localized Landau positivity (`naskrecki_2026_riemann_rev`) deduce `Re(s)=1/2`, and what do Hypotheses 1-13 demand?\n2) **Why sqrt(X) Iterated Theta Lifts Replace Differentiation**: Trace `stepanov_2008_ff` -> Alpöge's `U(X_0)->...->U(X_m)` + worked **lemniscate case** in `rubinstein_2026_zeta_guide` + **Stages 3-5** (`adriazola_2026_dep_map`): why the exponent is `1/2`, why one lift stops at `2/3`, and how `p`-adic gain trades against Hecke loss.\n3) **Automorphic & GGP Core**: Dissect `gan_ichino_2014_ggp`, `LinkDIV` (Stage 6), Rallis seesaw + Bessel periods, and the sixfold cover of `GL_5` (`mu` period integral & Poincaré series norm reduction), plus why `GL_n` / Grand RH stays open.\n4) **Arakelov, Siegel Mass, Iwasawa & Vandiver**: Audit Stage 7 & Stage 9 (Bost slope inequality, Chowla-Selberg/Weyl/Siegel mass divisibility, Behrend-choice Iwasawa tower, Vandiver weakening & K-groups).\n5) **Lean Kernel Trust vs Human Unwritten Gaps**: Check exact Lean theorem statements & `nanoda` verification (`rubinstein_2026_lean_audit`) against Rubinstein's Section I.12 (what parts of the 265p prose writeup are still unreduced to classical prose!) and Adriazola's `PC-1..PC-7` reconstruction status.\n6) **Unconditional Payoffs & Boundaries**: Connect non-constructive Lean existence to external constructive bounds (`lamzouri_2013_grh`, `grenie_molteni_2022_classgroup`), Siegel zeros / `siegel_brauer_2026`, `pair_corr_2026`, cryptography (why RSA/GNFS/ECDLP hold while VDF/class-group/deterministic witnesses sharpen), and ERH/BSD limits.",
+  "mode_text": "RIGOROUS PROOF RECONSTRUCTION SYMPOSIUM:\nWORKFLOW FOR LARGE DOCUMENTS: Start on any unfamiliar large paper (especially `rubinstein_2026_zeta_guide` at 1.13MB!) by running `@DOC_TOC <doc_id>` FIRST to get exact section headings and character offsets, or `@DOC_SEARCH <doc_id|all> <keywords>`, THEN `@DOC_READ <doc_id> <offset>` to read full proofs and theorem statements verbatim. Cite `[doc_id @ offset]` or section names for every technical claim!\nCOLLABORATION RULES: Use `@CLAIM`, `@CHALLENGE <c1|c2|...>`, `@VOTE <c1|c2|...> yes|no`, `@RETRACT`, `@WHISPER <name>: ...`, and `#proof_core` / `#algo_bridge`. Pass turns across different specialists (`NEXT: <name>`) rather than locking two speakers together.\nARTIFACTS:\n- `@APPEND debate_notes: ...` for verified excerpts, derivations, and cross-document dictionaries.\n- `@APPEND` / `@REPLACE proof_ledger: ...` to track each stage (`Stage 1..10`, `H1..H13`, Lean `Theorems 1..5`, and external theorems): `Stage / Component | Mathematical Statement / Mechanism | Verification & Reconstruction Status | Primary Citation`.\n- `@REPLACE rh_2026_deep_proof_report: ...` to lock ONE rigorous, citation-backed, crystal-clear master technical report (`>= 10000` bytes, ZERO placeholders) with all 8 required sections:\n  `[Executive Verdict & Proof Architecture]`, `[Main Inequality (M) & The Thirteen Numbered Hypotheses]`, `[Stepanov-to-Theta-Lift Multiplicity & The Lemniscate Worked Case]`, `[Automorphic Machinery: Rallis Seesaw, GGP Periods & Sixfold GL_5 Cover]`, `[Arithmetic Geometry: Bost Slope, Siegel Mass, Iwasawa Towers & Vandiver]`, `[Lean 4 Formalization Audit: Five Theorems, Axioms & External Census]`, `[Analytic, Algorithmic & Cryptographic Consequences]`, and `[Generalization Barriers (ERH, Grand RH, BSD) & Proof Compression Roadmap]`.\nOnly tune `@SET_SAMPLING` when intentionally shifting sampling regime (omit if unchanged). From turn 22 onward, vote `@END_RUN: <reason>` once `proof_ledger.md` and `rh_2026_deep_proof_report.md` are complete and verified (4 of 7 majority ends cleanly). Always end with `NEXT: <name>`.",
+  "scheduler": "self_directed",
+  "end_mode": "agent_decided",
+  "end_policy": "majority",
+  "min_turns_before_end": 22,
+  "board_visible": true,
+  "dm_visibility": "notice",
+  "channels": {
+    "proof_core": {},
+    "algo_bridge": {}
+  },
+  "artifacts": {
+    "max_bytes": 1048576,
+    "max_workspace_bytes": 8388608,
+    "max_count": 24,
+    "seed": {
+      "debate_notes": "# Deep Proof Audit Notes — Exact Excerpts, Stage Mappings & Challenges\n\nRecord verbatim definitions of Main Inequality (M), Hypotheses 1-13, Stage 1-10 mechanics, Lean theorem signatures, and verified algorithm bounds here.\n",
+      "proof_ledger": "# Alpoge-Claude RH/GRH Proof Reconstruction & Verification Ledger\n\n| Stage / Component | Core Mathematical Mechanism / Statement | Formal & Human Reconstruction Status | Primary Citation |\n|---|---|---|---|\n",
+      "rh_2026_deep_proof_report": "# Deep Proof Reconstruction & Formal Audit of the November 2026 RH/GRH Proof\n\nConsolidate ONE definitive, primary-source-cited technical report here via `@REPLACE rh_2026_deep_proof_report:` with all 8 required sections:\n- [Executive Verdict & Proof Architecture]\n- [Main Inequality (M) & The Thirteen Numbered Hypotheses]\n- [Stepanov-to-Theta-Lift Multiplicity & The Lemniscate Worked Case]\n- [Automorphic Machinery: Rallis Seesaw, GGP Periods & Sixfold GL_5 Cover]\n- [Arithmetic Geometry: Bost Slope, Siegel Mass, Iwasawa Towers & Vandiver]\n- [Lean 4 Formalization Audit: Five Theorems, Axioms & External Census]\n- [Analytic, Algorithmic & Cryptographic Consequences]\n- [Generalization Barriers (ERH, Grand RH, BSD) & Proof Compression Roadmap]\n"
+    },
+    "visible": [
+      "rh_2026_deep_proof_report",
+      "proof_ledger",
+      "debate_notes"
+    ],
+    "validation": {
+      "artifact": "rh_2026_deep_proof_report",
+      "require_modified": true,
+      "min_bytes": 10000,
+      "disallow_placeholders": true,
+      "required_sections": [
+        "[Executive Verdict & Proof Architecture]",
+        "[Main Inequality (M) & The Thirteen Numbered Hypotheses]",
+        "[Stepanov-to-Theta-Lift Multiplicity & The Lemniscate Worked Case]",
+        "[Automorphic Machinery: Rallis Seesaw, GGP Periods & Sixfold GL_5 Cover]",
+        "[Arithmetic Geometry: Bost Slope, Siegel Mass, Iwasawa Towers & Vandiver]",
+        "[Lean 4 Formalization Audit: Five Theorems, Axioms & External Census]",
+        "[Analytic, Algorithmic & Cryptographic Consequences]",
+        "[Generalization Barriers (ERH, Grand RH, BSD) & Proof Compression Roadmap]"
+      ]
+    }
+  },
+  "limits": {
+    "max_agents": 8,
+    "max_turns": 60,
+    "max_requests": 150,
+    "max_consecutive": 1,
+    "max_dyad_turns": 4,
+    "starvation_turns": 9,
+    "max_tokens_per_response": 16384,
+    "max_total_tokens": 5000000,
+    "max_context_chars": 600000,
+    "max_message_chars": 49152,
+    "max_actions_per_response": 24,
+    "max_dms": 200,
+    "max_channel_posts": 200,
+    "max_board_items": 300,
+    "max_note_chars": 16000,
+    "max_artifacts": 24,
+    "max_artifact_bytes": 1048576,
+    "max_workspace_bytes": 8388608,
+    "artifact_preview_chars": 16000,
+    "artifact_read_chars": 16000,
+    "doc_read_chars": 14000,
+    "max_pending_doc_reads": 8,
+    "max_duration_s": 14400
+  },
+  "endpoints": {
+    "local": {
+      "provider": "llamacpp",
+      "remote": false,
+      "api_key_env": "",
+      "base_url": "http://127.0.0.1:8080/v1",
+      "model": "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
+      "request_timeout_s": 600
+    }
+  },
+  "agents": [
+    {
+      "name": "STEPANOV_THETA",
+      "endpoint": "local",
+      "identity": "You are STEPANOV_THETA, a specialist in Stepanov's method and theta correspondence. Compare `stepanov_2008_ff` (F_q differentiation) with `rubinstein_2026_zeta_guide` (why the exponent is 1/2, the worked lemniscate case, dictionary with Alpöge) and `adriazola_2026_dep_map` (Stages 3-5: arithmetic Stepanov, m~sqrt(X) unitary theta lifts, p-adic gain vs Hecke loss).",
+      "focus": "Stepanov-to-theta-lift multiplicity, lemniscate worked case, sqrt(X) scaling",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["proof_core"],
+      "temperature": 0.80,
+      "min_p": 0.05,
+      "top_k": 40,
+      "max_tokens": 16384,
+      "context_chars": 450000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "ANALYTIC_M_AUDIT",
+      "endpoint": "local",
+      "identity": "You are ANALYTIC_M_AUDIT, an explicit-formula and Tauberian analyst. Use `@DOC_TOC rubinstein_2026_zeta_guide` and `@DOC_TOC adriazola_2026_route_notes` to read the exact statement of Main Inequality (M), the reduction of (M) to 13 numbered hypotheses, Guinand-Weil positivity, one-sided window bounds, and Naskręcki's localized Landau step (`naskrecki_2026_riemann_rev`).",
+      "focus": "Main Inequality (M), 13 hypotheses, Guinand-Weil & localized Landau deduction of RH",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["proof_core"],
+      "temperature": 0.76,
+      "min_p": 0.06,
+      "top_k": 40,
+      "max_tokens": 16384,
+      "context_chars": 450000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "AUTOMORPHIC_GGP",
+      "endpoint": "local",
+      "identity": "You are AUTOMORPHIC_GGP, a Langlands and Gan-Gross-Prasad specialist. Trace `gan_ichino_2014_ggp`, `adriazola_2026_dep_map` (Stages 6 & 8, `LinkDIV`), `rubinstein_2026_zeta_guide`, and `alpoge_2026_remark`: Rallis seesaw, Bessel periods independent of Hecke characters, sixfold cover of GL_5 automorphy of mu, relative trace formula Cauchy-Schwarz Poincaré bound, and why higher GL_n Grand RH does not automatically follow.",
+      "focus": "GGP Bessel periods, Rallis seesaw, LinkDIV, sixfold cover GL_5, GL_n barriers",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["proof_core"],
+      "temperature": 0.82,
+      "min_p": 0.05,
+      "top_k": 45,
+      "max_tokens": 16384,
+      "context_chars": 450000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "ARAKELOV_IWASAWA",
+      "endpoint": "local",
+      "identity": "You are ARAKELOV_IWASAWA, an arithmetic geometer & Iwasawa theorist. Read `rubinstein_2026_zeta_guide` (external census + Sections on Arakelov/divisibility) and `adriazola_2026_dep_map` (Stages 7 & 9): Bost's slope inequality, Chowla-Selberg/Weyl/Siegel mass covolumes, Behrend-choice Iwasawa tower, and how Alpöge–Claude weakened Vandiver's conjecture / bounded K-groups of Z.",
+      "focus": "Bost slope inequality, Siegel mass divisibility, Iwasawa tower, Vandiver weakening",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["proof_core"],
+      "temperature": 0.80,
+      "min_p": 0.05,
+      "top_k": 45,
+      "max_tokens": 16384,
+      "context_chars": 450000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "LEAN_KERNEL_AUDIT",
+      "endpoint": "local",
+      "identity": "You are LEAN_KERNEL_AUDIT, a formal-verification & statement-fidelity auditor. Read `rubinstein_2026_lean_audit` and `naskrecki_2026_riemann_rev` and `rubinstein_2026_zeta_guide` (Section I.12 / census): inspect the exact 5 Lean theorems, `#print axioms`, 175,187-module kernel replay vs 1,484,729-decl Rust `nanoda` check, ERH gap, and compare formal soundness vs missing human prose proofs in Rubinstein v2 and Adriazola's PC-1..PC-7 status.",
+      "focus": "Lean/nanoda verification, exact 5 theorem statements, axiom hygiene, prose gaps",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["proof_core", "algo_bridge"],
+      "temperature": 0.72,
+      "min_p": 0.06,
+      "top_k": 35,
+      "max_tokens": 16384,
+      "context_chars": 450000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "ALGO_CRYPTO_ENG",
+      "endpoint": "local",
+      "identity": "You are ALGO_CRYPTO_ENG, an algorithmic number theorist & cryptanalyst. Contrast Connes' spectral Weil extremization (`connes_2026_letter`) and non-constructive Lean existence (`Classical.choice`) against external constructive deterministic theorems now made unconditional by RH/GRH: `lamzouri_2013_grh` (`n_p < (ln p)^2`, explicit `L(1, chi)`), `grenie_molteni_2022_classgroup` (`< 4 log^2 Delta` class groups), `siegel_brauer_2026` (Siegel zeros & ERH boundary), `pair_corr_2026` (remaining post-GRH gaps), plus RSA/GNFS/ECDLP vs VDF impact and proof compression.",
+      "focus": "constructive GRH algorithms, class-group VDFs, Siegel zeros, pair-corr & ERH limits",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["algo_bridge"],
+      "temperature": 0.85,
+      "min_p": 0.05,
+      "top_k": 50,
+      "max_tokens": 16384,
+      "context_chars": 450000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "SYNTHESIS_CHAIR",
+      "endpoint": "local",
+      "identity": "You are SYNTHESIS_CHAIR, the symposium editor-in-chief. Enforce `@DOC_TOC`/`@DOC_READ` verification, ensure all 7 specialists contribute before looping, curate `proof_ledger.md`, and write & lock the complete 8-section master monograph (`>= 10000` bytes, zero placeholders) in `rh_2026_deep_proof_report.md` via `@REPLACE rh_2026_deep_proof_report:` before calling for `@END_RUN`.",
+      "focus": "synthesizing proof_ledger.md and locking the 8-section rh_2026_deep_proof_report.md",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["proof_core", "algo_bridge"],
+      "temperature": 0.78,
+      "min_p": 0.06,
+      "top_k": 40,
+      "repeat_penalty": 1.06,
+      "max_tokens": 16384,
+      "context_chars": 450000,
+      "reasoning": "medium"
+    }
+  ]
+}

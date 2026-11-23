@@ -42,6 +42,14 @@ _SYMBOL_MAP = {
     "”": '"',
     "‘": "'",
     "’": "'",
+    "\\": " ",
+    "{": " ",
+    "}": " ",
+    "$": " ",
+    "~": " ",
+    "(": " ",
+    ")": " ",
+    "&": " ",
 }
 
 _SEARCH_STOPWORDS = {
@@ -104,9 +112,42 @@ def _normalize_with_map(text: str) -> Tuple[str, List[int]]:
 
 def _normalize_query(raw_query: str) -> str:
     """Clean quotes/carets and normalize symbols/whitespace in a search query."""
-    cleaned = raw_query.replace('"', " ").replace("'", " ").replace("`", " ").replace("^", " ")
+    cleaned = raw_query
+    for ch in ('"', "'", "`", "^", "(", ")", "\\", "{", "}", "$"):
+        cleaned = cleaned.replace(ch, " ")
     norm, _ = _normalize_with_map(cleaned)
     return norm.strip()
+
+
+def _clean_heading_title(raw_title: str) -> str:
+    """Simplify LaTeX/Markdown heading titles for readable table-of-contents lines."""
+    t = re.sub(r"\\texorpdfstring\{[^{}]*\}\{([^{}]*)\}", r"\1", raw_title)
+    t = re.sub(r"\\[A-Za-z]+\*?(?:\[[^\]]*\])?\{([^{}]*)\}", r"\1", t)
+    t = t.replace("{", "").replace("}", "").replace("$", "")
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def _extract_braced_group(text: str, open_idx: int) -> Tuple[str, int]:
+    """Return (content_inside_braces, index_after_closing_brace)."""
+    depth = 0
+    chars: List[str] = []
+    i = open_idx
+    while i < len(text):
+        ch = text[i]
+        if ch == "{":
+            if depth > 0:
+                chars.append(ch)
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return "".join(chars), i + 1
+            chars.append(ch)
+        else:
+            if depth > 0:
+                chars.append(ch)
+        i += 1
+    return "".join(chars), i
 
 
 class DocumentLibrary:
@@ -252,7 +293,7 @@ class DocumentLibrary:
             return ""
         lines = [
             "--- Reference Document Library (Read-Only Manifest) ---",
-            "Use `@DOC_SEARCH <doc_id|all> <keywords>` to find exact character offsets, or `@DOC_READ <doc_id> [offset]` to read full passages.",
+            "Use `@DOC_TOC <doc_id>` to list section offsets, `@DOC_SEARCH <doc_id|all> <keywords>` to search passages, or `@DOC_READ <doc_id> 0` (or any numeric char offset) to read full excerpts.",
         ]
         for e in self.entries.values():
             meta_parts = []
@@ -269,6 +310,87 @@ class DocumentLibrary:
                 line += f" — {summary}"
             lines.append(line)
         return "\n".join(lines)
+
+    def table_of_contents(self, raw_doc_id: Any, max_entries: int = 80) -> Tuple[str, str, List[Dict[str, Any]], str]:
+        """Extract section / subsection headings with exact raw character offsets."""
+        try:
+            doc_id = self.normalize_id(raw_doc_id)
+        except DocumentError:
+            avail = ", ".join(self.ids()) or "none"
+            raise DocumentError(f"unknown document {raw_doc_id!r} (available: {avail})")
+        if doc_id not in self.entries:
+            avail = ", ".join(self.ids()) or "none"
+            raise DocumentError(f"no reference document {doc_id!r} (available: {avail})")
+
+        entry = self.entries[doc_id]
+        text = self._texts[doc_id]
+        tex_cmd_re = re.compile(r"^\s*\\(part|chapter|section|subsection|subsubsection)\*?\s*(?:\[[^\]]*\])?\s*\{")
+        md_heading_re = re.compile(r"^\s*(#{1,3})\s+(.+?)\s*#*\s*$")
+        thm_re = re.compile(
+            r"^\s*(?:\\begin\{(theorem|proposition|lemma|hypothesis|conjecture|corollary|remark)\}|"
+            r"(?:#{1,4}\s*)?(?:\*\*)?(Theorem|Proposition|Lemma|Hypothesis|Conjecture|Corollary)\s+[0-9A-Za-z.()]+)",
+        )
+
+        headings: List[Dict[str, Any]] = []
+        fallback_items: List[Dict[str, Any]] = []
+        offset = 0
+        for line in text.splitlines(keepends=True):
+            stripped = line.lstrip()
+            mt = tex_cmd_re.match(line)
+            if mt and not stripped.startswith("%"):
+                level = mt.group(1).lower()
+                brace_idx = line.find("{", mt.end() - 1)
+                if brace_idx != -1:
+                    raw_title, _ = _extract_braced_group(line, brace_idx)
+                    title = _clean_heading_title(raw_title)
+                    if title:
+                        headings.append({"level": level, "offset": offset, "title": title[:140]})
+            else:
+                mm = md_heading_re.match(line)
+                if mm and not stripped.startswith("%"):
+                    level = f"h{len(mm.group(1))}"
+                    title = _clean_heading_title(mm.group(2))
+                    if title:
+                        headings.append({"level": level, "offset": offset, "title": title[:140]})
+                else:
+                    mthm = thm_re.match(line)
+                    if mthm and len(fallback_items) < max_entries:
+                        title = _clean_heading_title(line.strip())
+                        if title:
+                            fallback_items.append({"level": "item", "offset": offset, "title": title[:140]})
+            offset += len(line)
+
+        entries_all = headings if headings else fallback_items
+        total_found = len(entries_all)
+        shown = entries_all
+        if len(shown) > max_entries:
+            major = [e for e in entries_all if e["level"] in ("part", "chapter", "section", "h1", "h2", "item")]
+            if len(major) <= max_entries and major:
+                minor_budget = max_entries - len(major)
+                kept_ids = {id(e) for e in major}
+                for e in entries_all:
+                    if id(e) not in kept_ids and minor_budget > 0:
+                        kept_ids.add(id(e))
+                        minor_budget -= 1
+                shown = [e for e in entries_all if id(e) in kept_ids]
+            else:
+                shown = entries_all[:max_entries]
+
+        if not shown:
+            formatted = (
+                f"[Ref Doc TOC `{doc_id}` — {entry.title} ({entry.chars} chars): "
+                f"no explicit section headings found. Use `@DOC_READ {doc_id} 0` or `@DOC_SEARCH {doc_id} <keywords>`.]"
+            )
+            return doc_id, entry.title, [], formatted
+
+        lines = [
+            f"[Ref Doc TOC `{doc_id}` — {entry.title} ({entry.chars} chars, showing {len(shown)}/{total_found} headings)]"
+        ]
+        for h in shown:
+            indent = "  " if h["level"] in ("subsection", "subsubsection", "h2", "h3") else ""
+            lines.append(f"{indent}- offset {h['offset']} [{h['level']}]: {h['title']}")
+        lines.append(f"Tip: read any section via `@DOC_READ {doc_id} <offset>` (e.g. `@DOC_READ {doc_id} {shown[0]['offset']}`).")
+        return doc_id, entry.title, shown, "\n".join(lines)
 
     def read(self, raw_doc_id: Any, offset: int = 0, max_chars: int = 12000) -> Tuple[str, str, str, int, int]:
         try:

@@ -1,0 +1,3022 @@
+CONDITIONAL BOUNDS FOR THE LEAST QUADRATIC
+NON-RESIDUE AND RELATED PROBLEMS
+
+arXiv:1309.3595v3 [math.NT] 8 Dec 2016
+
+YOUNESS LAMZOURI, XIANNAN LI, AND KANNAN SOUNDARARAJAN
+Abstract. This paper studies explicit and theoretical bounds for several interesting quantities in number theory, conditionally on the Generalized Riemann
+Hypothesis. Specifically, we improve the existing explicit bounds for the least quadratic non-residue and the least prime in an arithmetic progression. We also refine
+the classical conditional bounds of Littlewood for L-functions at s = 1. In particular, we derive explicit upper and lower bounds for L(1, χ) and ζ(1 + it), and
+deduce explicit bounds for the class number of imaginary quadratic fields. Finally,
+we improve the best known theoretical bounds for the least quadratic non-residue,
+and more generally, the least k-th power non-residue.
+
+1. Introduction
+Let q > 1 be a natural number and let G = (Z/qZ)∗ denote the group of reduced
+residues (mod q). Given a proper subgroup H of G, two natural and interesting
+questions in number theory are:
+(1) Determine or estimate the least prime p not dividing q and lying outside the
+subgroup H, and
+(2) Given a coset of H in G, determine or estimate the least prime p lying in
+that coset.
+These problems have a long history, and have attracted the attention of many mathematicians. There are two particular cases that are especially well known. If q is prime
+and H is the group of quadratic residues the first problem amounts to the famous
+question of Vinogradov on the least quadratic non-residue. For any q, if H = {1} is
+the trivial subgroup, then the second problem is that of estimating the least prime
+in an arithmetic progression. In this paper we assume the truth of the Generalized Riemann Hypothesis and obtain explicit as well as asymptotic bounds on these
+problems. Our work improves upon previous results in this area, notably the works
+of Bach [2], and Bach and Sorenson [4].
+1.1. The least prime outside a subgroup. Assuming GRH, Ankeny [1] established that the least prime lying outside a proper subgroup H of (Z/qZ)∗ is
+O((log q)2 ). Ankeny’s work was refined by Bach [2], who gave explicit as well as
+asymptotic bounds for the least such prime. Thus Bach showed, on GRH, that the
+least prime p that does not lie in H is less than 2(log q)2 , and if the additional
+natural requirement that p ∤ q is imposed then p is less than 3(log q)2 . He further
+Date: December 12, 2016.
+2000 Mathematics Subject Classification. Primary 11N60; Secondary 11R42.
+The first author is supported in part by an NSERC Discovery grant. The third author is supported in part by NSF grant DMS-1001068, and a Simons Investigator grant from the Simons
+Foundation.
+1
+
+established that the least prime p ∤ q with p not lying in H satisfies the asymptotic
+bound p ≤ (1 + o(1))(log q)2 . In the special case when H consists of the square
+residue classes (mod q), Wedeniwski [16] has recently given the improved explicit
+bound 32 (log q)2 − 44
+log q + 13. We begin with an explicit result on this question.
+5
+We shall assume that q ≥ 3000, since questions for smaller values of q may easily
+be settled by direct calculation. As usual we denote by ω(q) the number of distinct
+prime factors of q.
+Theorem 1.1. Assume GRH. Let q ≥ 3000 be an integer, and let H be a proper
+subgroup of G = (Z/qZ)∗ .
+P
+(1) Let A(q) = max(0, 2 log log q − 8/5 − p|q (log p)/(p − 1)), and put
+B(q) = max(0, 2 log log q + 3 + 2ω(q)(log log q)2 / log q − 2A(q)).
+
+The least prime ℓ with ℓ ∤ q and ℓ not lying in the subgroup H satisfies the
+bound ℓ ≤ (log q + B(q))2 .
+(2) Suppose q is not divisible by any prime below (log q)2 . Then there is a prime
+ℓ ≤ (log q)2 with ℓ not lying in the subgroup H.
+The quantity B(q) in Theorem 1.1 is zero when q is large and does not have
+too many small prime factors. Asymptotically B(q) = o(log log q), and in any given
+situation it may easily be directly estimated.
+Consider now the special case when q is prime and H is the subgroup of quadratic
+residues (mod q). Combining Theorem 1.1 with a computer calculation for the
+primes below 3000 we obtain the following corollary.
+Corollary 1.1. Assume GRH. If q ≥ 5 is prime, the least quadratic non-residue
+(mod q) lies below (log q)2 .
+Theorem 1.1 establishes an explicit bound of the same strength as the asymptotic
+bound given in Bach [2]. Interestingly it turns out that the asymptotic bound in this
+question may also be improved.
+Theorem 1.2. Assume GRH. Let q be a large integer and let H be a subgroup of
+G = (Z/qZ)∗ with index h = [G : H] > 1. Then the least prime p not in H satisfies
+p < (α(h) + o(1))(log q)2 ,
+where α(2) = 0.8, α(3) = 0.7 and in general α(h) = 0.66 for all h > 3.
+In particular the least quadratic non-residue is bounded by (0.8 + o(1))(log q)2 .
+Theorem 1.2 gives good bounds when h is small, but when h is very large the
+following stronger result holds, which appears to be the limit of our method.
+Theorem 1.3. Assume GRH. Let q be a large integer and let H be a subgroup of
+G = (Z/qZ)∗ with index h = [G : H] ≥ 4. Then the least prime p not in H satisfies
+p<
+
+1
+4
+
++ o(1)
+
+
+
+1 2  log(2h) 2
+1−
+(log q)2 .
+h
+log(2h) − 4
+2
+
+1.2. The least prime in a given coset. Now we turn to the second of our questions: the problem of determining the least prime lying in a given coset of H.
+Theorem 1.4. Assume GRH. Let q ≥ 20000 and let H be a subgroup of G =
+(Z/qZ)∗ with index h = [G : H] > 1. Let p be the smallest prime lying in a given
+coset aH. Then either p ≤ 109 , or
+
+2
+5
+p ≤ (h − 1) log q + 3(h + 1) + (log log q)2 .
+2
+From the proof one may obtain more precise estimates, but the form above seems
+easiest to state.
+We next single out the case when H is the trivial subgroup comprising of just
+the identity. Here the problem amounts to getting bounds on the least prime P (a, q)
+in the arithmetic progression a (mod q) (where we assume that (a, q) = 1). A celebrated (unconditional) theorem of Linnik gives that P (a, q) ≪ q L for some absolute
+constant L. The work of Heath-Brown [10] shows that L = 5.5 is an admissible value
+for Linnik’s constant, and this has been recently improved to L = 5.2 by Xylouris
+[17].
+Under the assumption of the Generalized Riemann Hypothesis, Bach and Sorenson [4] showed that
+(1.1)
+
+P (a, q) ≤ (1 + o(1))(φ(q) log q)2 ,
+
+and they also derived the explicit bound
+(1.2)
+
+P (a, q) ≤ 2(q log q)2 .
+
+Our work leading up to Theorem 1.4 and some computation for q ≤ 20000 permits
+the following refinement of these bounds.
+Corollary 1.2. Assume GRH. Let q > 3, and let a (mod q) be a reduced residue
+class. The least prime in the arithmetic progression a (mod q) satisfies
+P (a, q) ≤ (φ(q) log q)2 .
+By modifying the argument for Theorems 1.2 and 1.3, and using the BrunTitchmarsh theorem, one may derive an asymptotic bound of the form P (a, q) ≤
+(1 − δ + o(1))(φ(q) log q)2 for some small δ > 0.
+1.3. Bounds for values of L-functions at s = 1. The Generalized Riemann
+Hypothesis implies the Generalized Lindelöf Hypothesis, thus furnishing good upper
+bounds for the values of L-functions. Such results go back to Littlewood [13], [14],
+and the best known asymptotic bounds may be found in [7] (for L-values on the
+critical line) and [5] (for L-values inside the critical strip). Explicit bounds on GRH
+for L-values on the critical line may be found in [6]. The methods of this paper allow
+us to give, assuming GRH, new explicit upper and lower bounds for L-values at the
+edge of the critical strip.
+Theorem 1.5. Assume GRH. Let q be a positive integer and χ be a primitive
+character modulo q. For q ≥ 1010 we have
+
+
+1
+1
+γ
+|L(1, χ)| ≤ 2e log log q − log 2 + +
+,
+2 log log q
+3
+
+and
+
+12eγ 
+1
+1
+14 log log q 
+1
+.
+≤ 2 log log q − log 2 + +
++
+|L(1, χ)|
+π
+2 log log q
+log q
+
+By Dirichlet’s class number formula, we can deduce explicit bounds for the class
+number of an imaginary quadratic field under the assumption of GRH. More specif
+ically, let −q be a fundamental discriminant with q > 4 and χ−q (n) = −q
+be
+n
+the Kronecker symbol, which is a primitive Dirichlet character (mod q).
+√ Moreover,
+denote by h(−q) the class number of the imaginary quadratic field Q( −q). Then,
+the Dirichlet class number formula reads
+√
+q
+(1.3)
+h(−q) =
+L(1, χ−q ).
+π
+For discussions on the computation of these class numbers, we refer to [3], [9], [12],
+[15]. From Theorem 1.5 we obtain the following corollary.
+Corollary 1.3. Assume GRH.√Let −q be a fundamental discriminant, and let h(−q)
+denote the class number of Q( −q). If q ≥ 1010 then
+π √ 
+1
+14 log log q −1
+1
+h(−q) ≥
++
++
+,
+q
+log
+log
+q
+−
+log
+2
++
+12eγ
+2 log log q
+log q
+
+and
+
+
+
+1
+1
+2eγ √
+.
+q log log q − log 2 + +
+h(−q) ≤
+π
+2 log log q
+
+The work of [12] computes class numbers and class groups for all imaginary
+quadratic fields with absolute discriminant below 1011 . From our corollary it follows
+that on GRH h(−q) ≥ 9053 when q ≥ 1011 .
+Our methods would also lead to explicit bounds for more general L-functions.
+We do not pursue this here, and content ourselves by stating that for real numbers
+t ≥ 1010 we have (assuming RH)
+
+
+1
+1
+γ
+|ζ(1 + it)| ≤ 2e log log t − log 2 + +
+,
+2 log log t
+and
+
+1
+1
+12eγ 
+1
+14 log log t 
+.
+≤ 2 log log t − log 2 + +
++
+|ζ(1 + it)|
+π
+2 log log t
+log t
+2. Preliminary lemmas
+
+This section collects together several preliminary results that will be useful in our
+subsequent work. We first introduce a convenient notation that will be in place for
+the rest of the paper. We let θ stand for a complex number of magnitude at most
+one. In each occurrence θ might stand for a different value, so that we may write
+θ − θ = 2θ, θ × θ = θ and so on.
+Recall from Chapter 12 of [8] the following properties of the Riemann zetafunction and Dirichlet L-functions. Set
+s
+s
+ξ(s) = s(s − 1)π − 2 Γ
+ζ(s),
+2
+4
+
+which is an entire function of order 1, satisfies the functional equation ξ(s) = ξ(1−s),
+and for which the Hadamard factorization formula gives
+Y
+s  s/ρ
+(2.1)
+ξ(s) = eBs
+1−
+e .
+ρ
+ρ
+Above ρ runs over the non-trivial zeros of ζ(s), and B is a real number given by
+X 1
+1
+γ
+(2.2)
+B=−
+Re = log(4π) − 1 − = −0.02309 . . .
+ρ
+2
+2
+ρ
+Let χ (mod q) denote a primitive Dirichlet character, and let L(s, χ) denote the
+associated Dirichlet L-function. Put a = (1 − χ(−1))/2 = 0 or 1 depending on
+whether the character χ is even or odd. Let ξ(s, χ) denote the completed L-function
+ q  2s  s + a 
+ξ(s, χ) =
+L(s, χ).
+Γ
+π
+2
+The completed L-function satisfies the functional equation
+ξ(s, χ) = ǫχ ξ(1 − s, χ)
+where ǫχ is a complex number of size 1. The zeros of ξ(s, χ) are precisely the nontrivial zeros of L(s, χ), and letting ρχ = 21 + iγχ denote such a zero (throughout the
+paper we assume the truth of the GRH), we have Hadamard’s factorization formula:
+Y
+s  s/ρχ
+1−
+e
+.
+(2.3)
+ξ(s, χ) = exp(A(χ) + sB(χ))
+ρχ
+ρ
+χ
+
+Above, A(χ) and B(χ) are constants, with ReB(χ) being of particular interest for
+us. Note that
+X
+1
+ξ′
+Re .
+(2.4)
+Re(B(χ)) = Re(B(χ)) = Re (0, χ) = −
+ξ
+ρχ
+ρ
+χ
+
+Γ′
+
+Recall the digamma function ψ0 (z) = Γ (z), and its derivative the trigamma
+function ψ1 (z) = ψ0′ (z). The following special values will be useful:
+π2
+π2
+ψ0 (1) = −γ, ψ1 (1) = ζ(2) = , ψ0 (1/2) = −2 log 2 − γ, and ψ1 (1/2) = .
+6
+2
+Lemma 2.1. Assume RH. For x > 1 there exists some |θ| ≤ 1 such that
+X
+n≤x
+
+Λ(n) log(x/n) = x − (log 2π) log x − 1 +
+
+∞
+X
+1 − x−2k
+k=1
+
+4k 2
+
+√
++ 2θ|B|( x + 1).
+
+Lemma 2.2. Assume GRH. Let q ≥ 3 and let χ (mod q) be a primitive Dirichlet
+character. Define
+X
+S(x, χ) :=
+Λ(n)χ(n) log(x/n).
+n≤x
+
+For x > 1, there exists some |θ| ≤ 1 such that
+
+q
+1
+ξ′
+ea (x),
+S(x, χ) = |Re(B(χ))|(2θ x + 2θ) − (0, χ) log x +
+log
+log x + E
+ξ
+2
+π
+√
+
+5
+
+where
+
+and
+
+In particular,
+
+∞
+X
+π2 γ
+x−2k
+1
+2
+e
+E0 (x) =
+− log x − (log x) −
+,
+2
+24 2
+2
+(2k)
+k=1
+
+∞
+2
+X
+x−2k−1
+e1 (x) = π − (log 2 + γ/2) log x −
+.
+E
+2
+8
+(2k
++
+1)
+k=0
+
+√
+q
+1
+ea (x).
+log
+log x + E
+ReS(x, χ) = |Re(B(χ))|(2θ x + 2θ + log x) +
+2
+π
+We shall confine ourselves to proving Lemma 2.2; the proof of Lemma 2.1 is
+essentially the same.
+Proof of Lemma 2.2. We begin with
+Z 2+i∞
+1
+ξ′
+xs
+− (s, χ) 2 ds,
+2πi 2−i∞
+ξ
+s
+
+and first evaluate the integral by moving the line of integration to the left. There are
+poles at the non-trivial zeros ρχ of L(s, χ), and a double pole at s = 0. Evaluating
+the residues here we find that our integral equals
+ ξ ′ ′
+X xρχ
+ξ′
+−
+−
+(0,
+χ)
+log
+x
+−
+(0, χ).
+2
+ρ
+ξ
+ξ
+χ
+ρ
+χ
+
+Invoking GRH,
+
+−
+Further
+
+√ X 1
+√
+=
+θ
+= 2θ x|Re(B(χ))|.
+x
+2
+2
+ρχ
+|ρχ |
+ρ
+
+X xρχ
+ρχ
+
+ ξ ′ ′
+ξ
+
+χ
+
+(0, χ) = −
+
+X 1
+ρχ
+
+ρ2χ
+
+= 2θ|Re(B(χ))|.
+
+Putting these observations together we obtain
+Z 2+i∞
+ √
+ ξ′
+xs
+ξ′
+1
+− (s, χ) 2 ds = |Re(B(χ))| 2θ x + 2θ − (0, χ) log x.
+(2.5)
+2πi 2−i∞
+ξ
+s
+ξ
+On the other hand, the LHS of (2.5) equals
+Z 2+i∞ 
+ xs
+1
+1
+q
+1  s + a  L′
+(2.6)
+− (s, χ) 2 ds.
+− log − ψ0
+2πi 2−i∞
+2
+π 2
+2
+L
+s
+
+The first and third terms above contribute
+X
+1
+q
+− log
+log x +
+Λ(n)χ(n) log(x/n).
+2
+π
+n≤x
+
+If a = 1, the middle term in (2.6) equals (here there are simple poles at the negative
+odd integers, and a double pole at 0)
+∞
+X
+1 1
+1 1
+x−2k−1
+e1 (x).
+log x − ψ1
+= −E
+− ψ0
+2
+(2k
++
+1)
+2
+2
+4
+2
+k=0
+6
+
+If a = 0 the middle term in (2.6) equals (here there are simple poles at the negative
+even integers, and a triple pole at 0)
+∞
+X
+x−2k
+k=1
+
+(2k)2
+
+1
+1
+1
+e0 (x).
++ (log x)2 − ψ0 (1) log x − ψ1 (1) = −E
+2
+2
+4
+
+This completes our proof of the first assertion. The second assertion follows by taking
+′
+real part, and noting that Re ξξ (0, χ) = Re(B(χ)) from (2.4).
+
+Lemma 2.3. Assume GRH. Let q ≥ 3 and let χ (mod q) be a primitive Dirichlet
+character. For any x > 1 we have, for some |θ| ≤ 1,
+
+where
+
+and
+
+ξ′
+1 ξ′
+2θ
+− (0, χ̄)−
+(0, χ) + √ |Re(B(χ))|
+ξ
+xξ
+x
+
+
+
+1
+q X Λ(n)
+n
+1
+1−
+log −
++ Ea (x),
+χ(n) 1 −
+=
+2
+x
+π n≤x n
+x
+∞
+γ
+1  log x + 1 X x−2k−1
+E0 (x) = − log 2 −
+1−
++
+−
+,
+2
+x
+x
+2k(2k + 1)
+k=1
+
+E1 (x) = −
+
+1  log 2
+γ
+x−2k−2
+1−
++
+−
+.
+(2k
++
+1)(2k
++
+2)
+2
+x
+x
+k=0
+
+∞
+X
+
+In particular, |Re(B(χ))| equals
+
+
+
+X Λ(n)
+2θ
+1
+q
+n
+1 −1  1 
+1+ √ +
+1−
+log − Re
++ Ea (x) .
+χ(n) 1 −
+2
+x
+π
+n
+x
+x x
+n≤x
+Proof. The proof is similar to that of Lemma 2.2, and so we will be brief. We consider
+Z 2+i∞ ′
+1
+xs−1
+ξ
+(2.7)
+(s, χ)
+ds,
+2πi 2−i∞ ξ
+s(s − 1)
+
+and begin by evaluating the integral by moving the line of integration to the left.
+There are poles at s = 1, s = ρχ and s = 0 and therefore our integral above equals
+X xρχ −1
+ξ′
+1 ξ′
+(1, χ) −
+(0, χ) +
+.
+ξ
+xξ
+ρχ (ρχ − 1)
+ρ
+χ
+
+′
+ξ′
+(1, χ) = − ξξ (0, χ̄). Further, since we are assuming GRH, we have for
+ξ
+
+Note that
+some |θ| ≤ 1,
+
+X
+ρχ
+
+θ X 1
+2θ
+xρχ −1
+=√
+= √ |Re(B(χ))|.
+2
+ρχ (ρχ − 1)
+x ρ |ρχ |
+x
+χ
+
+Thus the quantity in (2.7) equals the LHS of the first identity claimed in our lemma.
+On the other hand, we may rewrite the integral (2.7) as
+Z 2+i∞ 
+ xs−1
+q
+1  s + a  L′
+1
+1
++ (s, χ)
+(2.8)
+log + ψ0
+ds.
+2πi 2−i∞ 2
+π 2
+2
+L
+s(s − 1)
+7
+
+Now the first and the last terms above give
+
+1
+1
+q X Λ(n)
+n
+1−
+log −
+.
+χ(n) 1 −
+2
+x
+π n≤x n
+x
+
+If a = 1 then the middle term in (2.8) equals (there are simple poles at s = 1, 0,
+and the negative odd integers)
+∞
+X
+1
+1 1
+x−2k−2
+= E1 (x).
++ ψ0 (1) − ψ0
+−
+(2k
++
+1)(2k
++
+2)
+2
+2x
+2
+k=0
+If a = 0 then the middle term equals (here there are simple poles at s = 1 and at
+the negative even integers, and a double pole at s = 0)
+∞
+1  1  log x + 1 + γ/2 X x−2k−1
++
+ψ0
+−
+= E0 (x).
+2
+2
+x
+2k(2k
++
+1)
+k=1
+
+This proves the first part of our lemma.
+′
+′
+Now, by the functional equation and (2.4), we have Re ξξ (1, χ) = −Re ξξ (0, χ) =
+−Re(B(χ)). Thus taking real parts in the identity just established, we deduce the
+stated identity for |Re(B(χ))|.
+
+Lemma 2.4. Assume RH. For x > 1 we have, for some |θ| ≤ 1,
+∞
+X Λ(n) 
+n
+log(2π) X x−2n−1
+|B|
+1−
+= log x − (1 + γ) +
+−
++ 2θ √ .
+n
+x
+x
+2n(2n + 1)
+x
+n=1
+n≤x
+Proof. We argue as in Lemma 2.3, starting with
+Z 2+i∞
+X Λ(n) 
+n
+xs−1
+1
+ζ′
+1−
+.
+ds =
+− (s)
+2πi 2−i∞
+ζ
+s(s − 1)
+n
+x
+n≤x
+
+Moving the line of integration to the left, and computing residues, we find that the
+above equals
+∞
+X
+log(2π) X xρ−1
+x−2n−1
+log x − (1 + γ) +
+−
+−
+.
+x
+ρ(ρ − 1) n=1 2n(2n + 1)
+ρ
+
+The lemma follows.
+
+
+
+Lemma 2.5. Let q ≥ 3 and let χ (mod q) be a primitive Dirichlet character. Suppose that GRH holds for L(s, χ). For any x ≥ 2, there exists a real number |θ| ≤ 1
+such that
+
+X χ(n)Λ(n) log x
+1 1
+q
+1  1 + a 
+n
++
+log + ψ0
+log |L(1, χ)| = Re
+n log n log x
+log x 2
+π 2
+2
+n≤x
+ 1
+
+2θ
+2θ
+√
+−
++
+.
+|Re(B(χ))| +
+2
+log x
+x(log x)
+x log2 x
+Proof. For any σ ≥ 1, we consider
+Z 2+i∞
+X χ(n)Λ(n)
+L′
+xs
+1
+− (σ + s, χ) 2 ds =
+log(x/n).
+σ
+2πi 2−i∞
+L
+s
+n
+n≤x
+8
+
+Shifting the contour to the left, we find that the integral also equals
+ ′ ′
+∞
+X xρχ −σ
+X
+L′
+L
+x−2n−a−σ
+− (σ, χ) log x −
+(σ, χ) −
+−
+.
+2
+2
+L
+L
+(ρ
+−
+σ)
+(2n
++
+a
++
+σ)
+χ
+ρ
+n=0
+χ
+
+Therefore
+
+ ′ ′
+X χ(n)Λ(n) log(x/n)
+L′
+L
+1
+− (σ, χ) =
++
+(σ, χ)
+σ
+L
+n
+log
+x
+log
+x
+L
+n≤x
+
+1
+∞
+θx−σ X x−2n
+θx 2 −σ X 1
++
+.
++
+log x ρ |ρχ |2 log x n=0 (2n + 1)2
+χ
+
+Integrating both sides over σ from 1 to ∞ and taking real parts we conclude that
+X χ(n)Λ(n) log(x/n)
+1
+L′
+log |L(1, χ)| = Re
+−
+Re (1, χ)
+n log n
+log x
+log x L
+n≤x
+X 1
+θ
+2θ
++√
++
+.
+2
+2
+x(log x)2
+x(log x) ρ |ρχ |
+χ
+
+The lemma follows upon noting that
+−Re
+
+ξ′
+1
+q
+1 1 + a
+L′
+(1, χ) = −Re (1, χ) + log + ψ0
+L
+ξ
+2
+π 2
+2
+
+1
+q
+1
+1 + a
+= −|Re(B(χ))| + log + ψ0
+.
+2
+π 2
+2
+
+
+
+Lemma 2.6. Assume RH. For all x ≥ e we have
+X Λ(n) log(x/n)
+γ
+2Bθ
+θ
+= log log x + γ − 1 +
++√
+.
++ 3
+2
+2
+n
+log
+n
+log
+x
+log
+x
+3x
+(log
+x)
+x(log
+x)
+n≤x
+Proof. Analogously to the proof of Lemma 2.5 we begin with, for any σ > 1,
+Z 2+i∞
+X Λ(n)
+1
+ζ′
+xs
+− (s + σ) 2 ds =
+log(x/n),
+2πi 2−i∞
+ζ
+s
+nσ
+n≤x
+
+and moving the line of integration to the left, this equals
+∞
+ ζ ′ ′
+X
+X xρ−σ
+ζ′
+x−2n−σ
+x1−σ
+−
+(σ)
+log
+x
+−
+−
+.
+(σ)
+−
+(σ − 1)2
+ζ
+ζ
+(ρ − σ)2 n=1 (2n + σ)2
+ρ
+
+Let σ0 denote a parameter that will tend to 1 from above, and integrate the two
+expressions above for σ from σ0 to ∞. Thus
+Z ∞
+X Λ(n)
+ζ′
+x1−σ
+log(x/n)
+=
+dσ
++
+(log
+x)
+log
+ζ(σ
+)
++
+(σ0 )
+0
+σ0 log n
+2
+n
+(σ
+−
+1)
+ζ
+σ
+0
+n≤x
++√
+
+θ
+2Bθ
++ 3
+.
+x log x 3x log x
+
+9
+
+Now, with α = (σ0 − 1) log x,
+Z ∞
+σ0
+
+x1−σ
+dσ = (log x)
+(σ − 1)2
+
+Z ∞
+α
+
+e−y
+dy,
+y2
+
+and upon integrating by parts we have
+Z ∞ −y
+Z 1
+Z ∞ −y
+e−α
+e
+1 − e−y
+e
+dy =
+−
+dy +
+dy + log α.
+y2
+α
+y
+y
+1
+α
+α
+
+Now let σ0 → 1+ , so that α → 0+ , and note that log ζ(σ0 ) = − log(σ0 −1)+O(σ0 −1),
+R1
+R∞
+−ζ ′ /ζ(σ0 ) = 1/(σ0 −1) −γ + O(σ0 −1), and that 0 (1 −e−y )dy/y − 1 e−y dy/y = γ.
+The lemma then follows.
+
+3. Proof of Theorem 1.1
+Unlike the other results of this paper, the following simple lemma is unconditional.
+Lemma 3.1. Let m ≥ 3 be an integer and x ≥ 2 be a real number. Then
+X
+1
+Λ(n) log(x/n) ≤ ω(m)(log x)2 ,
+2
+n≤x
+(n,m)>1
+
+and
+
+X Λ(n) 
+X Λ(n) X log p
+n
+1−
+≤
+=
+.
+n
+x
+n
+p−1
+n
+n≤x
+(n,m)>1
+
+(n,m)>1
+
+p|m
+
+Proof. If (n, m) > 1 and n ≤ x is a prime power, then n = pα where p|m and
+α ≤ log x/ log p. Hence
+ 
+X
+X
+X
+x
+Λ(n) log(x/n) =
+log p log
+pα
+n≤x
+p≤x
+(n,m)>1
+
+p|m
+
+α≤log x/ log p
+
+
+
+ X
+log x
+log p log x
+=
+log2 p
+−
+log
+p
+p≤x
+p≤x
+X
+p|m
+
+p|m
+
+X
+
+α
+
+α≤log x/ log p
+
+
+
+1X
+1
+log x
+≤
+≤ ω(m)(log x)2 .
+log p log x
+2 p≤x
+log p
+2
+p|m
+
+The second part of the lemma is evident.
+
+
+
+Let q ≥ 3000 and let H be a proper subgroup of G = (Z/qZ)∗ . Let X be such
+that all primes ℓ ∤ q with ℓ ≤ X lie in the subgroup H. Let H̃ denote the group of
+Dirichlet characters χ (mod q) such that χ(n) = 1 for all n ∈ H. Thus H̃ is a subgroup of the group of Dirichlet characters mod q, and note that |H̃| equals [G : H].
+The assumption that all primes ℓ ≤ X with ℓ ∤ q lie in H is equivalent to χ(ℓ) = 1
+for all χ ∈ H̃. Since H is a proper subgroup, there exists a non-principal character χ
+(mod q) in H̃. Our strategy is to compare upper and lower bounds for Re(S(X, χ))
+10
+
+P
+where, as defined earlier, S(X, χ) = n≤X Λ(n)χ(n) log(X/n). Note that the character χ need not be primitive, and we let χ̃ (mod q̃) denote the primitive character
+that induces χ.
+3.1. Proof of Part 1. Here we assume that X = (log q + B(q))2 ≥ (log q)2 ≥ 64,
+and seek a contradiction. The assumption that χ(ℓ) = 1 for all primes ℓ below X
+with ℓ ∤ q gives
+X
+X
+S(X, χ) =
+Λ(n) log(X/n) −
+Λ(n) log(X/n).
+n≤X
+
+n≤X
+(n,q)>1
+
+Using Lemma 2.1 and Lemma 3.1 (recall that χ(n) = 1 for all n ≤ X) we obtain
+the lower bound
+
+
+√
+(log log q)2
+(3.1) Re(S(X, χ)) ≥ X − X 2|B| + 2ω(q)
+−log(2π) log X −1−2|B|,
+log q
+√
+where we used that X ≥ (log q)2 and so (log X)2 / X ≤ 4(log log q)2 / log q.
+Next we work on the upper bound for Re(S(X, χ)). Note that
+(3.2)
+
+S(X, χ) − S(X, χ̃) = θ
+
+X
+
+Λ(n) log(X/n) = θ
+
+n≤X
+(n,q/q̃)>1
+
+ω(q/q̃)
+(log X)2 .
+2
+
+Using Lemma 2.2 for χ̃, and since Ẽa (X) ≤ −11/4 for X ≥ 64, we find
+√
+1
+q̃ 
+11
+(3.3)
+Re(S(X, χ̃)) ≤ (2 X + 2 + log X)|Re(B(χ̃))| +
+log
+log X − .
+2
+π
+4
+
+We shall bound |Re(B(χ̃))| above using Lemma 2.3. First note that by Lemmas
+2.4 and 3.1
+X Λ(n) 
+X Λ(n) 
+X Λ(n)χ̃(n) 
+n
+n
+n
+1−
+=
+1−
+−
+1−
+n
+X
+n
+X
+n
+X
+n≤X
+n≤X
+n≤X
+(n,q̃)>1
+
+
+8 X log p 
+≥ max 0, log(X) − −
+5
+p−1
+p|q
+
+8 X log p 
+≥ max 0, 2 log log q − −
+= A(q).
+5
+p−1
+p|q
+
+For X ≥ 64, we have that (1 − √1X )−2 ≤ 1 + 2√5X and Ea (X) < −1/4. Using this in
+Lemma 2.3, we get
+
+1 −2 1
+q̃
+log q̃ 2
+|Re(B(χ̃))| ≤ 1 − √
+log − A(q) + Ea (X) ≤
++ − A(q).
+2
+π
+2
+5
+X
+
+We use this bound in (3.3) and combine that with (3.2) to obtain an upper bound for
+Re(S(X, χ)). Since ω(q/q̃) ≤ (log(q/q̃))/ log 2, the resulting upper bound is largest
+11
+
+when q̃ = q. Thus
+ log X 
+ log q 2
+√
+q  11
+Re(S(X, χ)) ≤ (2 X + 2 + log X)
+log
+−
++ − A(q) +
+2
+5
+2
+π
+4
+
+√ 
+4
+log q
+39
+log X
+≤ X log q + − 2A(q) + √ log q + √
+−
+5
+20
+X
+X
+ 39
+√ 
+9
+≤ X log q + 2 log log q + − 2A(q) − .
+5
+20
+Comparing the upper bound above with the lower bound (3.1) gives the desired
+contradiction.
+3.2. Proof of Part 2. Here we suppose that X ≥ (log q)2 and seek a contradiction.
+The proof follows the same lines as Part 1, with simplifications due to the assumption
+that q has no prime factors below X, and a little more care with constants. Thus
+using Lemma 2.1 we have the lower bound
+X
+√
+(3.4) ReS(X, χ) =
+Λ(n) log(X/n) ≥ X − 2|B|( X + 1) − log(2π) log X − 1.
+n≤X
+
+Now we turn to the upper bound. Since q has no prime factors below X we have
+S(X, χ) = S(X, χ̃). From Lemma 2.3 and Lemma 2.4 we have that
+
+
+q̃
+8
+1 −2  1
+log − log X + + Ea (X) .
+|Re(B(χ̃))| ≤ 1 − √
+2
+π
+5
+X
+√
+√ −2
+For X ≥ 64 we have that (1 − 1/ X) ≤ (1 + 5/(2 X)), and we may check that
+for a = 0 or 1,
+1
+8
+7
+− log π − log X + + Ea (X) ≤ − log X + .
+2
+5
+6
+2
+Therefore, as X ≥ (log q) , and q̃ ≤ q,
+
+7
+5  1
+log q̃ − log X +
+|Re(B(χ̃))| ≤ 1 + √
+6
+2 X 2
+
+
+
+log q 5
+7
+5
+≤
++ + 1+ √
+− log X
+2
+4
+2 X 6
+log q log X
+4
+≤
+−
+− ,
+2
+2
+7
+where the last bound follows upon using X ≥ 64 together with a little calculus.
+Using this in Lemma 2.2, and noting that Ẽa (x) < 0 for a = 0 or 1 and x ≥ 3, we
+get (recall X ≥ (log q)2 )
+1
+√
+q
+1
+4 1
++
+log
+log X
+ReS(X, χ) ≤ (2 + 2 X + log X) log q − log X −
+2
+2
+7√ 2
+π
+ 1
+√
+X 8
+11 
+≤ X log q + log X − log(πX) −
+−
+−
+2
+7
+7
+7
+√
+√
+X
+8
+≤ X log q −
+(3.5)
+− 2 log X − .
+7
+7
+Comparing the bounds (3.4) and (3.5) gives a contradiction, which proves the
+claimed result.
+12
+
+4. The least prime in a given coset
+As before, let H̃ denote the group of characters χ (mod q) with χ(n) = 1 for all n ∈
+H. Recall that |H̃| = [G : H] = h, and given a coset aH we have the orthogonality
+relation
+(
+1X
+1 if n ∈ aH
+(4.1)
+χ(a)χ(n) =
+h
+0 if n ∈
+/ aH.
+χ∈H̃
+
+Note that q ≥ 20000. Let X be such that no prime below X lies in the coset aH,
+9
+2
+and we assume below
+P that X ≥ max(10 , ((h − 1) log q) ).
+Set S(X, χ) = n≤X Λ(n)χ(n) log(X/n), so that
+X
+1X
+χ(a)S(X, χ).
+Λ(n) log(X/n) =
+(4.2)
+h
+n≤X
+χ∈H̃
+
+n∈aH
+
+Our strategy is again to obtain upper and lower bounds for the quantity above, and
+then to derive a contradiction.
+4.1. Preliminary bounds. First, consider the principal character χ0 (mod q) which
+certainly belongs to the group H̃. Since
+X
+X
+Λ(n) log(X/n),
+S(X, χ0 ) =
+Λ(n) log(X/n) −
+n≤X
+
+n≤X
+(n,q)>1
+
+using Lemmas 2.1 and 3.1, we obtain that for X ≥ max((h − 1)2 log2 q, 109 ),
+√
+ω(q)
+|S(X, χ0 ) − X| ≤ 2|B|( X + 1) + (log 2π) log X + 1 +
+(log X)2
+2
+√
+X ω(q)
+≤
+(4.3)
++
+(log X)2 .
+20
+2
+For a non-principal character χ ∈ H̃, let χ̃ (mod q̃) denote the primitive character that induces χ. By Lemma 2.2 we find that
+(4.4)
+√
+q̃ 
+1
+ξ′
+log
+log X + Ẽa (X) .
+|S(X, χ̃)| ≤ (2 X + 2)|Re(B(χ̃))| + (0, χ̃) log X +
+ξ
+2
+π
+Now for X ≥ 109 we know that Ẽa (X) < 0, and examining the definition of Ẽa we
+find that
+q
+
+1
+1
+q̃ 
+log
+log X + Ẽa (X) ≤ (log X) log max
+(4.5)
+, 2X .
+2
+π
+2
+π
+Recall from (3.2) that
+
+(log X)2
+.
+2
+We now invoke Lemma 2.3, taking there x = 100. Since |ξ ′/ξ(0, χ̃)| = |ξ ′ /ξ(0, χ̃)| ≥
+|Re(B(χ̃))| we obtain
+
+X Λ(n) 
+n 
+2
+1  1 99
+q̃
+ξ′
+≤
+1−
+.
+(0, χ̃) 1 −
+−
+log +
+ξ
+10 100
+2 100
+π n≤100 n
+100
+
+(4.6)
+
+|S(X, χ)| ≤ |S(X, χ̃)| + ω(q/q̃)
+
+13
+
+It follows with a little computation that
+ξ′
+2
+q
+(0, χ̃) ≤ log + 4.
+ξ
+3
+π
+
+(4.7)
+
+Further, using Lemma 2.3 (taking there x = X, and since Ea (X) ≤ −2/7 for
+X ≥ 109 ), we find that
+
+
+X Λ(n)
+1
+q̃
+1 −2  1 
+n 2
+1−
+log − Re
+−
+.
+|Re(B(χ̃))| ≤ 1 − √
+χ̃(n) 1 −
+2
+X
+π
+n
+q
+7
+X
+n≤X
+Further,
+Re
+
+
+
+X Λ(n)
+n
+n
+≥ Re
+−
+χ̃(n) 1 −
+χ(n) 1 −
+n
+X
+n
+X
+n≤X
+
+X Λ(n)
+
+n≤X
+
+≥ Re
+
+n≤X
+(n,q/q̃)>1
+
+Λ(n) 
+n
+1−
+n
+X
+
+
+1  X log p
+n 
+− 1−
+χ(n) 1 −
+.
+n
+X
+X
+p−1
+
+X Λ(n)
+
+n≤X
+
+X
+
+p|(q/q̃)
+
+√
+Therefore, we find that for X ≥ 109 , the quantity (2 X + 2)|Re(B(χ̃))| is bounded
+by
+√
+
+X log p
+X Λ(n)
+q̃
+n  4
+19 
+≤
+log + 2
+−
+.
+− 2Re
+χ(n) 1 −
+X+
+6
+π
+p−1
+n
+X
+7
+n≤X
+p|(q/q̃)
+
+Consider the quantity above
+X)2 /2 appearing in
+Ptogether with the term ω(q/q̃)(log
+9
+(4.6). Since log q̃ ≤ log q − p|(q/q̃) log p, and X ≥ 10 , we may check that the sum
+of these two quantities is largest when q/q̃ is 6. Putting in this worst case bound,
+we find that
+√
+(log X)2
+(2 X + 2)|Re(B(χ̃))| + ω(q/q̃)
+≤ (log X)2
+2
+
+√
+X Λ(n)
+q
+4
+n 
+19 
+log + log 2 − − 2Re
+.
+χ(n) 1 −
+X+
++
+6
+π
+7
+n
+X
+n≤X
+Combining this estimate with (4.4), (4.5), (4.6), and (4.7) we conclude that
+√
+
+X Λ(n)
+19 
+51
+n 
+|S(X, χ)| ≤
+X+
+log q −
++ (log X)2
+− 2Re
+χ(n) 1 −
+6
+50
+n
+X
+n≤X
+
+q
+
+2
+q
+(log X)
+(4.8)
+log + 4 (log X) +
+log max
+, 2X .
++
+3
+π
+2
+π
+
+We sum the above over the h − 1 non-principal characters of H̃. Note that, using
+the orthogonality relations and Lemma 2.4,
+
+X X Λ(n)
+n
+3
+n  X Λ(n) 
+≤
+1−
+≤ log X − .
+χ(n) 1 −
+−Re
+n
+X
+n
+X
+2
+n≤X
+n≤X
+χ∈H̃
+χ6=χ0
+
+14
+
+Thus, we conclude that
+√
+
+X
+19 
+|S(X, χ)| ≤
+(h − 1) log q − (h + 2) + 2 log X + (h − 1)(log X)2
+X+
+6
+χ∈H̃
+χ6=χ0
+
+2
+
+q
+
+q
+1
++ (h − 1) log X
+log + 4 + log max
+, 2X .
+3
+π
+2
+π
+
+Using that q ≥ 20000 and X ≥ max(109 , ((h − 1) log q)2 ), we may simplify the above
+bound, and obtain that
+
+X
+√ 
+6
+|S(X, χ)| ≤ X (h − 1) log q − h + + 3 log X + (h − 1)(log X)2
+5
+χ∈H̃
+χ6=χ0
+
+(4.9)
+
++ (h − 1)
+
+q
+
+log X
+log max
+, 2X .
+2
+π
+
+Combining this with (4.3) we obtain a lower bound for the LHS of (4.2).
+4.2. Upper bound for (4.2). Now we turn to the upper bound. By assumption
+there are no primes p ≤ X with p ∈ aH. Therefore
+X
+X
+X
+Λ(n) log(X/n) ≤
+(log p) log(X/p2k ) +
+(log p) log(X/p2k+1).
+n≤X
+n∈aH
+
+p2k≤X
+p2k ∈aH
+
+p2k+1 ≤X
+
+The second term above is, using Lemma 2.1, and a little computation using X ≥ 109 ,
+X
+X
+≤
+(2k + 1)
+(log p) log(X 1/(2k+1) /p)
+k≤log X/(2 log 2)−1/2
+
+≤
+
+X
+
+k≤log X/(2 log 2)−1/2
+
+p≤X 1/(2k+1)
+
+√
+
+1/(4k+2) 
+X
+X
+≤
+,
+(2k + 1) X 1/(2k+1) +
+20
+7
+
+so that
+(4.10)
+
+X
+
+n≤X
+n∈aH
+
+Λ(n) log(X/n) ≤
+
+X
+
+p2k ≤X
+p2k ∈aH
+
+(log p) log(X/p2k ) +
+
+√
+
+X
+.
+7
+
+4.3. The least prime in an arithmetic progression. Using a computer we
+checked Corollary 1.2 when q ≤ 20000. Suppose now that q > 20000 and let a
+(mod q) be an arithmetic progression with (a, q) = 1 such that no prime below
+X = (φ(q) log q)2 is ≡ a (mod q).
+If q has at least six distinct prime factors then φ(q) ≥ φ(2 · 3 · 5 · 7 · 11 · 13) = 5760,
+while if q has at most five prime factors then φ(q) ≥ qφ(2·3·5·7·11)/(2·3·5·7·11) >
+4155. In either case, φ(q) ≥ 4156. By similar elementary arguments we may check
+that for q > 20000 we have 2ω(q) ≤ q 3/7 , and that φ(q) ≥ q 5/6 .
+Thus X = (φ(q) log q)2 ≥ 109 , and we may use our work above; note that here H
+is the trivial subgroup consisting of just the identity, and h = φ(q). First we work
+15
+
+out the lower bound for the quantity in (4.2). Using (4.3) and (4.9), together with
+the bounds 2ω(q) ≤ q 3/7 and X ≤ (q log q)2 , we find that
+
+X
+√ 
+24
+3
+φ(q)
+Λ(n) log(X/n) ≥ X − X (φ(q) − 1) log q − φ(q) + + 3(log X) .
+25
+2
+n≤x
+n≡a
+
+(mod q)
+
+To obtain a corresponding upper bound, it remains to estimate the first term in
+(4.10). Note that the number of square roots of a (mod q) is bounded by 2ω(q)+1 ≤
+2q 3/7 . Since (log p)(log X/p2k ) ≤ (log X)2 /8 we find that
+√
+
+2
+X
+X
+(log X)2
+X
+2k
+3/7 (log X)
+(log p) log(X/p ) ≤
+1≤q
++1 .
+8
+4
+q
+√
+2k
+p ≤X
+p2k ∈aH
+
+n≤ X
+n2 ≡a (mod q)
+
+Therefore
+
+n≡a
+
+X
+
+n≤x
+(mod q)
+
+√
+
+2
+X
+X
+(log
+X)
++ q 3/7
++1 .
+Λ(n) log(X/n) ≤
+7
+4
+q
+√
+
+Using our bounds φ(q) ≥ q 5/6 , q > 20000 and (q log q)2 ≥ X ≥ 109 , a little computation shows that the upper and lower bounds derived above give a contradiction.
+4.4. The general case. In general we bound the first term in (4.10) crudely by
+√
+√
+X
+X
+X 1/4 + 1 
+Λ(n) log
+,
+≤2 X+
+≤2
+n
+20
+√
+n≤ X
+
+so that
+
+X
+
+n≤X
+n∈aH
+
+Λ(n) log(X/n) ≤
+
+11 √
+X.
+5
+
+On the other hand, using (4.3) and (4.9) together with the bounds 2ω(q) ≤ q 3/7
+and X ≥ max(109 , ((h − 1) log q)2 ), we obtain
+X
+√ 
+24
+5 7
+(log X)2 
+h
+Λ(n) log(X/n) ≥ X − X (h − 1) log q − h + + (log X) +
+.
+25
+4 2
+3(h − 1)
+n≤X
+n∈aH
+
+Comparing this with our upper bound, we must have
+√
+5
+5 7
+(log X)2
+.
+X ≤ (h − 1) log q + h + + (log X) +
+4
+4 2
+3(h − 1)
+√
+2
+Since X ≥ 109 , we have 72 log X + (log3X) ≤ X/100, so that from the above estimate
+√
+we may first derive that X ≤ 2(h − 1) log q. Now inserting this bound into our
+estimate, we obtain the refined bound
+√
+5
+4(log(2(h − 1) log q))2
+X ≤ (h − 1) log q + (h + 1) + 7 log(2(h − 1) log q) +
+.
+4
+3(h − 1)
+
+The bound stated in Theorem 1.4 follows from this with a little calculation.
+16
+
+5. Explicit bounds for |L(1, χ)|: Proof of Theorem 1.5
+
+5.1. Upper bounds for L(1, χ). Let q ≥ 1010 be a positive integer and x ≥ 100
+be a real number to be chosen later. Lemma 2.5 gives
+ 1 + a 
+X χ(n)Λ(n) log(x/n)
+q
+1 
+log |L(1, χ)| ≤ Re
+log + ψ0
++
+n log n
+log x
+2 log x
+π
+2
+n≤x
+ 1
+
+2
+2
+−√
+.
+−
+|Re(B(χ))| +
+2
+log x
+x(log x)2
+x(log x)
+
+Invoking Lemma 2.3 (with the same value of x above), we have
+
+
+X Λ(n)χ(n) 
+1 −2  1 
+1
+q
+n
+|Re(B(χ))| ≥ 1 + √
+1−
+log − Re
+1−
++ Ea (x) .
+x
+2
+x
+π
+n
+x
+n≤x
+Now for x ≥ 100,
+
+
+1 + a
+1 −2  1
+2
+2
+1
+−Ea (x) 1 + √
++
+−√
++
+ψ
+≤ 0,
+0
+2
+x
+log x
+x(log x)
+2 log x
+2
+x(log x)2
+
+and therefore
+
+1 
+log(q/π) 
+1+
++ √
+n log n
+log x
+( x + 1) log x
+log x
+n≤x
+ 1
+
+n
+2
+1 −2 X Λ(n)χ(n) 
++
+1−
+.
+−√
+1+ √
+Re
+log x
+n
+x
+x(log x)2
+x
+n≤x
+
+log |L(1, χ)| ≤ Re
+
+X χ(n)Λ(n) log(x/n)
+
+The right hand side above is largest when χ(p) = 1 for all p ≤ x, and so
+
+X Λ(n) log(x/n)
+log q
+1 
+1 X Λ(n)  n 
+1− + √
+1+
+.
++
+log |L(1, χ)| ≤
+n
+log
+n
+log
+x
+log
+x
+n
+x
+(
+x
++
+1)
+log
+x
+log
+x
+n≤x
+n≤x
+Appealing now to Lemmas 2.4 and 2.6 we conclude that
+log |L(1, χ)| ≤ log log x + γ −
+
+1
+log q 
+1 
+.
++√
+1+
+log x
+log x
+x log x
+
+Choosing x = (log q)2 /4, so that x ≥ 130 for q ≥ 1010 , we deduce that
+
+
+
+3.1 
+1
+1
+|L(1, χ)| ≤ eγ log x + 1 +
+≤ 2eγ log log q − log 2 + +
+.
+log x
+2 log log q
+This proves the stated upper bound for |L(1, χ)|.
+
+5.2. Lower bounds for |L(1, χ)|. The argument proceeds similarly to the one for
+upper bounds. Let q ≥ 1010 be a positive integer. As before choose x = (log q)2 /4
+so that x ≥ 132. Lemma 2.5 gives
+ 1 + a 
+X Λ(n)χ(n) log(x/n)
+q
+1 
+log |L(1, χ)| ≥ Re
+log + ψ0
++
+n log n
+log x
+2 log x
+π
+2
+n≤x
+ 1
+
+2
+2
++√
+.
+−
+|Re(B(χ))| −
+2
+log x
+x(log x)2
+x(log x)
+17
+
+From Lemma 2.3 (with the same value of x above) we find that
+
+
+X Λ(n)χ(n) 
+1 −2  1 
+1
+q
+n
+|Re(B(χ))| ≤ 1 − √
+1−
+log − Re
+1−
++ Ea (x) .
+x
+2
+x
+π
+n
+x
+n≤x
+Now for x ≥ 100
+1 + a
+
+
+2
+2
+1 −2  1
+1
+−
++√
+ψ
+≥ 0,
+−Ea (x) 1 − √
++
+0
+2
+x
+log x
+x(log x)
+2 log x
+2
+x(log x)2
+and therefore
+
+√
+log(q/π) 
+1 + 1/ x 
+log |L(1, χ)| ≥ Re
+− √
+1+
+n log n
+log x
+log x
+( x − 1) log x
+n≤x
+
+ X Λ(n)χ(n) 
+n
+2
+1 −2  1
+(5.1)
+1
+−
+.
++√
++ 1− √
+Re
+x
+log x
+x(log x)2
+n
+x
+n≤x
+X Λ(n)χ(n) log(x/n)
+
+From Lemma 2.4 it follows that for x ≥ 132,
+X Λ(n)χ(n) 
+n
+Re
+1−
+≥ − log x + 1,
+n
+x
+n≤x
+and therefore, with a little calculation,
+
+
+n
+2
+2
+1  X Λ(n)χ(n) 
+1 −2  1
+Re
+1
+−
+≥ −√ .
++√
+−
+1− √
+2
+x
+log x
+x(log x)
+log x
+n
+x
+x
+n≤x
+Using this bound in (5.1) we obtain
+
+X
+log |L(1, χ)| ≥ Re
+Λ(n)χ(n)
+(5.2)
+
+1 
+1
+−
+n log n x log x
+n≤x
+√
+log(q/π) 
+2
+1 + 1/ x 
+− √
+−√ .
+1+
+log x
+( x − 1) log x
+x
+
+The next lemma shows that the sum over n above is smallest when χ(p) = −1 for
+all p ≤ x.
+Lemma 5.1. For x ≥ 100 we have
+
+ 1
+X
+1
+1  X
+1 
+≥
+Λ(pk )(−1)k k
+.
+−
+−
+Re
+Λ(n)χ(n)
+n log n x log x
+p log pk x log x
+k
+n≤x
+p ≤x
+
+Proof. Consider the contribution of the powers of a single prime p ≤ x to both
+sides of the inequality above; we claim that the contribution to the left hand side
+is at least as large as the contribution to the right hand side. If χ(p) = 0 then the
+contribution to the left hand side is zero, and the contribution to the right hand
+side is negative. If χ(p) 6= 0 then writing χ(p) = −e(θ), we see that the difference
+in the contributions to the left hand side and right hand side equals
+
+X
+1
+1 
+(log p)
+(−1)k−1 (1 − cos(kθ)) k
+.
+−
+p log pk x log x
+k≤log x/ log p
+
+18
+
+If p ≥ 3 then using (1 − cos(kθ)) ≤ k 2 (1 − cos θ) we see that the quantity above is
+∞
+ 1
+X
+1
+(2j)2 
+≥ (log p)(1 − cos θ)
+−
+−
+≥ 0.
+p log p x log x j=1 p2j log p2j
+
+For p = 2 we use the bound 0 ≤ (1 − cos(kθ)) ≤ k 2 (1 − cos θ) for k ≥ 6 and compute
+explicitly the trigonometric polynomial arising from the first five terms. With a little
+computer calculation the lemma follows in this case.
+
+Note that
+
+X Λ(n) log(x/n)
+X
+1 
+1
+=
+−
+−
+Λ(pk )(−1)k k
+p log pk x log x
+n log n log x
+n≤x
+pk ≤x
+
+X
+1 X Λ(n) 
+n
+1
+1 
+−
+(5.3)
+1−
++2
+Λ(m)
+.
+−
+log x n≤x n
+x
+m2 log m2 x log x
+2
+m ≤x
+
+The third term above is
+X
+log ζ(2) −
+
+m2 >x
+
+X Λ(m)
+3
+Λ(m)
+−
+2
+≥ log ζ(2) − √ ,
+2
+m log m
+x log x
+2 x
+2
+m ≤x
+
+where we bound the sums over prime powers trivially by replacing them with sums
+over odd numbers and powers of 2. The first two terms in (5.3) are handled using
+Lemmas 2.4 and 2.6. Putting these together, and using x ≥ 132, we conclude that
+
+X
+1
+1 
+8
+1
+k
+k
+≥ − log log x − γ + log ζ(2) +
+−
+− √ .
+Λ(p )(−1)
+k
+k
+p log p
+x log x
+log x 5 x
+pk ≤x
+√
+Inserting this estimate and Lemma 5.1 into (5.2), and noting that log(q/π) ≤ 2 x−
+1, we obtain with a little calculation
+2
+4
+1
+√
+−
+−
+.
+log |L(1, χ)| ≥ − log log x − γ + log ζ(2) −
+log x (log x)2
+x
+Exponentiating this, and using x ≥ 132, we obtain the stated lower bound.
+6. Asymptotic bounds
+Let δ be a fixed positive real number, and let K(s) denote a function holomorphic
+in a region containing −1/2 − δ < Re(s) ≤ 21 + δ, save for possibly a simple pole
+at s = −1/2 with residue r. Further suppose that for all s in this region bounded
+away from −1/2 we have |K(s)| ≪ 1/(1 + |s|2). For ξ > 0 define the inverse Mellin
+transform
+Z c+i∞
+1
+e
+K(ξ) =
+K(s)ξ −s ds,
+2πi c−i∞
+where the integral is over any vertical line with − 12 < c ≤ 21 + δ. If ξ ≥ 1 then by
+taking the c = 1/2 in the integral above, and using |K(s)| ≪ 1/(1 + |s|2 ), we find
+√
+e
+that K(ξ)
+≪ 1/ ξ. If ξ ≤ 1 then moving the line of integration to c = −1/2 − δ/2
+√
+e
+(encountering potentially a pole at −1/2) we find that K(ξ)
+≪ ξ. Thus
+1
+
+e
+|K(ξ)|
+≪ min(ξ, 1/ξ) 2 .
+Finally we assume that K is such that e
+K(ξ) > 0 for all ξ > 0.
+
+(6.1)
+
+19
+
+As before, let G = (Z/qZ)∗ and H be a proper subgroup of G. Let X be such that
+all primes ℓ ∤ q with ℓ ≤ X lie in the subgroup H. We may assume that X ≫ (log q)2 .
+Further, let H̃ denote the group of characters χ (mod q) with χ(n) = 1 for all n ∈ H.
+Recall that |H̃| = [G : H] = h, and that the orthogonality relation (4.1) holds.
+Lemma 6.1. Assume GRH. Let χ (mod q) be in H̃. If χ is the principal character
+then
+
+X Λ(n)χ(n)
+√
+log x 
+√
+K̃(n/x) = K(1/2) x + O 1 + log q √
+.
+n
+x
+n
+
+If χ is non-principal then
+Z
+
+X Λ(n)χ(n)
+log q ∞
+log x 
+√
+Re
+K̃(n/x) = θ(1 + o(1))
+.
+|K(it)|dt + O 1 + log q √
+n
+2π
+x
+−∞
+n
+
+Proof. Consider first the case when χ is non-principal. Let χ̃ (mod q̃) denote the
+primitive character that induces χ and let ξ(s, χ̃) denote the corresponding completed L-function. We start with
+Z
+ξ′
+1
+− (s + 21 , χ̃)K(s)xs ds,
+(6.2)
+I=
+2πi (1/2+δ) ξ
+which we evaluate, as usual, in two ways. Note that
+Z
+ 1
+log q
+q̃ 
+1
+− log
+K(s)xs ds ≪ √ ,
+2πi (1/2+δ)
+2
+π
+x
+
+upon shifting the integral to Res = −1/2 − δ and possibly picking up a pole at
+s = −1/2. Further, by moving the line of integration to Re(s) = 0, we find that
+Z
+Z ∞
+1 Γ′  1/2 + s + a 
+1
+s
+−
+K(s)x ds ≪
+log(2 + |t|)|K(it)|dt ≪ 1.
+2πi (1/2+δ) 2 Γ
+2
+−∞
+Now by expanding −L′ /L into its Dirichlet series we have
+Z
+X Λ(n)χ̃(n)
+L′
+1
+√
+− ( 12 + s, χ̃)K(s)xs ds =
+K̃(n/x).
+2πi (1/2+δ) L
+n
+n
+
+Note that
+X Λ(n)χ(n)
+X Λ(n)
+X Λ(n)χ̃(n)
+√
+√
+√ |K̃(n/x)|,
+K̃(n/x) −
+K̃(n/x) ≪
+n
+n
+n
+n
+n
+(n,q)>1
+
+and using (6.1) this is
+≪
+
+X
+p|q
+
+∞
+ 1
+ √x pk/2 
+X
+X
+log x
+log x 
+1
+√
+√
+√
+≪
+(log
+p)
+≪ (log q) √ .
+min
+,
++
+(log p)
+k/2
+k/2
+p
+p
+x
+x
+x log p
+x
+k=1
+p|q
+
+From these observations, we conclude that
+
+X Λ(n)χ(n)
+log x 
+√
+K̃(n/x) + O 1 + log q √
+.
+(6.3)
+I=
+n
+x
+n
+20
+
+Now evaluate the integral in (6.2) by shifting the line of integration to Re(s) =
+−1/2 − δ/2. Thus, with γ running over the ordinates of zeros of ξ(s, χ̃),
+Z
+X
+ξ′
+ξ′
+1
+iγ
+−1/2
+I =−
+K(iγ)x − r (0, χ̃)x
+− ( 21 + s, χ̃)K(s)xs ds.
++
+ξ
+2πi (−1/2−δ/2) ξ
+γ
+
+Using now the functional equation for ξ, we find that the integral on the right hand
+side is bounded by ≪ x−1/2−δ/2 .
+′
+Recall that Re ξξ (0, χ̃) ≪ log q, so that
+
+
+
+
+Z
+X
+log q
+log q
+log q̃ ∞
+Re(I) = θ
+|K(iγ)| + O √
+|K(it)|dt + O √
+= θ(1 + o(1))
+,
+2π −∞
+x
+x
+γ
+
+where the final estimate follows from an application of the explicit formula (see
+Theorem 5.12 of [11]). This establishes our lemma for non-principal characters. For
+principal characters, we have that
+Z
+X Λ(n)
+1
+ζ′
+√ K̃(n/x) =
+− (1/2 + s)K(s)xs ds
+n
+2πi (1/2+δ/2) ζ
+n
+Z
+X
+√
+ζ′
+1
+(1/2 + s)K(s)xs ds −
+K(iγ)xiγ
+= K(1/2) x −
+2πi (−1/2−δ/2) ζ
+γ
+√
+= K(1/2) x + O(1).
+On the other hand, similar to before
+X Λ(n)χ0 (n)
+X Λ(n)
+log x
+√
+√ K̃(n/x) ≪ (log q) √ .
+K̃(n/x) −
+n
+n
+x
+n
+n
+
+From these observations, we conclude that
+
+X Λ(n)χ(n)
+log x 
+√
+.
+K̃(n/x) + O 1 + log q √
+I=
+n
+x
+n
+
+
+
+Proposition 6.1. Assume GRH. Keep the notations above, and recall that X is
+such that all primes ℓ ∤ q with ℓ ≤ X lie in the subgroup H. Then, for any λ > 0 we
+have
+
+√
+ Z λ
+1 Z ∞
+√
+du
+|K(it)|dt .
+h
+K̃(u) √ − K(1/2) X ≤ (1 + o(1)) λ(h − 1)(log q)
+u
+2π −∞
+0
+
+Proof. We may assume that X ≫ (log q)2 . We shall use Lemma 6.1 for each character
+χ ∈ H̃, and taking x = X/λ. Thus we obtain that
+
+1 Z ∞
+X Λ(n)χ(n)
+X
+√
+√
+Re
+K̃(n/x) ≤ K(1/2) x+(1+o(1))(h−1) log q
+|K(it)|dt .
+n
+2π −∞
+n
+χ∈H̃
+
+From (4.1), and since K̃(n/x) ≥ 0 for all n, we see that the left hand side above is
+Z X
+ X Λ(n)
+
+X Λ(n)
+dt
+√ K̃(n/x) + O h
+√ K̃(n/x) = h
+K̃(t/x) √ + o(h log q).
+≥h
+n
+n
+t
+1
+n≤X
+(n,q)>1
+21
+
+After a change of variables u = t/x, the above becomes
+Z λ
+√
+du
+h x
+K̃(u) √ + o(h log q).
+u
+0
+The proposition follows with a little rearrangement.
+
+
+
+Limitations of the method. By MellinR inversion we have that K(1/2) =
+R6.1.
+√
+∞
+∞
+1
+|K(it)|dt. Therefore
+K̃(u)du/ u, and note also that K̃(u) ≤ 2π
+−∞
+0
+Z λ
+Z λ
+√ 1 Z ∞
+du
+du
+h
+K̃(u) √ − K(1/2) ≤ (h − 1)
+|K(it)|dt.
+K̃(u) √ ≤ (2h − 2) λ
+2π −∞
+u
+u
+0
+0
+
+Hence Proposition 6.1 cannot lead to a bound for X that is better than ( 14 +
+o(1))(log q)2 .
+αs
+
+−αs
+
+) 2
+) and λ = 1. Note that the
+6.2. Bounds for large h. Take K(s) = ( (e −e
+s
+inverse Mellin transform for K is K̃(u) = max(0, 2α − | log u|). Now
+Z ∞
+Z ∞
+1
+1
+2 sin(αt) 2
+|K(it)|dt =
+dt = 2α,
+2π −∞
+2π −∞
+t
+
+and
+
+Z 1
+
+Z 1
+du
+2α + log u
+√
+K̃(u) √ =
+du = 4α − 4 + 4e−α .
+u
+u
+−2α
+0
+e
+Thus Proposition 6.1 implies that
+√
+
+−α
+α/2
+−α/2 2
+h(4α − 4 + 4e ) − 4(e − e
+)
+X ≤ (1 + o(1))(2α(h − 1))(log q).
+
+Selecting α = 12 log(2h), it follows that for h ≥ 4
+
+1
+1 2  log(2h) 2
++ o(1) 1 −
+(log q)2 .
+X≤
+4
+h
+log(2h) − 4
+
+For large h, the above bound is about (1/4 + o(1))(log q)2 which is of the same
+quality as the limit of the method, but the convergence to this limit is quite slow.
+6.3. Bounds for small h. For smaller values of h, better estimates may be obtained
+using the kernel K(s) = Γ(s + 1/2). Note that K(s) satisfies the conditions stated
+√
+at the beginning of this section and that K̃(u) = ue−u ≥ 0 for all u. Noting that
+K(1/2) = Γ(1) = 1, we apply Proposition 6.1 to see that
+ Z λ
+
+Z
+√
+√
+log q ∞
+−u
+|Γ(1/2 + it)| dt,
+X ≤ λ(h − 1)
+h
+e du − 1
+2π −∞
+0
+so that
+
+√
+
+Z ∞
+λ(h − 1) log q
+|Γ(1/2 + it)| dt.
+X≤
+2π(h − 1 − he−λ ) −∞
+When h = 2, we choose λ = 2.452, which is more or less optimal, and find that
+X < (0.794+o(1))(log q)2 . For h = 3, we choose λ = 2.025, and find that X < (0.7+
+o(1))(log q)2 . For h = 4, we choose λ = 1.825 and get that X < (0.66 + o(1))(log q)2 .
+We may apply this for other smaller values of h and get progressively better bounds
+as h increases, with 0.545(log q)2 being the limit for this test function.
+√
+
+22
+
+Aknowledgements
+We thank Emanuel Carneiro and Micah Milinovich for drawing our attention
+to an error in Lemma 6.1 of the previous version of the paper, which affects the
+asymptotic bounds in Theorems 1.2 and 1.3 there. These results are corrected in
+this updated version.
+References
+[1] N.C. Ankeny, The least quadratic non-residue, Ann. of Math. 55 (1952), pp. 65-72.
+[2] E. Bach, Explicit bounds for primality testing and related problems, Math. Comp. 55 (1990),
+no. 191, 355-380.
+[3] A. Booker, Quadratic class numbers and character sums, Math. Comp. 75 (2006), no. 255,
+1481-1492.
+[4] E. Bach and J. Sorenson, Explicit bounds for primes in residue classes, Math. Comp. 65
+(1996), no. 216, 1717-1735.
+[5] E. Carneiro and V. Chandee, Bounding ζ(s) in the critical strip, J. Number Theory 131
+(2011), no. 3, 363-384.
+[6] V. Chandee, Explicit upper bounds for L-functions on the critical line, Proc. Amer. Math.
+Soc. 137 (2009), no. 12, 4049-4063.
+[7] V. Chandee and K. Soundararajan, Bounding |ζ(1/2 + it)| on the Riemann hypothesis, Bull.
+Lond. Math. Soc. 43 (2011), no. 2, 243-250.
+[8] H. Davenport, Multiplicative Number Theory, vol.74, Springer-Verlag (GTM), 2000.
+[9] J. L. Hafner and K. S. McCurley, A rigorous subexponential algorithm for computation of
+class groups, J. Amer. Math. Soc. 2 (1989), no. 4, 837-850.
+[10] D. R. Heath-Brown, Zero-free regions for Dirichlet L-functions, and the least prime in an
+arithmetic progression, Proc. London Math. Soc. (3) 64 (1992), no. 2, 265-338.
+[11] H. Iwaniec and E. Kowalski, Analytic Number Theory, Colloquium Publications, vol. 53,
+American Mathematical Society, Providence, 2004.
+[12] M.J. Jacobson Jr., S. Ramachandran, and H.C. Williams, Numerical results on class groups
+of imaginary quadratic fields. Algorithmic Number Theory. Lecture notes in Computer Science Vol. 4076 (2006) 87-101.
+[13] J. E. Littlewood, On the zeros of the Riemann zeta-function, Math. Proc. Cambridge Philos.
+Soc. 22 (1924) 295–318.
+[14] J. E. Littlewood, On the function 1/ζ(1 + it), Proc. London Math. Soc. 27 (1928) 349-357.
+[15] M. Watkins, Class numbers of imaginary quadratic fields. Math. Comp. 73 (2004), 907–938.
+[16] S. Wedeniwski, Primality Tests on Commutator Curves. Dissertation: Tübingen, Germany,
+2001.
+[17] T. Xylouris, On Linnik’s constant, Acta Arith. 150 (2011), 65–91.
+Department of Mathematics and Statistics, York University, 4700 Keele Street,
+Toronto, ON, M3J1P3
+E-mail address: lamzouri@mathstat.yorku.ca
+Department of Mathematics, University of Illinois at Urbana-Champaign, 1409
+W. Green Street, Urbana, IL, 61801
+E-mail address: xiannan@illinois.edu
+Department of Mathematics, Stanford University, Stanford, CA 94305
+E-mail address: ksound@math.stanford.edu
+
+23
+
+
