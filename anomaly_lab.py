@@ -21,6 +21,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from artifacts import find_internal_subsection_duplicates
 from checkpoint import write_atomic
 
 ANOMALY_CATEGORIES = (
@@ -470,7 +471,7 @@ class AnomalyLaboratory:
         # 6. Blackboard Target Category Error (voting/challenging an agent name instead of a claim ID)
         board_cat_errors = []
         for ev in events:
-            if ev.get("status") == "rejected" and ev.get("type") in ("VOTE", "CHALLENGE", "RETRACT"):
+            if ev.get("status") == "rejected" and ev.get("type") in ("VOTE", "CHALLENGE", "RETRACT", "RESOLVE"):
                 tgt = str(ev.get("target", "")).upper()
                 if tgt in agents_set and re.search(r"target item\b.*not on board", str(ev.get("detail", ""))):
                     board_cat_errors.append({
@@ -712,6 +713,53 @@ class AnomalyLaboratory:
                 generative_follow_up={
                     "regression_test": "test_artifact_collaboration_and_audits.py::ArtifactCollaborationAndAuditsTests::test_section_heading_demotion_and_duplicate_section_validation",
                     "follow_up_experiment": "Verify @SECTION heading demotion preserves single canonical section headers across multi-edit runs.",
+                },
+                discovered_at=now_iso,
+            ))
+
+        # 10. Intra-Section Duplicate Subheadings or Near-Identical Repeated Blocks
+        dup_sub_artifacts: Dict[str, Dict[str, Any]] = {}
+        for fname, text in art_texts.items():
+            sub_dups = find_internal_subsection_duplicates(text)
+            if sub_dups:
+                dup_sub_artifacts[fname] = sub_dups
+        if dup_sub_artifacts:
+            turns_tot = int(metrics.get("turns_completed") or 1)
+            total_sub_dups = sum(
+                sum(max(0, int(c) - 1) for c in (sec_info.get("duplicate_subheadings") or {}).values())
+                + int(sec_info.get("repeated_blocks") or 0)
+                for art_secs in dup_sub_artifacts.values()
+                for sec_info in art_secs.values()
+            )
+            specimens.append(AnomalySpecimen(
+                specimen_id=self._make_id(run_id, "duplicate_artifact_subsection_content"),
+                anomaly_type="duplicate_artifact_subsection_content",
+                title="Duplicate Subheadings or Repeated Prose Blocks Inside Artifact Sections",
+                categories=["harness_defect", "model_behavior"],
+                run_id=run_id,
+                run_dir=rdir_str,
+                turn_range=[1, turns_tot],
+                models_involved=models,
+                scheduler=scheduler,
+                evidence={
+                    "duplicate_subsection_or_block_count": total_sub_dups,
+                    "artifacts": dup_sub_artifacts,
+                },
+                epistemic_assessment={
+                    "observed": (
+                        f"Detected intra-section duplicate subheadings or repeated prose blocks in "
+                        f"{len(dup_sub_artifacts)} artifact(s): "
+                        + "; ".join(f"{fn} ({len(secs)} section(s))" for fn, secs in dup_sub_artifacts.items())
+                    ),
+                    "inferred_mechanism": (
+                        "Repeated @APPEND_SECTION / @APPEND writes inside a section created duplicate "
+                        "level-3+ subheadings or near-identical repeated paragraphs."
+                    ),
+                    "unknowns": "Whether conservative duplicate guards on @APPEND_SECTION and @APPEND eliminate section bloat cleanly.",
+                },
+                generative_follow_up={
+                    "regression_test": "test_artifact_collaboration_and_audits.py::ArtifactCollaborationAndAuditsTests::test_duplicate_append_prevention_and_conservative_math_allowance",
+                    "follow_up_experiment": "Audit long multi-agent monographs after enabling @APPEND_SECTION duplicate rejection and @RESOLVE.",
                 },
                 discovered_at=now_iso,
             ))

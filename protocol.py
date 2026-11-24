@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from presets import SAMPLING_ALIASES, SAMPLING_PARAMS, normalize_sampling_param
 
 ACTION_TYPES = (
-    "SAY", "WHISPER", "PUBLISH", "SUBSCRIBE", "CLAIM", "CHALLENGE", "RETRACT", "VOTE",
+    "SAY", "WHISPER", "PUBLISH", "SUBSCRIBE", "CLAIM", "CHALLENGE", "RETRACT", "RESOLVE", "VOTE",
     "PROPOSE_NEXT", "SET_TEMPERATURE", "SET_SAMPLING", "SET_STYLE", "PROPOSE_TOPIC", "ARTIFACT_WRITE",
     "ARTIFACT_READ", "ARTIFACT_LIST", "DOC_LIST", "DOC_TOC", "DOC_READ", "DOC_SEARCH", "UPDATE_NOTE", "FINISH", "END_RUN",
     "CREATE_GROUP", "INVITE_GROUP", "JOIN_GROUP", "LEAVE_GROUP", "COMPEL_GROUP", "RELEASE_GROUP"
@@ -33,7 +33,9 @@ ALIASES = {
     "READ": "ARTIFACT_READ", "LIST": "ARTIFACT_LIST", "DOCS": "DOC_LIST", "TOC": "DOC_TOC",
     "DOC_INDEX": "DOC_TOC", "DOC_OUTLINE": "DOC_TOC", "READ_DOC": "DOC_READ",
     "SEARCH_DOC": "DOC_SEARCH", "NOTE": "UPDATE_NOTE", "NEXT": "PROPOSE_NEXT",
-    "WITHDRAW": "RETRACT", "OBJECT": "CHALLENGE", "TOPIC": "PROPOSE_TOPIC", "STYLE": "SET_STYLE",
+    "WITHDRAW": "RETRACT", "OBJECT": "CHALLENGE", "RESOLVE_CLAIM": "RESOLVE",
+    "CLOSE_DISPUTE": "RESOLVE", "DISMISS_CHALLENGE": "RESOLVE",
+    "TOPIC": "PROPOSE_TOPIC", "STYLE": "SET_STYLE",
     "TEMP": "SET_TEMPERATURE", "TEMPERATURE": "SET_TEMPERATURE",
     "SAMPLING": "SET_SAMPLING", "SET_PARAMS": "SET_SAMPLING",
     "PROPOSE_END": "END_RUN", "END": "END_RUN", "DONE": "END_RUN",
@@ -445,7 +447,7 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
             issues.append(f"CLAIM ({kind}) missing content text")
             return None
 
-    elif act_type in ("CHALLENGE", "RETRACT"):
+    elif act_type in ("CHALLENGE", "RETRACT", "RESOLVE"):
         tgt = canonicalize_claim_id(res.get("target"))
         if not tgt:
             issues.append(f"{act_type} missing target claim ID")
@@ -690,6 +692,12 @@ def _command(word: str, rest: str, lines_after: List[str], known_names: Optional
     if w == "RETRACT":
         tgt, text = split_head()
         return {"type": "RETRACT", "target": tgt, "content": text}
+
+    if w == "RESOLVE":
+        raw_s = (rest or "").strip()
+        m_res = re.match(r"^([^\s:]+)\s*:?\s*(.*)$", raw_s)
+        tgt, text = (m_res.group(1).strip(), m_res.group(2).strip()) if m_res else ("", "")
+        return {"type": "RESOLVE", "target": tgt, "content": text}
 
     if w == "VOTE":
         parts = (head + " " + body).split()

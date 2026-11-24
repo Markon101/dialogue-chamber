@@ -4,6 +4,7 @@ Agents never supply paths. They name an artifact ("world", "world.md" or "artifa
 validated against a strict pattern and mapped to <workspace>/<name>.md. Symlinks, traversal, non-Markdown
 files, oversized content and stale overwrites are rejected. Content is stored as data and never interpreted.
 """
+import difflib
 import hashlib
 import os
 import re
@@ -108,6 +109,301 @@ def normalize_section_body_headings(body: str, parent_level: int) -> str:
         lines[idx] = f"{indent}{new_hashes}{rest}"
     trailing_nl = "\n" if body.endswith("\n") else ""
     return "\n".join(lines) + trailing_nl
+
+
+_PROTECTED_NL_SPAN_RE = re.compile(
+    r"(?:```[\s\S]*?```"
+    r"|~~~[\s\S]*?~~~"
+    r"|``[^\n]+?``"
+    r"|`[^`\n]+`"
+    r"|\\begin\{(?P<math_env>(?:equation|align|gather|multline|eqnarray|math|displaymath|flalign|alignat)\*?)\}[\s\S]*?\\end\{(?P=math_env)\}"
+    r"|\$\$[\s\S]*?\$\$"
+    r"|\\\[[\s\S]*?\\\]"
+    r"|\\\([\s\S]*?\\\)"
+    r"|(?<!\\)\$(?!\$)(?:\\.|[^$\\\n])+\$)"
+)
+
+_SINGLE_NL_BOUNDARY_RE = re.compile(
+    r"(?<!\\)\\n(?=(?:[ \t]*(?:#{1,6}[ \t]|[-*+][ \t]|\d+\.[ \t]|>[ \t]|\*\*|__|\$)|[ \t]*$))"
+)
+
+
+def normalize_escaped_newlines(text: str) -> str:
+    """Convert unambiguous literal ``\\n`` line breaks into real newlines without touching code or LaTeX."""
+    if not text or "\\n" not in text:
+        return text
+
+    def _convert_prose(seg: str) -> str:
+        if "\\n" not in seg:
+            return seg
+        # Multi-newline escape runs (\n\n...) not immediately preceding lowercase macro letters (\neq/\nu)
+        seg = re.sub(
+            r"(?<!\\)((?:\\n){2,})(?![a-z])",
+            lambda m: "\n" * (len(m.group(1)) // 2),
+            seg,
+        )
+        # Single escaped newline directly before Markdown structure or end-of-segment
+        seg = _SINGLE_NL_BOUNDARY_RE.sub("\n", seg)
+        return seg
+
+    out = []
+    pos = 0
+    for m in _PROTECTED_NL_SPAN_RE.finditer(text):
+        if m.start() > pos:
+            out.append(_convert_prose(text[pos:m.start()]))
+        out.append(m.group(0))
+        pos = m.end()
+    if pos < len(text):
+        out.append(_convert_prose(text[pos:]))
+    return "".join(out)
+
+
+def _extract_atx_headings(text: str, min_level: int = 3, max_level: int = 6):
+    """Return list of ``(normalized_key, raw_heading)`` for non-fenced ATX headings in ``min_level..max_level``."""
+    out = []
+    in_fence = False
+    for ln in str(text or "").splitlines():
+        if ln.lstrip().startswith(("```", "~~~")):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        hm = re.match(r"^[ \t]*(#{1,6})[ \t]+(.+?)[ \t]*$", ln)
+        if not hm:
+            continue
+        lvl = len(hm.group(1))
+        if not (min_level <= lvl <= max_level):
+            continue
+        raw_h = hm.group(2).strip()
+        norm_h = re.sub(r"\s+", " ", raw_h.strip("[]*_")).strip().lower()
+        if norm_h:
+            out.append((norm_h, raw_h))
+    return out
+
+
+def _strip_fences_and_normalize_prose(text: str) -> str:
+    """Strip fenced code blocks and light Markdown formatting for conservative duplicate comparison."""
+    lines = []
+    in_fence = False
+    for ln in str(text or "").splitlines():
+        if ln.lstrip().startswith(("```", "~~~")):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        clean = re.sub(r"^[ \t]*#{1,6}[ \t]+", "", ln)
+        clean = clean.replace("**", "").replace("__", "")
+        lines.append(clean)
+    return re.sub(r"\s+", " ", "\n".join(lines)).strip().lower()
+
+
+def _word_ngrams(norm_text: str, n: int = 4):
+    """Return the set of consecutive alphanumeric word n-grams in ``norm_text``."""
+    words = re.findall(r"[a-z0-9]+", norm_text)
+    if len(words) < n:
+        return set()
+    return {tuple(words[i:i + n]) for i in range(len(words) - n + 1)}
+
+
+def _split_comparison_blocks(text: str, min_chars: int = 180):
+    """Extract normalized subsection and substantial paragraph blocks from non-fenced Markdown."""
+    blocks = []
+    seen_blocks = set()
+    in_fence = False
+    clean_lines = []
+    for ln in str(text or "").splitlines():
+        if ln.lstrip().startswith(("```", "~~~")):
+            in_fence = not in_fence
+            continue
+        if not in_fence:
+            clean_lines.append(ln)
+    clean_text = "\n".join(clean_lines)
+
+    def _add(raw_chunk: str):
+        norm = _strip_fences_and_normalize_prose(raw_chunk)
+        if len(norm) >= min_chars and norm not in seen_blocks:
+            seen_blocks.add(norm)
+            blocks.append(norm)
+
+    # Subsection blocks (###..######)
+    sub_parts = re.split(r"(?=^[ \t]*#{3,6}[ \t]+\S)", clean_text, flags=re.M)
+    for part in sub_parts:
+        _add(part)
+
+    # Substantial paragraphs and 2-4 paragraph windows
+    paras = [p.strip() for p in re.split(r"\n[ \t]*\n", clean_text) if p.strip()]
+    for p in paras:
+        _add(p)
+    for win in (2, 3, 4):
+        if len(paras) >= win:
+            for i in range(len(paras) - win + 1):
+                _add("\n\n".join(paras[i:i + win]))
+    return blocks
+
+
+_DUP_MIN_EXACT_CHARS = 140
+_DUP_MIN_FUZZY_CHARS = 180
+_DUP_MIN_NGRAMS = 20
+_DUP_NGRAM_THRESHOLD = 0.80
+_DUP_SEQ_LEN_RATIO = 0.65
+_DUP_SEQ_MIN_NGRAMS = 15
+_DUP_SEQ_RATIO = 0.82
+
+
+def _blocks_near_identical(norm_a: str, norm_b: str, ng_a=None, ng_b=None) -> bool:
+    """Return True if two normalized prose blocks are exact or near-identical duplicates."""
+    if not norm_a or not norm_b:
+        return False
+    if len(norm_a) >= _DUP_MIN_EXACT_CHARS and (norm_a == norm_b or norm_a in norm_b):
+        return True
+    if min(len(norm_a), len(norm_b)) < _DUP_MIN_FUZZY_CHARS:
+        return False
+    ng_a = ng_a if ng_a is not None else _word_ngrams(norm_a, 4)
+    ng_b = ng_b if ng_b is not None else _word_ngrams(norm_b, 4)
+    if len(ng_a) >= _DUP_MIN_NGRAMS and ng_b:
+        if (len(ng_a & ng_b) / len(ng_a)) >= _DUP_NGRAM_THRESHOLD:
+            return True
+    if len(ng_a) >= _DUP_SEQ_MIN_NGRAMS:
+        ratio_len = min(len(norm_a), len(norm_b)) / max(len(norm_a), len(norm_b))
+        if ratio_len >= _DUP_SEQ_LEN_RATIO and difflib.SequenceMatcher(None, norm_a, norm_b).ratio() >= _DUP_SEQ_RATIO:
+            return True
+    return False
+
+
+def find_duplicate_append_reason(
+    existing_text: str,
+    candidate_text: str,
+    check_headings: bool = True,
+    min_heading_level: int = 3,
+):
+    """Return a rejection reason if appending ``candidate_text`` would duplicate existing content, else ``None``.
+
+    Strictly rejects exact duplicate subheadings and exact/near-identical repeated blocks
+    while staying conservative for shorter formulas, shared definitions, and citations.
+    """
+    if not candidate_text or not existing_text:
+        return None
+
+    if check_headings:
+        existing_h = {k for k, _ in _extract_atx_headings(existing_text, min_level=min_heading_level, max_level=6)}
+        seen_cand = set()
+        for norm_h, raw_h in _extract_atx_headings(candidate_text, min_level=min_heading_level, max_level=6):
+            if norm_h in existing_h:
+                return f"subheading {raw_h!r} already exists in this section"
+            if norm_h in seen_cand:
+                return f"subheading {raw_h!r} is repeated within appended content"
+            seen_cand.add(norm_h)
+
+    cand_norm = _strip_fences_and_normalize_prose(candidate_text)
+    exist_norm = _strip_fences_and_normalize_prose(existing_text)
+    if not cand_norm or not exist_norm:
+        return None
+
+    if len(cand_norm) >= _DUP_MIN_EXACT_CHARS and cand_norm in exist_norm:
+        return "appended content already exists verbatim in this section"
+
+    if len(cand_norm) >= _DUP_MIN_FUZZY_CHARS:
+        cand_4 = _word_ngrams(cand_norm, 4)
+        exist_4 = _word_ngrams(exist_norm, 4)
+        if len(cand_4) >= _DUP_MIN_NGRAMS and exist_4:
+            containment = len(cand_4 & exist_4) / len(cand_4)
+            if containment >= _DUP_NGRAM_THRESHOLD:
+                pct = int(round(containment * 100))
+                return f"appended content heavily overlaps existing text ({pct}% 4-gram overlap)"
+
+        exist_blocks = _split_comparison_blocks(existing_text, min_chars=_DUP_MIN_FUZZY_CHARS)
+        cand_units = [cand_norm]
+        cand_subs = re.split(r"(?=^[ \t]*#{3,6}[ \t]+\S)", candidate_text, flags=re.M)
+        if len(cand_subs) > 1:
+            for sub in cand_subs:
+                sn = _strip_fences_and_normalize_prose(sub)
+                if len(sn) >= _DUP_MIN_FUZZY_CHARS and sn not in cand_units:
+                    cand_units.append(sn)
+        for cu in cand_units:
+            cu_4 = _word_ngrams(cu, 4)
+            for eb in exist_blocks:
+                if _blocks_near_identical(cu, eb, ng_a=cu_4):
+                    return "appended block is near-identical to an existing block in this section"
+
+    return None
+
+
+def find_internal_subsection_duplicates(text: str):
+    """Detect duplicate ``###``+ subheadings or near-identical repeated blocks inside each ``##`` section."""
+    if not text:
+        return {}
+
+    lines = text.splitlines()
+    sections = []  # list of (section_title, body_text)
+    cur_title = "[document]"
+    cur_lines = []
+    in_fence = False
+    saw_h2 = False
+    for ln in lines:
+        if ln.lstrip().startswith(("```", "~~~")):
+            in_fence = not in_fence
+            cur_lines.append(ln)
+            continue
+        if not in_fence:
+            hm2 = re.match(r"^[ \t]*##[ \t]+(.+?)[ \t]*$", ln)
+            if hm2:
+                if cur_lines and (saw_h2 or any(x.strip() for x in cur_lines)):
+                    sections.append((cur_title, "\n".join(cur_lines)))
+                cur_title = hm2.group(1).strip()
+                cur_lines = []
+                saw_h2 = True
+                continue
+        cur_lines.append(ln)
+    if cur_lines and (saw_h2 or any(x.strip() for x in cur_lines)):
+        sections.append((cur_title, "\n".join(cur_lines)))
+
+    findings = {}
+    for sec_title, sec_body in sections:
+        h_counts = {}
+        h_labels = {}
+        for norm_h, raw_h in _extract_atx_headings(sec_body, min_level=3, max_level=6):
+            h_counts[norm_h] = h_counts.get(norm_h, 0) + 1
+            h_labels.setdefault(norm_h, raw_h)
+        dup_headings = {h_labels[k]: c for k, c in h_counts.items() if c >= 2}
+
+        # Strip code fences and extract non-overlapping chunks (subsections if present, plus >=180-char paragraphs)
+        clean_lines = []
+        in_f = False
+        for ln in sec_body.splitlines():
+            if ln.lstrip().startswith(("```", "~~~")):
+                in_f = not in_f
+                continue
+            if not in_f:
+                clean_lines.append(ln)
+        clean_body = "\n".join(clean_lines)
+
+        chunks = []
+        raw_subs = re.split(r"(?=^[ \t]*#{3,6}[ \t]+\S)", clean_body, flags=re.M)
+        if len(raw_subs) > 1:
+            chunks = raw_subs
+        else:
+            chunks = [p.strip() for p in re.split(r"\n[ \t]*\n", clean_body) if p.strip()]
+
+        norm_chunks = []
+        for ch in chunks:
+            nc = _strip_fences_and_normalize_prose(ch)
+            if len(nc) >= _DUP_MIN_EXACT_CHARS:
+                norm_chunks.append((nc, _word_ngrams(nc, 4)))
+
+        repeated_blocks = 0
+        for j in range(1, len(norm_chunks)):
+            nj, ng_j = norm_chunks[j]
+            if any(_blocks_near_identical(nj, ni, ng_a=ng_j, ng_b=ng_i) for ni, ng_i in norm_chunks[:j]):
+                repeated_blocks += 1
+
+        if dup_headings or repeated_blocks:
+            entry = {}
+            if dup_headings:
+                entry["duplicate_subheadings"] = dup_headings
+            if repeated_blocks:
+                entry["repeated_blocks"] = repeated_blocks
+            findings[sec_title] = entry
+    return findings
 
 
 class ArtifactError(Exception):
@@ -375,6 +671,7 @@ class ArtifactManager:
         if not isinstance(content, str) or not content.strip():
             raise ArtifactError("artifact content must be non-empty text")
         content = CONTROL_CHARS.sub("", content)
+        content = normalize_escaped_newlines(content)
         fname = self.normalize(name)
         path = self._path(fname)
         exists = fname in self.versions
@@ -421,6 +718,18 @@ class ArtifactManager:
                     eff_level = level if level is not None else 2
                     body_norm = normalize_section_body_headings(body_without_heading, eff_level)
                     if mode == "append_section":
+                        dup_reason = find_duplicate_append_reason(
+                            old[h_end:b_end],
+                            body_norm,
+                            check_headings=True,
+                            min_heading_level=eff_level + 1,
+                        )
+                        if dup_reason:
+                            raise ArtifactError(
+                                f"{fname} append_section rejected: {dup_reason}. "
+                                f"Use @SECTION {short_name} | {sec_spec}: <consolidated body> "
+                                f"to edit/consolidate instead of appending a duplicate."
+                            )
                         existing_block = old[h_start:b_end].rstrip("\n")
                         section_block = f"{existing_block}\n\n{body_norm}" if body_norm else existing_block
                     else:
@@ -444,6 +753,12 @@ class ArtifactManager:
                 new = (f"{first_hdg}\n\n{rest_norm}" if rest_norm else first_hdg) + "\n"
         elif mode == "append" and exists:
             old = self._read_file(path, max_bytes=art_limit)
+            dup_reason = find_duplicate_append_reason(old, content.strip(), check_headings=False)
+            if dup_reason:
+                raise ArtifactError(
+                    f"{fname} append rejected: {dup_reason}. "
+                    f"Consolidate existing text with @SECTION or @REPLACE instead of appending a duplicate."
+                )
             note = f"\n\n— *{agent}, turn {turn}*" if attribution else ""
             new = old.rstrip("\n") + "\n\n" + content.strip() + note + "\n"
         else:
@@ -558,6 +873,14 @@ DEFAULT_PLACEHOLDER_PATTERNS = (
     r"Track Title:\s*TBD\b",
 )
 
+SECTION_STUB_PATTERNS = (
+    r"\b(?:audit|review|verification|section|draft|analysis|report|synthesis)\b[^.\n]{0,60}\bis\s+(?:currently\s+)?(?:underway|in\s+progress|pending|ongoing)\b",
+    r"\b(?:to\s+be\s+(?:completed|written|added|filled|finalized|determined)|work\s+in\s+progress|coming\s+soon|will\s+be\s+(?:added|filled|completed|updated)\s+(?:later|shortly|soon|next))\b",
+    r"\b(?:stub|placeholder\s+section|not\s+yet\s+(?:written|completed|populated|audited))\b",
+)
+
+REFEREE_SECTION_RE = re.compile(r"\b(?:referee|red[- ]?team|final\s+audit|verification\s+report)\b", re.I)
+
 
 def is_placeholder_stub(text: str) -> bool:
     """Return True if ``text`` is an unfilled template or stub replacement rather than full content."""
@@ -590,6 +913,7 @@ def validate_artifact(manager: ArtifactManager, spec: dict):
         return False, [str(exc)], {"artifact": raw_name}
 
     issues = []
+    warnings = []
     if fname not in manager.versions:
         return False, [f"Required deliverable {fname} does not exist yet."], {"artifact": fname, "exists": False}
 
@@ -616,11 +940,27 @@ def validate_artifact(manager: ArtifactManager, spec: dict):
         if m:
             issues.append(f"{fname} contains unfinished placeholder text matching {m.group(0)!r}; replace with full content.")
 
-    # Required sections check (case-insensitive header/marker match with non-empty body and uniqueness)
-    req_sections = [str(s) for s in (spec.get("required_sections") or []) if str(s).strip()]
+    # Required sections check (case-insensitive header/marker match with non-empty body, completeness, and uniqueness)
+    raw_req = [str(s) for s in (spec.get("required_sections") or []) if str(s).strip()]
+    ref_explicit = [str(s) for s in (spec.get("required_referee_sections") or []) if str(s).strip()]
+    req_sections = list(raw_req)
+    for rs in ref_explicit:
+        if rs not in req_sections:
+            req_sections.append(rs)
+    enforce_ref = spec.get("enforce_referee_sections", True)
+    referee_sections_set = set(ref_explicit)
+    if enforce_ref:
+        for sec in req_sections:
+            if REFEREE_SECTION_RE.search(sec):
+                referee_sections_set.add(sec)
+    referee_sections = [s for s in req_sections if s in referee_sections_set]
+
     missing_sections = []
     empty_sections = []
     duplicate_sections = []
+    stub_sections = []
+    thin_sections = []
+    section_sizes = {}
     if req_sections:
         positions = []
         for sec in req_sections:
@@ -633,12 +973,65 @@ def validate_artifact(manager: ArtifactManager, spec: dict):
                 if len(matches) > 1:
                     duplicate_sections.append(sec)
         positions.sort()
+        sec_min_map = spec.get("section_min_bytes") if isinstance(spec.get("section_min_bytes"), dict) else {}
+        base_min = int(spec.get("min_section_bytes") or 0)
+        explicit_ref_min = spec.get("referee_min_section_bytes")
+        explicit_warn_min = spec.get("warn_section_bytes")
+        if explicit_warn_min is not None:
+            warn_min = int(explicit_warn_min)
+        elif min_bytes >= 4000:
+            warn_min = min(800, max(200, min_bytes // max(4, len(req_sections) * 4)))
+        else:
+            warn_min = 0
+
         for idx, (_, end_pos, sec) in enumerate(positions):
             next_start = positions[idx + 1][0] if idx + 1 < len(positions) else len(text)
-            body = text[end_pos:next_start].strip()
-            # Ignore pure stage-direction/metadata-only 1-liners < 20 chars
+            span = find_section_span(text, sec)
+            eff_end = min(span[2], next_start) if span else next_start
+            eff_end = max(end_pos, eff_end)
+            body = text[end_pos:eff_end].strip()
+            body_bytes = len(body.encode("utf-8"))
+            section_sizes[sec] = body_bytes
             if len(body) < 20:
                 empty_sections.append(sec)
+                continue
+            if disallow:
+                stub_hit = None
+                for spat in SECTION_STUB_PATTERNS:
+                    sm = re.search(spat, body, re.I)
+                    if sm:
+                        stub_hit = sm.group(0)
+                        break
+                if stub_hit:
+                    stub_sections.append(sec)
+                    issues.append(
+                        f"{fname} section {sec} contains unfinished/stub language matching {stub_hit!r}; "
+                        f"complete the section before concluding."
+                    )
+            sec_min = int(sec_min_map.get(sec) or base_min)
+            if sec in referee_sections_set:
+                if explicit_ref_min is not None:
+                    ref_min = int(explicit_ref_min)
+                elif min_bytes >= 4000:
+                    ref_min = min(1000, max(400, min_bytes // max(2, len(req_sections) * 3)))
+                elif min_bytes >= 200:
+                    ref_min = max(120, min_bytes // max(2, len(req_sections) * 2))
+                else:
+                    ref_min = 0
+                hard_min = max(sec_min, ref_min)
+            else:
+                hard_min = sec_min
+            if hard_min and body_bytes < hard_min:
+                thin_sections.append(sec)
+                kind_lbl = "required referee section" if sec in referee_sections_set else "required section"
+                issues.append(
+                    f"{fname} {kind_lbl} {sec} is too brief ({body_bytes}B < {hard_min}B minimum); "
+                    f"complete this section with concrete verified findings rather than leaving a short stub."
+                )
+            elif warn_min and body_bytes < warn_min and sec not in stub_sections:
+                warnings.append(
+                    f"{fname} section {sec} looks thin ({body_bytes}B < recommended {warn_min}B); consider expanding it."
+                )
 
     if missing_sections:
         issues.append(f"{fname} is missing required section(s): {', '.join(missing_sections)}.")
@@ -660,5 +1053,10 @@ def validate_artifact(manager: ArtifactManager, spec: dict):
         "missing_sections": missing_sections,
         "empty_sections": empty_sections,
         "duplicate_sections": duplicate_sections,
+        "stub_sections": stub_sections,
+        "thin_sections": thin_sections,
+        "referee_sections": referee_sections,
+        "section_sizes": section_sizes,
+        "warnings": warnings,
     }
     return (len(issues) == 0), issues, details

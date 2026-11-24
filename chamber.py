@@ -155,11 +155,15 @@ class BoardItem:
     author: str
     kind: str
     content: str
-    status: str = "active"   # active | disputed | retracted
+    status: str = "active"   # active | disputed | resolved | retracted
     assignee: Optional[str] = None
     challenges: list = field(default_factory=list)   # list of dict(turn, author, content)
+    resolutions: list = field(default_factory=list)  # list of dict(turn, author, content)
     retracted_turn: Optional[int] = None
     retracted_reason: str = ""
+    resolved_turn: Optional[int] = None
+    resolved_by: str = ""
+    resolved_reason: str = ""
     votes: dict = field(default_factory=dict)        # agent -> vote string
 
 
@@ -504,6 +508,7 @@ class Chamber:
         self.deliverable_issues: List[str] = []
         self.pending_validation_feedback: List[str] = []
         self._turn_replaced_artifacts: Set[str] = set()
+        self._turn_board_touched: Set[str] = set()
         self.speaker_transitions: List[Tuple[int, str, str]] = []
         self.resurrection_events: List[dict] = []
         self.fallbacks_triggered: List[dict] = []
@@ -714,7 +719,7 @@ class Chamber:
             )
 
         # Blackboard
-        if self.board and (self.board_visible or any(k in agent.capabilities for k in ("CLAIM", "CHALLENGE", "RETRACT"))):
+        if self.board and (self.board_visible or any(k in agent.capabilities for k in ("CLAIM", "CHALLENGE", "RESOLVE", "RETRACT"))):
             b_lines = []
             for item in list(self.board.values())[-18:]:
                 tag = item.status.upper()
@@ -722,11 +727,16 @@ class Chamber:
                     tag = f"RETRACTED by {item.author} on turn {item.retracted_turn} — withdrawn, do not treat as active"
                 elif item.status == "disputed":
                     tag = f"DISPUTED ({len(item.challenges)} challenge(s))"
+                elif item.status == "resolved":
+                    tag = f"RESOLVED by {item.resolved_by} on turn {item.resolved_turn}"
                 extra = f" [assigned: {item.assignee}]" if item.assignee else ""
                 votes = f" [votes: {', '.join(f'{k}={v}' for k, v in item.votes.items())}]" if item.votes else ""
                 b_lines.append(f"- {item.id} [{item.kind} by {item.author}, {tag}]{extra}{votes}: {item.content}")
                 for ch in item.challenges[-2:]:
                     b_lines.append(f"    ↳ challenge by {ch['author']} (turn {ch['turn']}): {ch['content']}")
+                if item.status == "resolved":
+                    for res_entry in item.resolutions[-1:]:
+                        b_lines.append(f"    ↳ resolved by {res_entry['author']} (turn {res_entry['turn']}): {res_entry['content']}")
             tail_sections["blackboard"] = "--- Shared Blackboard ---\n" + "\n".join(b_lines)
 
         # Subscribed channels
@@ -761,22 +771,27 @@ class Chamber:
                 status_parts.append(f"End votes ({self.end_policy}): {voted_cnt}/{active_cnt} active")
             status_lines = [" | ".join(status_parts)]
             if self.deliverable_validation:
-                deliv_ok, deliv_issues, deliv_det = validate_artifact(self.artifacts, self.deliverable_validation)
+                deliv_ok, deliv_issues, deliv_det = self._validate_deliverable()
                 dname = deliv_det.get("artifact", str(self.deliverable_validation.get("artifact", "")))
                 dver = deliv_det.get("version")
                 dsz = deliv_det.get("size_bytes", 0)
                 meta_str = f"v{dver}, {dsz}B" if dver else "missing"
                 trail = self.artifacts.recent_history_summary(dname, limit=5) if dver else ""
+                deliv_warnings = list(deliv_det.get("warnings") or [])
                 if deliv_ok:
                     status_lines.append(f"Deliverable `{dname}`: READY ({meta_str}, all required sections present)")
                     if trail:
                         status_lines.append(f"  Versions: {trail}")
+                    for warn in deliv_warnings:
+                        status_lines.append(f"  - Warning: {warn}")
                 else:
                     status_lines.append(f"Deliverable `{dname}`: INCOMPLETE ({meta_str})")
                     if trail:
                         status_lines.append(f"  Versions: {trail}")
                     for iss in deliv_issues:
                         status_lines.append(f"  - {iss}")
+                    for warn in deliv_warnings:
+                        status_lines.append(f"  - Warning: {warn}")
             if self.documents.has_docs():
                 all_doc_ids = self.documents.ids()
                 doc_audit = self._compute_doc_citation_audit()
@@ -807,7 +822,7 @@ class Chamber:
                     )
             if self.board_visible:
                 if self.board:
-                    b_counts = {"active": 0, "disputed": 0, "retracted": 0}
+                    b_counts = {"active": 0, "disputed": 0, "resolved": 0, "retracted": 0}
                     total_ch = 0
                     for b_item in self.board.values():
                         st_k = b_item.status if b_item.status in b_counts else "active"
@@ -815,11 +830,11 @@ class Chamber:
                         total_ch += len(b_item.challenges)
                     status_lines.append(
                         f"Blackboard: {b_counts['active']} active, {b_counts['disputed']} disputed, "
-                        f"{b_counts['retracted']} retracted ({total_ch} challenge(s))"
+                        f"{b_counts['resolved']} resolved, {b_counts['retracted']} retracted ({total_ch} challenge(s))"
                     )
                 else:
                     status_lines.append(
-                        "Blackboard: 0 items (use @CLAIM / @CHALLENGE / @VOTE to record and stress-test key claims)"
+                        "Blackboard: 0 items (use @CLAIM / @CHALLENGE / @RESOLVE / @VOTE to record and stress-test key claims)"
                     )
             tail_sections["session_status"] = "--- Session Status ---\n" + "\n".join(status_lines)
 
@@ -876,7 +891,7 @@ class Chamber:
                 f"TEMP: <number> ({lo} to {hi})",
             ]
             if "CLAIM" in caps:
-                lines.append("Optional board lines: @CLAIM: <idea> | @CHALLENGE <id>: <why> | @RETRACT <id>")
+                lines.append("Optional board lines: @CLAIM: <idea> | @CHALLENGE <id>: <why> | @RESOLVE <id>: <rationale> | @RETRACT <id>")
             if "WHISPER" in caps:
                 lines.append("Optional private line: @WHISPER <name>: <secret message>")
             if self.documents.has_docs() and ("DOC_READ" in caps or "DOC_SEARCH" in caps):
@@ -906,6 +921,7 @@ class Chamber:
                 '  "actions": [\n'
                 '    {"type": "CLAIM", "kind": "hypothesis|claim|question|proposal|decision|task", "content": "..."},\n'
                 '    {"type": "CHALLENGE", "target": "c1", "content": "counterargument"},\n'
+                '    {"type": "RESOLVE", "target": "c1", "content": "verification rationale resolving dispute"},\n'
                 '    {"type": "RETRACT", "target": "c1", "content": "reason for withdrawing your own claim"},\n'
                 '    {"type": "WHISPER", "recipient": "NAME", "content": "private message"},\n'
                 '    {"type": "PUBLISH", "channel": "planning", "content": "channel post"},\n'
@@ -932,6 +948,8 @@ class Chamber:
             cmds.append("@CLAIM hypothesis: <statement>  (or @CLAIM claim: ...)")
         if "CHALLENGE" in caps:
             cmds.append("@CHALLENGE <c1|c2|...>: <objection>  (use exact board ID, e.g. c1)")
+        if "RESOLVE" in caps:
+            cmds.append("@RESOLVE <c1|c2|...>: <verification rationale>  (clears dispute on resolved claim)")
         if "RETRACT" in caps:
             cmds.append("@RETRACT <c1|c2|...>: <why you withdraw your claim>")
         if "VOTE" in caps:
@@ -1159,7 +1177,6 @@ class Chamber:
             self.public_messages.append(msg)
             self._record(agent.name, "SAY", "accepted", target=mid, detail=parsed.message[:120])
             self._check_dm_answered(agent.name, parsed.message)
-            self._check_resurrection(agent.name, parsed.message)
             self._check_answer_key(parsed.message)
             for other in self.agent_order:
                 if other != agent.name and self.communication.allows("public", agent.name, other) and re.search(rf"\b{re.escape(other)}\b", parsed.message):
@@ -1212,6 +1229,7 @@ class Chamber:
                 deduped_actions.insert(max_act - 1, term_act)
 
         self._turn_replaced_artifacts.clear()
+        self._turn_board_touched.clear()
         try:
             for idx, act in enumerate(deduped_actions):
                 if idx >= max_act:
@@ -1219,8 +1237,11 @@ class Chamber:
                                  detail=f"exceeded max_actions_per_response ({max_act}); keep <= {max_act} actions per turn")
                     continue
                 self._apply_action(agent, act)
+            if parsed.message:
+                self._check_resurrection(agent.name, parsed.message, exempt_claim_ids=set(self._turn_board_touched))
         finally:
             self._turn_replaced_artifacts.clear()
+            self._turn_board_touched.clear()
 
     def _apply_action(self, agent: AgentState, act: dict):
         atype = str(act.get("type") or "").upper()
@@ -1429,13 +1450,53 @@ class Chamber:
                              detail=f"target item {tgt!r} not on board (existing IDs: {active_ids})")
                 return
             item = self.board[tgt]
+            if item.status == "retracted":
+                self._record(agent.name, atype, "rejected", target=tgt,
+                             detail=f"{tgt} was retracted on turn {item.retracted_turn} and cannot be challenged")
+                return
             content = str(act.get("content") or "").strip()[: int(lim["max_item_chars"])]
             item.status = "disputed"
+            item.resolved_turn = None
+            item.resolved_by = ""
+            item.resolved_reason = ""
             item.challenges.append({"turn": self.turn, "author": agent.name, "content": content})
+            self._turn_board_touched.add(tgt)
             self._record(agent.name, atype, "accepted", target=tgt, detail=content[:100])
             self._emit(f"  ⚔ {agent.name} challenged {tgt}: {content}")
+            self._refresh_deliverable_status()
             if item.author != agent.name:
                 self._queue_reactive(item.author)
+            return
+
+        if atype == "RESOLVE":
+            tgt = canonicalize_claim_id(act.get("target"))
+            if tgt not in self.board:
+                active_ids = ", ".join(list(self.board.keys())[-10:]) or "none"
+                self._record(agent.name, atype, "rejected", target=tgt,
+                             detail=f"target item {tgt!r} not on board (existing IDs: {active_ids})")
+                return
+            item = self.board[tgt]
+            if item.status == "retracted":
+                self._record(agent.name, atype, "rejected", target=tgt,
+                             detail=f"{tgt} was retracted on turn {item.retracted_turn} and cannot be resolved")
+                return
+            if item.status != "disputed":
+                self._record(agent.name, atype, "rejected", target=tgt,
+                             detail=f"{tgt} is currently {item.status} (not disputed)")
+                return
+            rationale = str(act.get("content") or "").strip()[: int(lim["max_item_chars"])]
+            if not rationale:
+                self._record(agent.name, atype, "rejected", target=tgt, detail="RESOLVE requires resolution rationale")
+                return
+            item.status = "resolved"
+            item.resolved_turn = self.turn
+            item.resolved_by = agent.name
+            item.resolved_reason = rationale
+            item.resolutions.append({"turn": self.turn, "author": agent.name, "content": rationale})
+            self._turn_board_touched.add(tgt)
+            self._record(agent.name, atype, "accepted", target=tgt, detail=rationale[:160])
+            self._emit(f"  ✅ {agent.name} resolved {tgt}: {rationale}")
+            self._refresh_deliverable_status()
             return
 
         if atype == "RETRACT":
@@ -1452,8 +1513,10 @@ class Chamber:
             item.status = "retracted"
             item.retracted_turn = self.turn
             item.retracted_reason = str(act.get("content") or "withdrawn by author")[:120]
+            self._turn_board_touched.add(tgt)
             self._record(agent.name, atype, "accepted", target=tgt, detail=item.retracted_reason)
             self._emit(f"  ✗ {agent.name} retracted {tgt}: {item.retracted_reason}")
+            self._refresh_deliverable_status()
             return
 
         if atype == "VOTE":
@@ -1680,11 +1743,7 @@ class Chamber:
                 except ArtifactError:
                     deliv_fname = ""
                 if self.pending_validation_feedback or (deliv_fname and fname == deliv_fname):
-                    ok, issues, _ = validate_artifact(self.artifacts, self.deliverable_validation)
-                    self.deliverable_verified = ok
-                    self.deliverable_issues = issues
-                    if self.pending_validation_feedback:
-                        self.pending_validation_feedback = [] if ok else issues
+                    self._refresh_deliverable_status()
                 if mode != "revert" and not existed_before and fname not in self.visible_artifacts and deliv_fname and fname != deliv_fname:
                     short_new = fname.removesuffix(".md")
                     short_deliv = deliv_fname.removesuffix(".md")
@@ -1728,7 +1787,7 @@ class Chamber:
                 self._emit(f"  🏁 {agent.name} voted to end run: {reason}")
             self._evaluate_agent_end()
             if not self.end_requested and self.deliverable_validation and not self.pending_validation_feedback:
-                d_ok, d_issues, d_det = validate_artifact(self.artifacts, self.deliverable_validation)
+                d_ok, d_issues, d_det = self._validate_deliverable()
                 if not d_ok:
                     d_name = d_det.get("artifact", str(self.deliverable_validation.get("artifact", "")))
                     self._record(
@@ -1736,6 +1795,31 @@ class Chamber:
                         detail=f"Your @END_RUN vote is recorded, but deliverable {d_name} is still INCOMPLETE: {'; '.join(d_issues)}",
                     )
             return
+
+    def _validate_deliverable(self):
+        """Validate required deliverable artifact and verify zero unresolved blackboard disputes."""
+        ok, issues, details = validate_artifact(self.artifacts, self.deliverable_validation)
+        issues = list(issues)
+        disputed_ids = [bid for bid, item in self.board.items() if item.status == "disputed"]
+        if disputed_ids:
+            ok = False
+            issues.append(
+                f"Unresolved blackboard dispute(s): {', '.join(disputed_ids)}; "
+                f"resolve with @RESOLVE <id>: <rationale> or @RETRACT <id>: <reason> before concluding."
+            )
+        details = dict(details)
+        details["unresolved_disputes"] = disputed_ids
+        return ok, issues, details
+
+    def _refresh_deliverable_status(self):
+        """Recompute deliverable verification status after artifact or blackboard state transitions."""
+        if not self.deliverable_validation:
+            return
+        ok, issues, _ = self._validate_deliverable()
+        self.deliverable_verified = ok
+        self.deliverable_issues = issues
+        if self.pending_validation_feedback:
+            self.pending_validation_feedback = [] if ok else list(issues)
 
     def _evaluate_agent_end(self):
         active = [n for n in self.agent_order if self.agents[n].active]
@@ -1757,7 +1841,7 @@ class Chamber:
 
         self.end_votes_attempted = True
         if self.deliverable_validation:
-            ok, issues, details = validate_artifact(self.artifacts, self.deliverable_validation)
+            ok, issues, details = self._validate_deliverable()
             self.deliverable_verified = ok
             self.deliverable_issues = issues
             if not ok:
@@ -1806,7 +1890,7 @@ class Chamber:
                             self.verified_synthesis_turn = self.turn
                             break
 
-    def _check_resurrection(self, speaker: str, text: str):
+    def _check_resurrection(self, speaker: str, text: str, exempt_claim_ids: Optional[Set[str]] = None):
         low = text.lower()
         if re.search(r"\b(retract|reject|abandon|drop|wrong|not|never|stop)\b", low):
             return
@@ -1815,7 +1899,10 @@ class Chamber:
                 self.resurrection_events.append(
                     dict(turn=self.turn, speaker=speaker, source="watch_term", term=term, snippet=text[:120])
                 )
+        exempt = exempt_claim_ids or set()
         for item in self.board.values():
+            if item.id in exempt:
+                continue
             if item.status in ("retracted", "disputed") and item.turn < self.turn:
                 words = [w for w in re.findall(r"[a-z][a-z0-9_-]{4,}", item.content.lower()) if w not in STOP_WORDS]
                 hits = [w for w in set(words[:6]) if w in low]
@@ -2191,8 +2278,8 @@ class Chamber:
             self.elapsed_s = time.monotonic() - self.start_time
             if self.stop_reason == "not started":
                 self.stop_reason = "completed"
-            if self.deliverable_validation and self.deliverable_verified is None:
-                ok, issues, _ = validate_artifact(self.artifacts, self.deliverable_validation)
+            if self.deliverable_validation:
+                ok, issues, _ = self._validate_deliverable()
                 self.deliverable_verified = ok
                 self.deliverable_issues = issues
             if not failed:
@@ -2384,7 +2471,7 @@ class Chamber:
             board_total=len(self.board),
             board_by_status={
                 st: sum(1 for x in self.board.values() if x.status == st)
-                for st in ("active", "disputed", "retracted")
+                for st in ("active", "disputed", "resolved", "retracted")
             },
             accepted_actions=len(accepted_ev),
             rejected_actions=len(rejected_ev),
@@ -2440,6 +2527,8 @@ class Chamber:
                     ev_lines.append(f"  - Votes: {', '.join(f'`{k}`={v}' for k, v in item.votes.items())}")
                 for ch in item.challenges:
                     ev_lines.append(f"  - ⚔ Challenge by `{ch['author']}` (turn {ch['turn']}): {ch['content']}")
+                for res_entry in item.resolutions:
+                    ev_lines.append(f"  - ✓ Resolved by `{res_entry['author']}` (turn {res_entry['turn']}): {res_entry['content']}")
                 if item.status == "retracted":
                     ev_lines.append(f"  - ✗ Retracted on turn {item.retracted_turn}: {item.retracted_reason}")
 
@@ -2533,7 +2622,7 @@ class Chamber:
             f"- **Speaker attribution / boundary flags**: {metrics['attribution_flag_count']}",
             f"- **Model fallbacks triggered**: {metrics['fallbacks_count']}",
             f"- **Direct messages (total / unanswered)**: {metrics['dm_total']} / {metrics['dm_unanswered']}",
-            f"- **Blackboard items (active / disputed / retracted)**: {metrics['board_by_status']['active']} / {metrics['board_by_status']['disputed']} / {metrics['board_by_status']['retracted']}",
+            f"- **Blackboard items (active / disputed / resolved / retracted)**: {metrics['board_by_status']['active']} / {metrics['board_by_status']['disputed']} / {metrics['board_by_status']['resolved']} / {metrics['board_by_status']['retracted']}",
             f"- **Non-speech actions (accepted / rejected / invalid rate)**: {metrics['accepted_actions']} / {metrics['rejected_actions']} ({metrics['invalid_action_rate']*100:.1f}%)",
             f"- **Response parse formats**: `{json.dumps(metrics['format_counts'])}`",
             f"- **Truncated generations (`finish_reason=length`)**: {metrics['truncated_generations']}",

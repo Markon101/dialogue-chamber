@@ -6,11 +6,11 @@ import unittest
 from pathlib import Path
 
 from anomaly_lab import AnomalyLaboratory
-from artifacts import ArtifactError, ArtifactManager, find_section_span, validate_artifact
+from artifacts import ArtifactError, ArtifactManager, find_section_span, normalize_escaped_newlines, validate_artifact
 from chamber import Chamber
 from context import ContextIntelligence
 from documents import DocumentLibrary
-from inference import MockBackend
+from inference import MockBackend, Result
 from protocol import canonicalize_agent_id, parse_reply
 
 
@@ -707,7 +707,7 @@ class ArtifactCollaborationAndAuditsTests(unittest.TestCase):
         ch = Chamber(cfg, run_dir=self.root / "cross_hint_run", backend=backend, quiet=True, copy_dir="").run()
         # CHAIR on Turn 3 sees live Blackboard status count in Session Status
         t3_tail = backend.calls[2][1]["messages"][-1]["content"]
-        self.assertIn("Blackboard: 1 active, 1 disputed, 0 retracted (1 challenge(s))", t3_tail)
+        self.assertIn("Blackboard: 1 active, 1 disputed, 0 resolved, 0 retracted (1 challenge(s))", t3_tail)
         # ALPHA on Turn 4 sees persistent cross-tool rejection hints from Turn 1
         t4_tail = backend.calls[3][1]["messages"][-1]["content"]
         self.assertIn("use @DOC_READ siegel_brauer_2026 0 instead", t4_tail)
@@ -753,6 +753,372 @@ class ArtifactCollaborationAndAuditsTests(unittest.TestCase):
             self.assertGreaterEqual(len(hits_sb), 1)
             _, hits_gm, _ = real_lib.search("grenie_molteni_2022_classgroup", "4 -")
             self.assertGreaterEqual(len(hits_gm), 1)
+
+    def test_resolve_lifecycle_rechallenge_resurrection_and_deliverable_gate(self):
+        # Parsing variants: with/without colon, colons in rationale, aliases, missing rationale rejection
+        p_ok = parse_reply(
+            "@RESOLVE c3: Verified: denominator matches gan_ichino_2014_ggp offset 53250\n"
+            "@CLOSE_DISPUTE #C4 Confirmed equation without colon separator\n"
+            "@DISMISS_CHALLENGE c5 Checked lemma 2.1",
+            me="RED_TEAM_CHAIR",
+            names=("RED_TEAM_CHAIR", "GGP_GL2_ARCHITECT"),
+        )
+        self.assertEqual(p_ok.issues, [])
+        self.assertEqual(len(p_ok.actions), 3)
+        self.assertEqual(p_ok.actions[0]["type"], "RESOLVE")
+        self.assertEqual(p_ok.actions[0]["target"], "c3")
+        self.assertIn("Verified: denominator matches", p_ok.actions[0]["content"])
+        self.assertEqual(p_ok.actions[1]["target"], "c4")
+        self.assertEqual(p_ok.actions[2]["target"], "c5")
+
+        p_bad = parse_reply("@RESOLVE c3", me="RED_TEAM_CHAIR", names=("RED_TEAM_CHAIR",))
+        self.assertEqual(p_bad.actions, [])
+        self.assertTrue(any("RESOLVE missing reason" in iss for iss in p_bad.issues))
+
+        valid_doc = (
+            "# Monograph\n\n"
+            "## [Core Analysis]\n"
+            + ("Detailed verified proof derivation of theta-lift divisibility and denominator bounds. " * 6)
+            + "\n\n## [Red-Team Referee Report]\n"
+            + ("All equations checked character-for-character against primary LaTeX sources with no remaining gaps. " * 10)
+        )
+        cfg = {
+            "name": "resolve_gate_test",
+            "topic": "Verify resolve lifecycle and deliverable dispute gate",
+            "scheduler": "round_robin",
+            "end_mode": "agent_decided",
+            "end_policy": "majority",
+            "min_turns_before_end": 1,
+            "board_visible": True,
+            "artifacts": {
+                "seed": {"monograph": "# Monograph\nSeed.\n"},
+                "visible": ["monograph"],
+                "validation": {
+                    "artifact": "monograph",
+                    "require_modified": True,
+                    "min_bytes": 600,
+                    "required_sections": ["[Core Analysis]", "[Red-Team Referee Report]"],
+                },
+            },
+            "limits": {"max_turns": 10},
+            "agents": [
+                {"name": "ALPHA", "endpoint": "local", "capabilities": "full"},
+                {"name": "BETA", "endpoint": "local", "capabilities": "full"},
+                {"name": "CHAIR", "endpoint": "local", "capabilities": "full"},
+            ],
+        }
+        backend = MockBackend({
+            "ALPHA": [
+                # Turn 1: post c1 and complete artifact
+                "Posting initial claim and writing deliverable.\n"
+                "@CLAIM: Automorphic seesaw denominator controls theta-lift divisibility across modular forms\n"
+                f"@REPLACE monograph: {valid_doc}",
+                # Turn 4: after c1 is disputed -> uncritical mention triggers resurrection_count; vote END_RUN prematurely
+                "The automorphic seesaw denominator controls modular forms completely.\n"
+                "@END_RUN: Deliverable complete and all disputes settled",
+                # Turn 7: resolved c1 -> mention same topic -> MUST NOT trigger resurrection!
+                "Building on the resolved automorphic seesaw denominator modular forms argument.",
+                # Turn 10: after second RESOLVE -> END_RUN achieves majority and succeeds!
+                "Final concurrence after second resolution.\n@END_RUN: All disputes genuinely resolved",
+            ],
+            "BETA": [
+                # Turn 2: challenge c1 (status -> disputed)
+                "Challenging c1 for missing offset.\n@CHALLENGE c1: Verify denominator against primary source",
+                # Turn 5: majority votes END_RUN while c1 is STILL disputed -> MUST BE BLOCKED despite artifact passing!
+                "Claiming completion.\n@END_RUN: All disputes resolved",
+                # Turn 8: CHAIR re-challenges c1!
+                "Re-opening c1 on second check.\n@CHALLENGE c1: Exponent on prime factor needs re-check",
+            ],
+            "CHAIR": [
+                # Turn 3: also vote END_RUN while disputed -> blocked when BETA votes, or stays blocked
+                "Reviewing status.\n@END_RUN: Looks done",
+                # Turn 6: CHAIR resolves c1 cleanly
+                "Checked source; automorphic seesaw denominator confirmed.\n@RESOLVE c1: Confirmed verbatim at gan_ichino_2014_ggp @ 53250",
+                # Turn 9: BETA re-challenged on Turn 8; BETA/ALPHA/etc: wait turn 9 mention triggers resurrection!
+                "Proceeding with the automorphic seesaw denominator modular forms analysis as drafted.",
+            ],
+        })
+        run_dir = self.root / "resolve_run"
+        ch = Chamber(cfg, run_dir=run_dir, backend=backend, quiet=True, copy_dir="").run()
+        # Let's check: on Turn 9 CHAIR didn't resolve c1, so Turn 10 BETA hadn't resolved -> max_turns=10 hit!
+        # Verify unresolved dispute after re-challenge kept final deliverable_verified=False!
+        self.assertFalse(ch.deliverable_verified)
+        self.assertTrue(any("Unresolved blackboard dispute(s): c1" in iss for iss in ch.deliverable_issues))
+        # On Turn 5, majority (ALPHA, BETA, CHAIR) had voted END_RUN while c1 was disputed -> MUST HAVE BEEN BLOCKED!
+        self.assertTrue(any(e.type == "END_RUN" and e.status == "rejected" and "Unresolved blackboard dispute(s): c1" in e.detail for e in ch.events))
+        # Turn 4 (while disputed) and Turn 9 (after re-challenge) both triggered resurrection on c1; Turn 7 (while resolved) did NOT!
+        c1_res_turns = [r["turn"] for r in ch.resurrection_events if "c1" in r["source"]]
+        self.assertIn(4, c1_res_turns)
+        self.assertNotIn(7, c1_res_turns)
+        self.assertIn(9, c1_res_turns)
+        # Re-challenge preserved resolution audit trail while returning status to disputed
+        self.assertEqual(ch.board["c1"].status, "disputed")
+        self.assertEqual(len(ch.board["c1"].challenges), 2)
+        self.assertEqual(len(ch.board["c1"].resolutions), 1)
+
+        # Resume the saved checkpoint to test second RESOLVE -> majority END_RUN -> deliverable_verified=True & checkpoint round-trip
+        ckpt = json.loads((run_dir / "checkpoint.json").read_text(encoding="utf-8"))
+        # Verify checkpoint persisted BoardItem resolution history before resume
+        self.assertEqual(len(ckpt["state"]["board"]["c1"]["resolutions"]), 1)
+        cfg2 = dict(cfg)
+        cfg2["limits"] = {"max_turns": 13}
+        backend2 = MockBackend({
+            "BETA": ["@RESOLVE c1: Verified prime exponent in source text\n@END_RUN: Second dispute resolved"],
+            "CHAIR": ["@END_RUN: Verified and resolved"],
+        })
+        ch2 = Chamber(
+            cfg2, run_dir=self.root / "resolve_run_cont", backend=backend2,
+            quiet=True, copy_dir="", checkpoint_data=ckpt,
+        ).run()
+        self.assertTrue(ch2.deliverable_verified)
+        self.assertTrue(ch2.end_requested)
+        self.assertEqual(ch2.board["c1"].status, "resolved")
+        self.assertEqual(ch2.board["c1"].resolved_by, "BETA")
+        self.assertEqual(len(ch2.board["c1"].resolutions), 2)
+        metrics2 = ch2.compute_metrics()
+        self.assertEqual(metrics2["board_by_status"]["resolved"], 1)
+        self.assertEqual(metrics2["board_by_status"]["disputed"], 0)
+        events_md = (self.root / "resolve_run_cont" / "events.md").read_text(encoding="utf-8")
+        self.assertIn("Resolved by `CHAIR` (turn 6)", events_md)
+        self.assertIn("Resolved by `BETA` (turn 11)", events_md)
+
+    def test_duplicate_append_prevention_and_conservative_math_allowance(self):
+        mgr = ArtifactManager(self.root / "dup_arts")
+        seed = (
+            "# Monograph\n\n"
+            "## [Spectral vs Functorial Divide]\n\n"
+            "### The Spectral Constraint\n"
+            "Connes extremizes the Weil quadratic form over the noncommutative adele class space so the Riemann Hypothesis holds if and only if the quadratic form is negative semidefinite on compactly supported test functions [connes_2026_letter @ 1200].\n\n"
+            "## [Automorphic Core]\n\n"
+            "### GGP Period Identity\n"
+            "In the Gan-Ichino theorem, $\\kappa = |S_{\\phi}|$ enters as a denominator at [gan_ichino_2014_ggp @ 53250].\n"
+        )
+        mgr.write("SYSTEM", "mono", "create", seed, turn=0, attribution=False)
+
+        # 1. Exact duplicate ### subheading rejected with consolidation hint
+        with self.assertRaises(ArtifactError) as ctx1:
+            mgr.write(
+                "SPECTRAL", "mono", "append_section",
+                "### The Spectral Constraint\nNew commentary on trace formula.",
+                section="[Spectral vs Functorial Divide]", turn=1,
+            )
+        self.assertIn("already exists", str(ctx1.exception))
+        self.assertIn("@SECTION mono | [Spectral vs Functorial Divide]", str(ctx1.exception))
+
+        # 2. Renamed-heading near-identical paragraph rejected conservatively
+        with self.assertRaises(ArtifactError) as ctx2:
+            mgr.write(
+                "SPECTRAL", "mono", "append_section",
+                "### Final Spectral Synthesis\n"
+                "Connes extremizes the Weil quadratic form over the noncommutative adele class space so the Riemann Hypothesis holds if and only if the quadratic form stays negative semidefinite on compactly supported test functions [connes_2026_letter @ 1200].",
+                section="[Spectral vs Functorial Divide]", turn=2,
+            )
+        self.assertIn("append_section rejected", str(ctx2.exception))
+
+        # 3. Same verbatim block repeated under whole-file @APPEND rejected
+        mgr.write("A", "notes", "create", "# Notes\n\nInitial line.", turn=1)
+        repeated_para = (
+            "By Banks Theorem 1.3 [siegel_brauer_2026 @ 10550], for Galois extensions K/k we obtain "
+            "an effective lower bound h_K R_K >= c(k) d_K^{1/2} / ((2*pi)^{[K:Q]} log d_K) independent of Landau-Siegel zeros."
+        )
+        mgr.write("A", "notes", "append", repeated_para, turn=2, attribution=False)
+        with self.assertRaises(ArtifactError) as ctx3:
+            mgr.write("B", "notes", "append", repeated_para, turn=3, attribution=False)
+        self.assertIn("append rejected", str(ctx3.exception))
+
+        # 4. Legitimate complementary math subsection sharing definitions & citations MUST SUCCEED
+        legit_addition = (
+            "### Bessel Identity & Covering Obstruction\n"
+            "In contrast to GL_1 characters, the sixfold GL_5 cover introduces BesselId dependencies after "
+            "$\\kappa = |S_{\\phi}|$ [gan_ichino_2014_ggp @ 53250] and shifts the Rank-2 Selmer lifting estimate "
+            "documented at [adriazola_2026_dep_map @ 4100] and [siegel_brauer_2026 @ 10550]."
+        )
+        _, ver_ok = mgr.write(
+            "GGP", "mono", "append_section", legit_addition,
+            section="[Automorphic Core]", turn=4,
+        )
+        self.assertEqual(ver_ok, 2)
+
+        # 5. AnomalyLab Detector #10 catches intra-section duplicates, ignores clean shared-citation sections
+        lab = AnomalyLaboratory(self.root / "lab10")
+        bad_run = self.root / "bad_subdup"
+        (bad_run / "artifacts").mkdir(parents=True)
+        (bad_run / "artifacts" / "monograph.md").write_text(
+            "# Master\n\n## [Section One]\n\n### Repeated Heading\nFirst body of sufficient length to count as real text.\n\n"
+            "### Repeated Heading\nSecond body.\n",
+            encoding="utf-8",
+        )
+        (bad_run / "metrics.json").write_text(json.dumps({"turns_completed": 5}), encoding="utf-8")
+        (bad_run / "events.jsonl").write_text("", encoding="utf-8")
+        (bad_run / "transcript.md").write_text("# Transcript\n", encoding="utf-8")
+        (bad_run / "checkpoint.json").write_text(json.dumps({"schema_version": 2, "state": {"config": {"agents": [{"name": "A"}]}}}), encoding="utf-8")
+        found_bad = [sp for sp in lab.inspect_run(bad_run) if sp.anomaly_type == "duplicate_artifact_subsection_content"]
+        self.assertEqual(len(found_bad), 1)
+
+        clean_run = self.root / "clean_subdup"
+        (clean_run / "artifacts").mkdir(parents=True)
+        (clean_run / "artifacts" / "monograph.md").write_text(mgr.read("GGP", "mono")[2], encoding="utf-8")
+        (clean_run / "metrics.json").write_text(json.dumps({"turns_completed": 5}), encoding="utf-8")
+        (clean_run / "events.jsonl").write_text("", encoding="utf-8")
+        (clean_run / "transcript.md").write_text("# Transcript\n", encoding="utf-8")
+        (clean_run / "checkpoint.json").write_text(json.dumps({"schema_version": 2, "state": {"config": {"agents": [{"name": "A"}]}}}), encoding="utf-8")
+        self.assertEqual([sp for sp in lab.inspect_run(clean_run) if sp.anomaly_type == "duplicate_artifact_subsection_content"], [])
+
+    def test_escaped_newline_normalization_preserves_latex_and_code(self):
+        raw = (
+            "### Bridge\\n\\n"
+            "To preserve $\\nu \\neq \\nabla \\notin \\mathbb{N}$, write:\n"
+            "$$\\sum_{k} \\nu_k \\neq \\nabla f \\mid n$$\n"
+            "And bare \\nu \\neq \\nabla outside math or \\\\n must stay intact.\\n\\n"
+            "1. First item.\\n- Bullet item.\\n"
+            "\\begin{equation}x \\neq y \\land \\nabla g\\end{equation}\\n\\n"
+            "**Directive:** Read ``\\n\\nkeep_inline`` and fence:\n"
+            "```python\ns = \"line1\\n\\nline2\"\n```\\n"
+        )
+        norm = normalize_escaped_newlines(raw)
+        self.assertIn("### Bridge\n\nTo preserve", norm)
+        self.assertIn("1. First item.\n- Bullet item.", norm)
+        self.assertIn("\n\n**Directive:**", norm)
+        self.assertTrue(norm.endswith("```\n"))
+        # LaTeX commands & escaped backslashes & code spans must remain verbatim
+        self.assertIn(r"$\nu \neq \nabla \notin \mathbb{N}$", norm)
+        self.assertIn(r"$$\sum_{k} \nu_k \neq \nabla f \mid n$$", norm)
+        self.assertIn(r"bare \nu \neq \nabla outside math or \\n", norm)
+        self.assertIn(r"\begin{equation}x \neq y \land \nabla g\end{equation}", norm)
+        self.assertIn("``\\n\\nkeep_inline``", norm)
+        self.assertIn('s = "line1\\n\\nline2"', norm)
+
+        mgr = ArtifactManager(self.root / "nl_arts")
+        mgr.write("A", "doc", "create", raw, turn=1, attribution=False)
+        stored = mgr.read("A", "doc")[2]
+        self.assertNotIn("Bridge\\n\\n", stored)
+        self.assertIn(r"\nu \neq \nabla", stored)
+
+    def test_section_completeness_warnings_and_referee_stub_blocking(self):
+        # Even when overall size >= min_bytes, a thin/stub referee section blocks validation!
+        long_core = "Verified derivation of Estimate C and Banks Theorem 1.3 with full bounds. " * 90  # ~6.7 KB
+        thin_exec = "Brief executive overview summarizing main results cleanly with key citations."  # ~83B (< warn_min)
+        stub_ref = "The audit of the Multiplicity Engine is underway. I am checking offset 14 next."  # explicit stub + small
+
+        spec = {
+            "artifact": "monograph",
+            "require_modified": True,
+            "min_bytes": 5000,
+            "required_sections": [
+                "[Executive Overview]",
+                "[Core Derivations]",
+                "[Red-Team Referee Report & Open 2027 Research Problems]",
+            ],
+        }
+        mgr = ArtifactManager(self.root / "ref_arts")
+        mgr.write("SYSTEM", "monograph", "create", "# Mono\n", turn=0, attribution=False)
+        mgr.read("CHAIR", "monograph", turn=1)
+        mgr.write(
+            "CHAIR", "monograph", "replace",
+            f"# Mono\n\n## [Executive Overview]\n{thin_exec}\n\n"
+            f"## [Core Derivations]\n{long_core}\n\n"
+            f"## [Red-Team Referee Report & Open 2027 Research Problems]\n{stub_ref}\n",
+            turn=1,
+        )
+        ok, issues, details = validate_artifact(mgr, spec)
+        self.assertFalse(ok)
+        self.assertIn("[Red-Team Referee Report & Open 2027 Research Problems]", details["stub_sections"])
+        self.assertIn("[Red-Team Referee Report & Open 2027 Research Problems]", details["thin_sections"])
+        self.assertTrue(any("underway" in iss for iss in issues))
+        self.assertTrue(any("required referee section" in iss for iss in issues))
+        self.assertTrue(any("[Executive Overview]" in w for w in details["warnings"]))
+
+        # End-to-end Chamber test: thin warning shown in Session Status, referee stub blocks END_RUN, full referee unblocks
+        cfg = {
+            "name": "referee_gate_test",
+            "topic": "Complete monograph including referee report",
+            "scheduler": "round_robin",
+            "end_mode": "agent_decided",
+            "end_policy": "majority",
+            "min_turns_before_end": 1,
+            "artifacts": {"seed": {"monograph": "# Mono\n"}, "visible": ["monograph"], "validation": spec},
+            "limits": {"max_turns": 6},
+            "agents": [
+                {"name": "A", "endpoint": "local", "capabilities": "full"},
+                {"name": "CHAIR", "endpoint": "local", "capabilities": "full"},
+            ],
+        }
+        full_ref = (
+            "### Verbatim Source Audit\n"
+            "Checked all 13 primary documents character-for-character: Banks Theorem 1.3 keeps d_K^{1/2} and explicit "
+            "base-field dependence c(k) separating fixed-base Galois bounds from general non-Galois extensions; "
+            "Grenie-Molteni Theorem 1.1 keeps (4 - 1/(2n)) log^2 Delta strictly conditional on Dedekind ERH while "
+            "quadratic/abelian specializations fall under Q-GRH; Gan-Ichino seesaw denominator |S_phi| and LinkDIV "
+            "dependencies pinpoint the GL_2 rank-jump barrier; Connes Weil quadratic form stays strictly separated from "
+            "theta-lift divisibility transport; Lean TCB hashes and 1,484,729 nanoda declaration counts match Waterloo "
+            "audit logs; no unverified citations remain. Open 2027 problems cover non-Galois Siegel mass bounds and "
+            "explicit sub-linear lift constants."
+        )
+        backend = MockBackend({
+            "A": [
+                "@REPLACE monograph: "
+                f"# Mono\n\n## [Executive Overview]\n{thin_exec}\n\n"
+                f"## [Core Derivations]\n{long_core}\n\n"
+                "## [Red-Team Referee Report & Open 2027 Research Problems]\n"
+                "Short non-stub referee summary still way too brief.\n@END_RUN: Done",
+                "@END_RUN: Re-affirming after referee completion",
+            ],
+            "CHAIR": [
+                # Turn 2: majority vote with brief referee section MUST fail validation!
+                "Voting done.\n@END_RUN: Accept",
+                # Turn 4: after expanding referee section -> passes validation and concludes cleanly!
+                f"Completed referee section.\n@SECTION monograph | [Red-Team Referee Report & Open 2027 Research Problems]: {full_ref}\n@END_RUN: Verified",
+            ],
+        })
+        ch = Chamber(cfg, run_dir=self.root / "ref_gate_run", backend=backend, quiet=True, copy_dir="").run()
+        # CHAIR Turn 2 sees thin-section warning in Session Status
+        t2_tail = backend.calls[1][1]["messages"][-1]["content"]
+        self.assertIn("Warning:", t2_tail)
+        self.assertIn("[Executive Overview]", t2_tail)
+        # Turn 2 END_RUN was blocked by referee floor; Turn 4 verified cleanly!
+        self.assertTrue(any(e.type == "END_RUN" and e.status == "rejected" and "required referee section" in e.detail for e in ch.events))
+        self.assertTrue(ch.deliverable_verified)
+        self.assertEqual(ch.turn, 4)
+
+    def test_v5_v6_historical_regression_checks(self):
+        repo_root = Path(__file__).resolve().parent
+        v5_dir = repo_root / "runs" / "rh_2026_deep_proof_v5_8a_long_cont"
+        v6_dir = repo_root / "runs" / "rh_2026_deep_proof_v6_8a_long"
+        lab = AnomalyLaboratory(self.root / "hist_lab")
+
+        if not (v5_dir.exists() and v6_dir.exists()):
+            self.skipTest("Historical v5/v6 run directories not present")
+
+        # v5 monograph and debate_notes remain free of duplicates; Detector #10 catches the 3 real repeated table blocks in v5 frontier_ledger.md
+        v5_specs = lab.inspect_run(v5_dir)
+        self.assertEqual([s.anomaly_type for s in v5_specs], ["duplicate_artifact_subsection_content"])
+        v5_dup_arts = v5_specs[0].evidence["artifacts"]
+        self.assertEqual(sorted(v5_dup_arts.keys()), ["frontier_ledger.md"])
+        self.assertEqual(v5_dup_arts["frontier_ledger.md"]["[document]"]["repeated_blocks"], 3)
+
+        # v6 triggers Detector #10 across its duplicated monograph sections (plus ledger/notes)
+        v6_specs = lab.inspect_run(v6_dir)
+        v6_subdup = [s for s in v6_specs if s.anomaly_type == "duplicate_artifact_subsection_content"]
+        self.assertEqual(len(v6_subdup), 1)
+        v6_mono_dups = v6_subdup[0].evidence["artifacts"].get("rh_2026_post_rh_frontier_monograph.md", {})
+        self.assertGreaterEqual(len(v6_mono_dups), 6)
+
+        # v6 monograph copied into temp ArtifactManager fails v6's spec due to Section 11 referee stub
+        v6_mono = (v6_dir / "artifacts" / "rh_2026_post_rh_frontier_monograph.md").read_text(encoding="utf-8")
+        v6_cfg = json.loads((repo_root / "experiments" / "rh_2026_deep_proof_v6_8a_long.json").read_text(encoding="utf-8"))
+        mgr = ArtifactManager(self.root / "v6_check", max_bytes=1048576, max_total_bytes=4194304)
+        mgr.write("SYSTEM", "rh_2026_post_rh_frontier_monograph", "create", "# Seed\n", turn=0, attribution=False)
+        mgr.read("A", "rh_2026_post_rh_frontier_monograph", turn=1)
+        mgr.write("A", "rh_2026_post_rh_frontier_monograph", "replace", v6_mono, turn=1, force=True)
+        ok_v6, issues_v6, det_v6 = validate_artifact(mgr, v6_cfg["artifacts"]["validation"])
+        self.assertFalse(ok_v6)
+        self.assertIn("[Red-Team Referee Report & Open 2027 Research Problems]", det_v6["stub_sections"])
+        self.assertIn("[Red-Team Referee Report & Open 2027 Research Problems]", det_v6["thin_sections"])
+
+        # Escaped-newline normalizer eliminates v6's literal \n\n leaks while leaving math untouched
+        fixed_v6 = normalize_escaped_newlines(v6_mono)
+        self.assertNotIn("\\n\\n", fixed_v6)
+        self.assertIn(r"\mathcal{C}_{lift}", fixed_v6)
 
 
 if __name__ == "__main__":
