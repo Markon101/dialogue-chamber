@@ -541,7 +541,7 @@ class AnomalyLaboratory:
                     running_sizes[aname] = write_sz
                 elif op in ("create", "replace", "revert"):
                     running_sizes[aname] = write_sz
-                elif op == "append":
+                elif op in ("append", "append_section"):
                     running_sizes[aname] = write_sz if m_sz else (prev_sz + write_sz + 32)
                 elif op == "replace_section":
                     running_sizes[aname] = write_sz if m_sz else max(prev_sz, write_sz)

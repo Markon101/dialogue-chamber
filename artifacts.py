@@ -370,8 +370,8 @@ class ArtifactManager:
 
     def _write(self, agent, name, mode, content, expected_version, turn, attribution,
                section=None, force=False, min_replace_ratio=0.0):
-        if mode not in ("create", "append", "replace", "replace_section"):
-            raise ArtifactError("mode must be create, append, replace or replace_section")
+        if mode not in ("create", "append", "replace", "replace_section", "append_section"):
+            raise ArtifactError("mode must be create, append, replace, replace_section or append_section")
         if not isinstance(content, str) or not content.strip():
             raise ArtifactError("artifact content must be non-empty text")
         content = CONTROL_CHARS.sub("", content)
@@ -399,9 +399,9 @@ class ArtifactManager:
         art_limit = self.limit_for(fname)
         short_name = fname.removesuffix(".md")
 
-        if mode == "replace_section":
+        if mode in ("replace_section", "append_section"):
             if not isinstance(section, str) or not section.strip():
-                raise ArtifactError("replace_section requires a target section heading")
+                raise ArtifactError(f"{mode} requires a target section heading")
             sec_spec = CONTROL_CHARS.sub("", section).strip()
             body_clean = content.strip()
             sec_pat = section_heading_regex(sec_spec)
@@ -420,8 +420,12 @@ class ArtifactManager:
                     canonical_heading = old[h_start:h_end].rstrip("\n")
                     eff_level = level if level is not None else 2
                     body_norm = normalize_section_body_headings(body_without_heading, eff_level)
-                    replacement_block = f"{canonical_heading}\n\n{body_norm}" if body_norm else canonical_heading
-                    parts = [old[:h_start].rstrip("\n"), replacement_block, old[b_end:].lstrip("\n")]
+                    if mode == "append_section":
+                        existing_block = old[h_start:b_end].rstrip("\n")
+                        section_block = f"{existing_block}\n\n{body_norm}" if body_norm else existing_block
+                    else:
+                        section_block = f"{canonical_heading}\n\n{body_norm}" if body_norm else canonical_heading
+                    parts = [old[:h_start].rstrip("\n"), section_block, old[b_end:].lstrip("\n")]
                     new = "\n\n".join(p for p in parts if p) + "\n"
                 else:
                     heading_line = sec_spec if sec_spec.startswith(("#", "[")) else f"## {sec_spec}"

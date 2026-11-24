@@ -27,6 +27,7 @@ ALIASES = {
     "APPEND": "ARTIFACT_WRITE", "REPLACE": "ARTIFACT_WRITE", "CREATE": "ARTIFACT_WRITE", "WORLD": "ARTIFACT_WRITE",
     "SECTION": "ARTIFACT_WRITE", "UPDATE_SECTION": "ARTIFACT_WRITE",
     "PATCH_SECTION": "ARTIFACT_WRITE", "REPLACE_SECTION": "ARTIFACT_WRITE",
+    "APPEND_SECTION": "ARTIFACT_WRITE", "ADD_TO_SECTION": "ARTIFACT_WRITE",
     "FORCE_REPLACE": "ARTIFACT_WRITE",
     "REVERT": "ARTIFACT_WRITE", "ARTIFACT_REVERT": "ARTIFACT_WRITE", "ROLLBACK": "ARTIFACT_WRITE",
     "READ": "ARTIFACT_READ", "LIST": "ARTIFACT_LIST", "DOCS": "DOC_LIST", "TOC": "DOC_TOC",
@@ -53,11 +54,9 @@ PROMPT_SECTION_LEAK_RE = re.compile(
     r"^\s*---\s*(?:Workspace Artifacts|Shared Blackboard|Your Private Scratchpad|Private Whispers|Public Conversation|Channel\b).*---\s*$",
     re.I,
 )
-_PEER_DIRECTIVE_RE = re.compile(
-    r"^(?:you|your|please|can\s+you|could\s+you|would\s+you|will\s+you|"
-    r"verify|check|confirm|audit|provide|extract|read|draft|focus|pull|run|"
-    r"search|compare|inspect|map|address|clarify|reconcile|quantify|report|"
-    r"update|review|summarize|explain|detail|we\s+need)\b",
+_FIRST_PERSON_IMPERSONATION_RE = re.compile(
+    r"^(?:i\s+(?:confirm|concur|agree|accept|retract|withdraw|have\s+completed|am\s+entering|will\s+update)\b|"
+    r"as\s+[A-Za-z0-9_]+\b)",
     re.I,
 )
 
@@ -212,6 +211,31 @@ def _parse_sampling_spec(raw_spec: str) -> Tuple[Optional[Dict[str, str]], Optio
     return params, None
 
 
+def _edit_distance_one(a: str, b: str) -> bool:
+    """Return True iff ``a`` and ``b`` differ by exact Levenshtein distance 1."""
+    if a == b:
+        return False
+    la, lb = len(a), len(b)
+    if abs(la - lb) > 1:
+        return False
+    if la == lb:
+        return sum(ca != cb for ca, cb in zip(a, b)) == 1
+    if la > lb:
+        a, b = b, a
+        la, lb = lb, la
+    i = j = diffs = 0
+    while i < la and j < lb:
+        if a[i] != b[j]:
+            diffs += 1
+            if diffs > 1:
+                return False
+            j += 1
+        else:
+            i += 1
+            j += 1
+    return True
+
+
 def canonicalize_agent_id(raw_id: Any, known_names: Optional[Set[str]] = None) -> Optional[str]:
     """Cleans and canonicalizes an agent identifier (removes wrappers, punctuation, case-normalizes)."""
     if raw_id is None:
@@ -252,6 +276,10 @@ def canonicalize_agent_id(raw_id: Any, known_names: Optional[Set[str]] = None) -
             for uname, orig in upper_names.items():
                 if first == uname or first == uname.replace("_", ""):
                     return orig
+        if len(s_full) >= 8:
+            fuzzy = [orig for uname, orig in upper_names.items() if _edit_distance_one(s_full, uname)]
+            if len(fuzzy) == 1:
+                return fuzzy[0]
     return s_full
 
 
@@ -444,7 +472,7 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
         res["name"] = name
         default_mode = "revert" if raw_t in ("REVERT", "ARTIFACT_REVERT", "ROLLBACK") else "append"
         mode = str(res.get("mode", default_mode)).strip().lower()
-        if mode not in ("create", "append", "replace", "replace_section", "revert"):
+        if mode not in ("create", "append", "replace", "replace_section", "append_section", "revert"):
             mode = default_mode
         res["mode"] = mode
         if mode == "revert":
@@ -455,10 +483,10 @@ def validate_action_schema(a: Dict[str, Any], issues: List[str], known_names: Op
                 return None
             res["target_version"] = ver_int
             res["content"] = ""
-        elif mode == "replace_section":
+        elif mode in ("replace_section", "append_section"):
             sec = str(res.get("section") or "").strip()
             if not sec:
-                issues.append("ARTIFACT_WRITE replace_section missing target section heading")
+                issues.append(f"ARTIFACT_WRITE {mode} missing target section heading")
                 return None
             res["section"] = sec
         if res.get("force"):
@@ -729,7 +757,7 @@ def _command(word: str, rest: str, lines_after: List[str], known_names: Optional
                 "mode": "revert",
                 "target_version": ver_tok,
             }
-        if w_up in ("SECTION", "UPDATE_SECTION", "PATCH_SECTION", "REPLACE_SECTION"):
+        if w_up in ("SECTION", "UPDATE_SECTION", "PATCH_SECTION", "REPLACE_SECTION", "APPEND_SECTION", "ADD_TO_SECTION"):
             raw_s = (rest or "").strip()
             art_tok, sec_name, inline_body = "", "", ""
             m_pipe = re.match(r"^([^\s|:]+)\s*\|\s*(.+)$", raw_s)
@@ -758,7 +786,7 @@ def _command(word: str, rest: str, lines_after: List[str], known_names: Optional
             return {
                 "type": "ARTIFACT_WRITE",
                 "name": art_tok,
-                "mode": "replace_section",
+                "mode": "append_section" if w_up in ("APPEND_SECTION", "ADD_TO_SECTION") else "replace_section",
                 "section": sec_name.strip(),
                 "content": text,
             }
@@ -871,11 +899,10 @@ def sanitize_speaker(text: str, me: str, names: Set[str], flags: List[str]) -> s
             cand = canonicalize_agent_id(m.group(1), names)
             if cand and cand in names:
                 if cand != me:
-                    # Preserve legitimate markdown-bold peer addressing (e.g. after a colon or leading a directive)
+                    # Preserve legitimate markdown-bold peer addressing unless it is first-person impersonation
                     if not has_turn_tag and line.lstrip().startswith(("**", "__")):
                         rest = line[m.end():].strip()
-                        prev_nonempty = next((x.strip() for x in reversed(out) if x.strip()), "")
-                        if prev_nonempty.endswith(":") or _PEER_DIRECTIVE_RE.match(rest):
+                        if not _FIRST_PERSON_IMPERSONATION_RE.match(rest) and not re.search(rf"\bas\s+{re.escape(cand)}\b", rest, re.I):
                             break
                     flags.append(f"wrote a line as {cand}; reply cut there")
                     line = None

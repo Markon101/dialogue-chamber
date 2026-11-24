@@ -805,6 +805,22 @@ class Chamber:
                         "Unverified doc citations (cited without @DOC_READ/@DOC_TOC/@DOC_SEARCH): "
                         + ", ".join(unverified.keys())
                     )
+            if self.board_visible:
+                if self.board:
+                    b_counts = {"active": 0, "disputed": 0, "retracted": 0}
+                    total_ch = 0
+                    for b_item in self.board.values():
+                        st_k = b_item.status if b_item.status in b_counts else "active"
+                        b_counts[st_k] += 1
+                        total_ch += len(b_item.challenges)
+                    status_lines.append(
+                        f"Blackboard: {b_counts['active']} active, {b_counts['disputed']} disputed, "
+                        f"{b_counts['retracted']} retracted ({total_ch} challenge(s))"
+                    )
+                else:
+                    status_lines.append(
+                        "Blackboard: 0 items (use @CLAIM / @CHALLENGE / @VOTE to record and stress-test key claims)"
+                    )
             tail_sections["session_status"] = "--- Session Status ---\n" + "\n".join(status_lines)
 
         # Public messages (append-only shared prefix across all agents)
@@ -895,7 +911,7 @@ class Chamber:
                 '    {"type": "PUBLISH", "channel": "planning", "content": "channel post"},\n'
                 '    {"type": "VOTE", "target": "c1", "value": "yes|no"},\n'
                 '    {"type": "UPDATE_NOTE", "content": "your private scratchpad note"},\n'
-                '    {"type": "ARTIFACT_WRITE", "name": "world", "mode": "create|append|replace|replace_section|revert", "section": "optional heading", "target_version": 2, "content": "markdown"},\n'
+                '    {"type": "ARTIFACT_WRITE", "name": "world", "mode": "create|append|replace|replace_section|append_section|revert", "section": "optional heading", "target_version": 2, "content": "markdown"},\n'
                 '    {"type": "ARTIFACT_READ", "name": "world"}'
                 + (',\n    {"type": "DOC_TOC", "doc_id": "..."},\n    {"type": "DOC_SEARCH", "target": "all", "query": "..."},\n    {"type": "DOC_READ", "doc_id": "...", "offset": 0}' if self.documents.has_docs() else '')
                 + "\n  ]\n}\n"
@@ -925,7 +941,8 @@ class Chamber:
         if "ARTIFACT_WRITE" in caps:
             cmds.append(
                 "@APPEND <artifact>: <markdown to append>  |  @SECTION <artifact> | <heading>: <replace one section>  |  "
-                "@REPLACE <artifact>: <full consolidated markdown>  |  @REVERT <artifact> v<N>  (or @READ <artifact> 0)"
+                "@APPEND_SECTION <artifact> | <heading>: <add to section>  |  @REPLACE <artifact>: <full markdown>  |  "
+                "@REVERT <artifact> v<N>  (or @READ <artifact> 0)"
             )
         if self.documents.has_docs() and ("DOC_READ" in caps or "DOC_SEARCH" in caps or "DOC_TOC" in caps):
             cmds.append("@DOC_TOC <doc_id>  |  @DOC_SEARCH <doc_id|all> <query>  |  @DOC_READ <doc_id> 0 (use numeric integer offset)  |  @DOC_LIST")
@@ -1320,7 +1337,18 @@ class Chamber:
                 self._record(agent.name, atype, "rejected", target=ch, detail="channel writer permission required")
                 return
             if not ch or ch not in self.channels:
-                self._record(agent.name, atype, "rejected", target=ch, detail="unknown channel")
+                valid_chs = ", ".join(f"#{c}" for c in sorted(self.channels)) or "none"
+                hint = ""
+                if ch:
+                    try:
+                        art_cand = self.artifacts.normalize(ch)
+                        if art_cand in self.artifacts.versions:
+                            hint = f"; `{art_cand}` is an artifact — use @APPEND {ch}: ... (valid channels: {valid_chs})"
+                    except ArtifactError:
+                        pass
+                if not hint:
+                    hint = f" (valid channels: {valid_chs})"
+                self._record(agent.name, atype, "rejected", target=ch, detail=f"unknown channel{hint}")
                 return
             if self.society and ch in self.society.groups and agent.name not in self.society.groups[ch]["members"]:
                 self._record(agent.name, atype, "rejected", target=ch, detail="group membership required")
@@ -1345,7 +1373,8 @@ class Chamber:
                 self._record(agent.name, atype, "rejected", target=ch, detail="channel reader permission required")
                 return
             if not ch or ch not in self.channels:
-                self._record(agent.name, atype, "rejected", target=ch, detail="unknown channel")
+                valid_chs = ", ".join(f"#{c}" for c in sorted(self.channels)) or "none"
+                self._record(agent.name, atype, "rejected", target=ch, detail=f"unknown channel (valid channels: {valid_chs})")
                 return
             if self.society and ch in self.society.groups:
                 self._record(agent.name, atype, "rejected", target=ch, detail="use JOIN_GROUP with an invitation")
@@ -1477,7 +1506,15 @@ class Chamber:
             try:
                 fname, ver, text = self.artifacts.read(agent.name, name, turn=self.turn, mark_seen=False)
             except ArtifactError as e:
-                self._record(agent.name, atype, "rejected", target=name, detail=str(e))
+                detail_msg = str(e)
+                if self.documents.has_docs():
+                    try:
+                        doc_cand = self.documents.normalize_id(name)
+                        if doc_cand in self.documents.entries:
+                            detail_msg = f"{detail_msg} — `{doc_cand}` is a reference document; use @DOC_READ {doc_cand} 0 instead"
+                    except Exception:
+                        pass
+                self._record(agent.name, atype, "rejected", target=name, detail=detail_msg)
                 return
             if offset >= len(text):
                 self._record(agent.name, atype, "rejected", target=fname, detail=f"offset {offset} is outside v{ver} ({len(text)} chars)")
@@ -1631,7 +1668,7 @@ class Chamber:
                 hist = self.artifacts.history.get(fname) or []
                 delta_bytes = hist[-1]["delta_bytes"] if hist else size_bytes
                 self._check_answer_key(content)
-                mode_label = f"replace_section[{str(section or '')[:40]}]" if mode == "replace_section" else mode
+                mode_label = f"{mode}[{str(section or '')[:40]}]" if mode in ("replace_section", "append_section") else mode
                 sz_label = f"{size_bytes}B, {delta_bytes:+d}B" if ver > 1 else f"{size_bytes}B"
                 self._record(agent.name, atype, "accepted", target=fname, detail=f"{mode_label} -> v{ver} ({sz_label})")
                 self._emit(f"  📝 artifact {fname} ({mode_label} by {agent.name} → v{ver}, {sz_label})")

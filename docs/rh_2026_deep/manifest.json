@@ -70,7 +70,7 @@
       "source_url": "https://arxiv.org/abs/0806.0044",
       "tags": ["Stepanov", "function-fields", "multiplicity", "Bombieri", "Frobenius"],
       "summary": "Reference exposition of Stepanov's elementary method and Bombieri's simplification over F_q, illustrating how Hasse-Schmidt hyperderivatives force high-order zero multiplicity — the exact obstruction Alpöge and Claude replaced over Z via iterated theta lifts.",
-      "path": "text/stepanov_2008_ff.txt"
+      "path": "text/stepanov_2008_ff.tex"
     },
     {
       "id": "gan_ichino_2014_ggp",
@@ -80,7 +80,7 @@
       "source_url": "https://arxiv.org/abs/1409.6824",
       "tags": ["GGP", "theta-correspondence", "seesaw", "Bessel-models", "unitary-groups"],
       "summary": "Foundational Annals/arXiv memoir connecting local unitary/symplectic Gan-Gross-Prasad conjectures for Bessel and Fourier-Jacobi periods directly to the theta correspondence and seesaw dual pairs.",
-      "path": "text/gan_ichino_2014_ggp.txt"
+      "path": "text/gan_ichino_2014_ggp.tex"
     },
     {
       "id": "connes_2026_letter",
@@ -90,7 +90,7 @@
       "source_url": "https://arxiv.org/abs/2602.04022",
       "tags": ["RH", "Weil-quadratic-form", "trace-formula"],
       "summary": "Feb 2026 monograph contrasting spectral/noncommutative Weil-form extremization with Alpöge-Claude's arithmetical Stepanov/theta-lift proof.",
-      "path": "text/connes_2026_letter.txt"
+      "path": "text/connes_2026_letter.tex"
     },
     {
       "id": "lamzouri_2013_grh",
@@ -100,7 +100,7 @@
       "source_url": "https://arxiv.org/abs/1309.3595",
       "tags": ["GRH", "n_p", "L(1,chi)", "explicit-bounds", "algorithms"],
       "summary": "Now-unconditional explicit computable GRH bounds on least quadratic non-residues n_p < (ln p)^2, primes in APs, and L(1, chi).",
-      "path": "text/lamzouri_2013_grh.txt"
+      "path": "text/lamzouri_2013_grh.tex"
     },
     {
       "id": "pair_corr_2026",
@@ -110,7 +110,7 @@
       "source_url": "https://arxiv.org/abs/2607.14515",
       "tags": ["GRH", "pair-correlation", "post-RH-frontiers"],
       "summary": "Shows what remains conditional even AFTER GRH falls: vertical pair-correlation conjectures on L-function zeros still strictly sharpen horizontal GRH bounds.",
-      "path": "text/pair_corr_2026.txt"
+      "path": "text/pair_corr_2026.tex"
     },
     {
       "id": "siegel_brauer_2026",
@@ -120,7 +120,7 @@
       "source_url": "https://arxiv.org/abs/2610.31402",
       "tags": ["Siegel-zeros", "Brauer-Siegel", "effective-constants", "ERH-vs-GRH"],
       "summary": "Quantifies Landau-Siegel lower bounds over general base fields k vs Dedekind/Artin ERH boundaries that Alpöge's Lean formalization has not yet proved.",
-      "path": "text/siegel_brauer_2026.txt"
+      "path": "text/siegel_brauer_2026.tex"
     },
     {
       "id": "grenie_molteni_2022_classgroup",
@@ -130,7 +130,7 @@
       "source_url": "https://arxiv.org/abs/2212.09461",
       "tags": ["GRH", "class-group", "Buchmann-algorithm", "cryptography"],
       "summary": "Turns unconditional GRH into sub-(4 log^2 Delta) ideal class group generator bounds improving Buchmann's algorithm (vs ERH requirements for non-abelian fields).",
-      "path": "text/grenie_molteni_2022_classgroup.txt"
+      "path": "text/grenie_molteni_2022_classgroup.tex"
     }
   ]
 }

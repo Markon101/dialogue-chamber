@@ -78,30 +78,43 @@ class DocumentEntry:
     sha256: str = ""
 
 
-def _normalize_with_map(text: str) -> Tuple[str, List[int]]:
+def _normalize_with_map(text: str, skip_tex_comments: bool = False) -> Tuple[str, List[int]]:
     """Normalize text for search while tracking exact raw char offsets.
 
     Maps common math/Greek symbols and PDF ligatures to ASCII, lowercases text,
     and collapses whitespace runs (including PDF line wraps) to single spaces.
+    When ``skip_tex_comments`` is True, pure LaTeX ``%`` comment lines are skipped
+    without shifting downstream character offsets in ``idx_map``.
     """
     out_chars: List[str] = []
     idx_map: List[int] = []
     prev_space = True
 
-    for raw_idx, ch in enumerate(text):
-        mapped = _SYMBOL_MAP.get(ch)
-        if mapped is None:
-            mapped = " " if ch.isspace() else ch.lower()
-        for mch in mapped:
-            if mch.isspace():
-                if not prev_space:
-                    out_chars.append(" ")
+    offset = 0
+    for line in text.splitlines(keepends=True):
+        if skip_tex_comments and line.lstrip().startswith("%"):
+            if not prev_space:
+                out_chars.append(" ")
+                idx_map.append(offset)
+                prev_space = True
+            offset += len(line)
+            continue
+        for j, ch in enumerate(line):
+            raw_idx = offset + j
+            mapped = _SYMBOL_MAP.get(ch)
+            if mapped is None:
+                mapped = " " if ch.isspace() else ch.lower()
+            for mch in mapped:
+                if mch.isspace():
+                    if not prev_space:
+                        out_chars.append(" ")
+                        idx_map.append(raw_idx)
+                        prev_space = True
+                else:
+                    out_chars.append(mch)
                     idx_map.append(raw_idx)
-                    prev_space = True
-            else:
-                out_chars.append(mch)
-                idx_map.append(raw_idx)
-                prev_space = False
+                    prev_space = False
+        offset += len(line)
 
     if out_chars and out_chars[-1] == " ":
         out_chars.pop()
@@ -200,7 +213,7 @@ class DocumentLibrary:
     def normalize_id(raw_id: Any) -> str:
         s = str(raw_id or "").strip().lower()
         s = re.sub(r"^[<\[(\"'`*@#]+|[>\])\"'`*:.,!]+$", "", s).strip()
-        for ext in (".txt", ".md"):
+        for ext in (".txt", ".md", ".tex"):
             if s.endswith(ext):
                 s = s[: -len(ext)]
         if not DOC_ID_RE.match(s):
@@ -259,7 +272,8 @@ class DocumentLibrary:
     def _normalized(self, doc_id: str) -> Tuple[str, List[int]]:
         cached = self._norm_cache.get(doc_id)
         if cached is None:
-            cached = _normalize_with_map(self._texts[doc_id])
+            skip_comments = str(self.entries[doc_id].path).lower().endswith(".tex")
+            cached = _normalize_with_map(self._texts[doc_id], skip_tex_comments=skip_comments)
             self._norm_cache[doc_id] = cached
         return cached
 
@@ -333,6 +347,7 @@ class DocumentLibrary:
 
         headings: List[Dict[str, Any]] = []
         fallback_items: List[Dict[str, Any]] = []
+        major_fallback_items: List[Dict[str, Any]] = []
         offset = 0
         for line in text.splitlines(keepends=True):
             stripped = line.lstrip()
@@ -354,13 +369,23 @@ class DocumentLibrary:
                         headings.append({"level": level, "offset": offset, "title": title[:140]})
                 else:
                     mthm = thm_re.match(line)
-                    if mthm and len(fallback_items) < max_entries:
+                    if mthm and not stripped.startswith("%") and len(fallback_items) < max_entries:
                         title = _clean_heading_title(line.strip())
                         if title:
-                            fallback_items.append({"level": "item", "offset": offset, "title": title[:140]})
+                            item_entry = {"level": "item", "offset": offset, "title": title[:140]}
+                            fallback_items.append(item_entry)
+                            kind_tok = (mthm.group(1) or mthm.group(2) or "").lower()
+                            if kind_tok in ("theorem", "corollary", "hypothesis", "conjecture", "proposition"):
+                                major_fallback_items.append(item_entry)
             offset += len(line)
 
-        entries_all = headings if headings else fallback_items
+        if headings:
+            if len(headings) < 15 and major_fallback_items:
+                entries_all = sorted(headings + major_fallback_items, key=lambda x: x["offset"])
+            else:
+                entries_all = headings
+        else:
+            entries_all = fallback_items
         total_found = len(entries_all)
         shown = entries_all
         if len(shown) > max_entries:
