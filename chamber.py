@@ -209,6 +209,33 @@ def preview_artifact(name: str, content: str, limit: int = 8000) -> str:
     return content[:prefix] + marker + content[-suffix:]
 
 
+def _looks_truncated_artifact_content(content: str) -> Optional[str]:
+    """Return a concise reason if ``content`` appears cut mid-token/mid-block under length truncation."""
+    s = (content or "").rstrip()
+    if not s:
+        return None
+    lines = s.splitlines()
+    if sum(1 for ln in lines if ln.lstrip().startswith(("```", "~~~"))) % 2 == 1:
+        return "unclosed fenced code block"
+    last_line = lines[-1]
+    if last_line.count("[") > last_line.count("]"):
+        tail_open = last_line[last_line.rfind("["):]
+        if not re.match(r"^\[[^\[\]\n]+,\s*[^\[\]\n]+\)", tail_open):
+            return "unclosed '[' bracket on final line"
+    if s.endswith("\\"):
+        return "dangling trailing backslash"
+    if len(re.findall(r"(?<!\\)\$", last_line.replace("$$", ""))) % 2 == 1:
+        return "unclosed inline math '$' on final line"
+    if (
+        len(s) >= 120
+        and re.search(r"[A-Za-z0-9_,\-:;({/]$", last_line)
+        and not re.match(r"^\s*\|.*\|\s*$", last_line)
+        and not re.match(r"^\s*#{1,6}\s+", last_line)
+    ):
+        return "abrupt mid-token/mid-sentence ending under finish_reason=length"
+    return None
+
+
 class Chamber:
     """One self-contained multi-agent experiment run with context intelligence and checkpointing."""
 
@@ -256,9 +283,9 @@ class Chamber:
         self.board_visible = bool(self.cfg.get("board_visible", True))
         self.dm_visibility = str(self.cfg.get("dm_visibility") or "private")
         self.prompt_layout = str(self.cfg.get("prompt_layout") or "auto").strip().lower()
-        if self.prompt_layout not in ("auto", "single", "kv_messages"):
+        if self.prompt_layout not in ("auto", "single", "kv_messages", "api_prefix"):
             raise ValueError(
-                f"unknown prompt_layout {self.prompt_layout!r}; expected 'auto', 'single', or 'kv_messages'"
+                f"unknown prompt_layout {self.prompt_layout!r}; expected 'auto', 'single', 'kv_messages', or 'api_prefix'"
             )
         self.watch_terms = [t.lower() for t in (self.cfg.get("watch_terms") or [])]
         self.answer_key = self.cfg.get("answer_key")
@@ -778,16 +805,25 @@ class Chamber:
                 meta_str = f"v{dver}, {dsz}B" if dver else "missing"
                 trail = self.artifacts.recent_history_summary(dname, limit=5) if dver else ""
                 deliv_warnings = list(deliv_det.get("warnings") or [])
+                sec_sizes = deliv_det.get("section_sizes") or {}
+                smallest_line = ""
+                if len(sec_sizes) >= 3:
+                    top_small = sorted(sec_sizes.items(), key=lambda kv: (kv[1], kv[0]))[:3]
+                    smallest_line = "  Smallest sections: " + ", ".join(f"{s} ({sz}B)" for s, sz in top_small)
                 if deliv_ok:
                     status_lines.append(f"Deliverable `{dname}`: READY ({meta_str}, all required sections present)")
                     if trail:
                         status_lines.append(f"  Versions: {trail}")
+                    if smallest_line:
+                        status_lines.append(smallest_line)
                     for warn in deliv_warnings:
                         status_lines.append(f"  - Warning: {warn}")
                 else:
                     status_lines.append(f"Deliverable `{dname}`: INCOMPLETE ({meta_str})")
                     if trail:
                         status_lines.append(f"  Versions: {trail}")
+                    if smallest_line:
+                        status_lines.append(smallest_line)
                     for iss in deliv_issues:
                         status_lines.append(f"  - {iss}")
                     for warn in deliv_warnings:
@@ -843,6 +879,13 @@ class Chamber:
                     for m in self.public_messages if m.speaker == agent.name or
                     self.communication.allows("public", m.speaker, agent.name)]
 
+        ep_provider = (agent.endpoint.get("provider") or "").strip().lower()
+        effective_layout = (
+            "api_prefix"
+            if self.prompt_layout == "auto" and not isinstance(self.backend, HttpBackend) and ep_provider in ("openrouter", "openai")
+            else self.prompt_layout
+        )
+
         messages, accounting = self.ctx_intelligence.assemble_and_budget(
             agent_name=agent.name,
             endpoint=agent.endpoint if isinstance(self.backend, HttpBackend) else {**agent.endpoint, "provider": "mock"},
@@ -857,7 +900,7 @@ class Chamber:
             max_context_chars=int(self.limits["max_context_chars"]),
             agent_context_chars=int(agent.context_chars),
             tail_sections=tail_sections,
-            prompt_layout=self.prompt_layout,
+            prompt_layout=effective_layout,
         )
 
         for diag_msg in accounting.diagnostics:
@@ -949,7 +992,7 @@ class Chamber:
         if "CHALLENGE" in caps:
             cmds.append("@CHALLENGE <c1|c2|...>: <objection>  (use exact board ID, e.g. c1)")
         if "RESOLVE" in caps:
-            cmds.append("@RESOLVE <c1|c2|...>: <verification rationale>  (clears dispute on resolved claim)")
+            cmds.append("@RESOLVE <c1|c2|...>: <verification rationale>  (ONLY for DISPUTED claims; use @VOTE <id> yes|no for active claims)")
         if "RETRACT" in caps:
             cmds.append("@RETRACT <c1|c2|...>: <why you withdraw your claim>")
         if "VOTE" in caps:
@@ -1048,6 +1091,7 @@ class Chamber:
                 stops=stops,
                 seed=self.seed + self.turn,
                 reasoning=reasoning,
+                session_id=f"chamber-{self.run_id}"[:128],
             )
 
             attempts = 0
@@ -1230,12 +1274,31 @@ class Chamber:
 
         self._turn_replaced_artifacts.clear()
         self._turn_board_touched.clear()
+        trunc_guard_act = (
+            parsed.actions[-1]
+            if (
+                parsed.truncated
+                and parsed.actions
+                and str(parsed.actions[-1].get("type") or "").upper() == "ARTIFACT_WRITE"
+                and str(parsed.actions[-1].get("mode") or "append").lower() != "revert"
+            )
+            else None
+        )
         try:
             for idx, act in enumerate(deduped_actions):
                 if idx >= max_act:
                     self._record(agent.name, act.get("type", "UNKNOWN"), "rejected",
                                  detail=f"exceeded max_actions_per_response ({max_act}); keep <= {max_act} actions per turn")
                     continue
+                if trunc_guard_act is not None and act is trunc_guard_act:
+                    trunc_reason = _looks_truncated_artifact_content(str(act.get("content") or ""))
+                    if trunc_reason:
+                        self._record(
+                            agent.name, "ARTIFACT_WRITE", "rejected",
+                            target=str(act.get("name") or ""),
+                            detail=f"truncated trailing write rejected ({trunc_reason}); re-emit complete update on next turn",
+                        )
+                        continue
                 self._apply_action(agent, act)
             if parsed.message:
                 self._check_resurrection(agent.name, parsed.message, exempt_claim_ids=set(self._turn_board_touched))
@@ -1482,7 +1545,7 @@ class Chamber:
                 return
             if item.status != "disputed":
                 self._record(agent.name, atype, "rejected", target=tgt,
-                             detail=f"{tgt} is currently {item.status} (not disputed)")
+                             detail=f"{tgt} is currently {item.status} (not disputed); @RESOLVE is only for disputed claims — use @VOTE {tgt} yes|no for active claims")
                 return
             rationale = str(act.get("content") or "").strip()[: int(lim["max_item_chars"])]
             if not rationale:
@@ -2162,7 +2225,12 @@ class Chamber:
                 ctx, accounting = self.build_context(ag)
                 self.token_accounting_history.append(accounting.to_dict())
 
-                stops = [f"\n{n}:" for n in self.agent_order if n != speaker] + ["\n--- Public Conversation"]
+                stops = [
+                    "\n--- Public Conversation",
+                    "\n--- Shared Blackboard",
+                    "\n--- Session Status",
+                    "\n--- Workspace Artifacts",
+                ]
 
                 try:
                     if ag.endpoint.get("enforce_context_budget") and (
@@ -2413,6 +2481,7 @@ class Chamber:
         doc_audit = self._compute_doc_citation_audit()
 
         return dict(
+            run_id=self.run_id,
             turns_completed=len(self.public_messages),
             requests_used=self.requests_used,
             retries_used=self.retries_used,

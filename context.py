@@ -212,12 +212,18 @@ class ContextIntelligence:
         endpoint), public turns are emitted as separate user messages before a final
         user message containing the mutable per-agent tail, allowing SWA checkpoint
         backends to cache the growing shared conversation prefix across turns.
+
+        When ``prompt_layout`` is ``"api_prefix"`` (or ``"auto"`` on ``openrouter``/
+        ``openai`` endpoints), static ``system_sections`` and ``fixed_sections`` are
+        consolidated into ``messages[0]`` (``system``) and dynamic public transcript +
+        per-agent tail into ``messages[1]`` (``user``), keeping a strict ``[system, user]``
+        message sequence with a large, turn-invariant shared cache prefix.
         """
         margin = safety_margin if safety_margin is not None else self.default_safety_margin
+        provider = (endpoint.get("provider") or "").strip().lower()
         layout = (prompt_layout or "single").strip().lower()
-        use_kv_messages = (layout == "kv_messages") or (
-            layout == "auto" and endpoint.get("provider") == "llamacpp"
-        )
+        use_kv_messages = (layout == "kv_messages") or (layout == "auto" and provider == "llamacpp")
+        use_api_prefix = (layout == "api_prefix") or (layout == "auto" and provider in ("openrouter", "openai"))
 
         # Adjust reserved output if context window is tight
         actual_reserved = min(reserved_output, max(128, effective_context // 2))
@@ -317,9 +323,9 @@ class ContextIntelligence:
                 used_chars += len(line) + 2
                 used_tokens += effective_line_tok
 
-        # In kv_messages layout, evict omitted turns in cache-friendly strides so the
-        # remaining prefix stays bit-identical across consecutive turns for SWA checkpoints.
-        if use_kv_messages and omitted > 0 and kv_evict_stride > 1 and len(formatted_msgs) > kv_evict_stride:
+        # In kv_messages and api_prefix layouts, evict omitted turns in cache-friendly strides so the
+        # remaining prefix stays bit-identical across consecutive turns for cache checkpoints.
+        if (use_kv_messages or use_api_prefix) and omitted > 0 and kv_evict_stride > 1 and len(formatted_msgs) > kv_evict_stride:
             target_omitted = ((omitted + kv_evict_stride - 1) // kv_evict_stride) * kv_evict_stride
             if target_omitted < len(formatted_msgs):
                 extra_drop = target_omitted - omitted
@@ -362,6 +368,16 @@ class ContextIntelligence:
                 final_parts.append(f"Your turn ({agent_name}):")
                 messages.append({"role": "user", "content": "\n\n".join(final_parts)})
             framing_overhead = 4 * max(0, len(messages) - 2)
+        elif use_api_prefix:
+            sys_full = "\n\n".join(p for p in (system_content, fixed_prompt_text) if p)
+            user_parts = [f"--- Public Conversation ---\n{transcript_block}"]
+            if tail_prompt_text:
+                user_parts.append(tail_prompt_text)
+            user_parts.append(f"Your turn ({agent_name}):")
+            messages = [
+                {"role": "system", "content": sys_full},
+                {"role": "user", "content": "\n\n".join(user_parts)},
+            ]
         else:
             user_parts = []
             if fixed_prompt_text:

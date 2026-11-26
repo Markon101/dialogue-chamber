@@ -406,6 +406,18 @@ def find_internal_subsection_duplicates(text: str):
     return findings
 
 
+def _strip_trailing_attribution(text: str, agent: str) -> str:
+    """Remove redundant trailing agent attribution line(s) before appending harness attribution."""
+    if not text or not agent:
+        return text
+    pat = re.compile(
+        rf"(?:\n+[ \t]*[*_]*(?:—|–|--)[ \t]*[*_]*{re.escape(str(agent))}[*_]*(?:[ \t]*,[ \t]*turn[ \t]+\d+)?[*_]*[ \t]*)+$",
+        re.I,
+    )
+    stripped = pat.sub("", text.rstrip()).rstrip()
+    return stripped if stripped else text.strip()
+
+
 class ArtifactError(Exception):
     """An artifact operation was refused."""
 
@@ -660,8 +672,13 @@ class ArtifactManager:
         except ArtifactError as e:
             self.log.append(dict(turn=turn, agent=agent, op=str(mode)[:16], name=str(name)[:60], version=None, ok=False, detail=str(e)))
             raise
-        self.log.append(dict(turn=turn, agent=agent, op=mode, name=fname, version=version, ok=True,
-                             detail=f"{len(content)} chars -> {size}B"))
+        log_entry = dict(
+            turn=turn, agent=agent, op=mode, name=fname, version=version, ok=True,
+            detail=f"{len(content)} chars -> {size}B",
+        )
+        if mode in ("replace_section", "append_section") and section:
+            log_entry["section"] = CONTROL_CHARS.sub("", str(section)).strip()
+        self.log.append(log_entry)
         return fname, version
 
     def _write(self, agent, name, mode, content, expected_version, turn, attribution,
@@ -753,14 +770,15 @@ class ArtifactManager:
                 new = (f"{first_hdg}\n\n{rest_norm}" if rest_norm else first_hdg) + "\n"
         elif mode == "append" and exists:
             old = self._read_file(path, max_bytes=art_limit)
-            dup_reason = find_duplicate_append_reason(old, content.strip(), check_headings=False)
+            append_body = _strip_trailing_attribution(content.strip(), agent) if attribution else content.strip()
+            dup_reason = find_duplicate_append_reason(old, append_body, check_headings=False)
             if dup_reason:
                 raise ArtifactError(
                     f"{fname} append rejected: {dup_reason}. "
                     f"Consolidate existing text with @SECTION or @REPLACE instead of appending a duplicate."
                 )
             note = f"\n\n— *{agent}, turn {turn}*" if attribution else ""
-            new = old.rstrip("\n") + "\n\n" + content.strip() + note + "\n"
+            new = old.rstrip("\n") + "\n\n" + append_body + note + "\n"
         else:
             new = content.strip() + "\n"
 
@@ -1043,6 +1061,42 @@ def validate_artifact(manager: ArtifactManager, spec: dict):
             f"consolidate or @REVERT."
         )
 
+    section_owners = spec.get("section_owners") if isinstance(spec.get("section_owners"), dict) else {}
+    enforce_owners = bool(spec.get("enforce_section_owners", False))
+    unauthored_by_owner = {}
+    if section_owners:
+        for sec_key, expected_owner in section_owners.items():
+            owner_str = str(expected_owner or "").strip()
+            if not owner_str or sec_key in missing_sections or sec_key in empty_sections:
+                continue
+            owner_norm = owner_str.upper()
+            owner_pat = section_heading_regex(sec_key)
+            authored = False
+            for entry in manager.log:
+                if not entry.get("ok") or entry.get("name") != fname:
+                    continue
+                if str(entry.get("agent") or "").strip().upper() != owner_norm:
+                    continue
+                op = str(entry.get("op") or "").lower()
+                if op in ("replace", "create"):
+                    authored = True
+                    break
+                if op in ("replace_section", "append_section") and entry.get("section"):
+                    if owner_pat.match(str(entry["section"]).strip()):
+                        authored = True
+                        break
+            if not authored:
+                unauthored_by_owner[sec_key] = owner_str
+                if enforce_owners:
+                    issues.append(
+                        f"{fname} section {sec_key} has not been authored by designated owner {owner_str} "
+                        f"(only peer additions or seed); {owner_str} must write it via @SECTION."
+                    )
+                else:
+                    warnings.append(
+                        f"{fname} section {sec_key} has not yet been authored by designated owner {owner_str}."
+                    )
+
     details = {
         "artifact": fname,
         "version": version,
@@ -1057,6 +1111,7 @@ def validate_artifact(manager: ArtifactManager, spec: dict):
         "thin_sections": thin_sections,
         "referee_sections": referee_sections,
         "section_sizes": section_sizes,
+        "unauthored_by_owner": unauthored_by_owner,
         "warnings": warnings,
     }
     return (len(issues) == 0), issues, details

@@ -70,6 +70,7 @@ def build_payload(
     stops: Optional[List[str]] = None,
     seed: Optional[int] = None,
     reasoning: Optional[str] = None,
+    session_id: Optional[str] = None,
 ) -> Tuple[Dict[str, Any], str]:
     """Constructs OpenAI-compatible chat completion payload with backend-specific reasoning kwargs.
 
@@ -108,6 +109,8 @@ def build_payload(
             reasoning_mode_label = f"boolean_thinking:{'on' if enable else 'off'}"
     elif provider == "openrouter":
         p["usage"] = {"include": True}  # Request OpenRouter usage & cost details
+        if session_id:
+            p["session_id"] = str(session_id)[:128]
         if mode == "off":
             p["reasoning"] = {"enabled": False}
             reasoning_mode_label = "effort:off"
@@ -117,6 +120,9 @@ def build_payload(
         elif mode:
             p["reasoning"] = {"enabled": True}
             reasoning_mode_label = "effort:on"
+    elif provider == "openai":
+        if session_id:
+            p["prompt_cache_key"] = str(session_id)[:128]
 
     if agent_cfg.get("structured"):
         p["response_format"] = {
@@ -170,6 +176,9 @@ class HttpBackend:
         if provider == "openrouter":
             headers["HTTP-Referer"] = "https://github.com/dialogue-chamber"
             headers["X-Title"] = "Dialogue Chamber"
+            sid = payload.get("session_id")
+            if sid:
+                headers["x-session-id"] = str(sid)[:128]
 
         url = endpoint["base_url"].rstrip("/") + "/chat/completions"
         req = urllib.request.Request(url, json.dumps(payload).encode("utf-8"), headers)
@@ -227,6 +236,12 @@ class HttpBackend:
         if isinstance(prompt_details.get("cached_tokens"), int):
             cached_tokens = prompt_details["cached_tokens"]
             cache_source = "usage.prompt_tokens_details.cached_tokens"
+        elif isinstance(usage.get("prompt_cache_hit_tokens"), int):
+            cached_tokens = usage["prompt_cache_hit_tokens"]
+            cache_source = "usage.prompt_cache_hit_tokens"
+        elif isinstance(usage.get("cache_read_input_tokens"), int):
+            cached_tokens = usage["cache_read_input_tokens"]
+            cache_source = "usage.cache_read_input_tokens"
         elif timings is not None and isinstance(timings.get("cache_n"), int):
             cached_tokens = timings["cache_n"]
             cache_source = "timings.cache_n"

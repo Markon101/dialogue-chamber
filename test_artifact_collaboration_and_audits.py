@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """Regression tests for section-level artifact collaboration, replace guards, citation audits, and scheduling hygiene."""
+import io
 import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from anomaly_lab import AnomalyLaboratory
 from artifacts import ArtifactError, ArtifactManager, find_section_span, normalize_escaped_newlines, validate_artifact
 from chamber import Chamber
 from context import ContextIntelligence
 from documents import DocumentLibrary
-from inference import MockBackend, Result
+from inference import HttpBackend, MockBackend, Result, build_payload
 from protocol import canonicalize_agent_id, parse_reply
 
 
@@ -1119,6 +1121,407 @@ class ArtifactCollaborationAndAuditsTests(unittest.TestCase):
         fixed_v6 = normalize_escaped_newlines(v6_mono)
         self.assertNotIn("\\n\\n", fixed_v6)
         self.assertIn(r"\mathcal{C}_{lift}", fixed_v6)
+
+    def test_api_prefix_caching_and_openrouter_sticky_routing(self):
+        # 1. Provider-specific sticky session / cache keys in build_payload
+        msgs_dummy = [{"role": "system", "content": "Sys"}, {"role": "user", "content": "Hi"}]
+        or_ep = {"provider": "openrouter", "model": "deepseek/deepseek-chat", "base_url": "https://openrouter.ai/api/v1"}
+        oa_ep = {"provider": "openai", "model": "gpt-5", "base_url": "https://api.openai.com/v1"}
+        lc_ep = {"provider": "llamacpp", "model": "gemma-4", "base_url": "http://127.0.0.1:8080/v1"}
+
+        p_or, _ = build_payload(or_ep, {}, msgs_dummy, 0.7, 512, session_id="chamber-or-test")
+        p_oa, _ = build_payload(oa_ep, {}, msgs_dummy, 0.7, 512, session_id="chamber-oa-test")
+        p_lc, _ = build_payload(lc_ep, {}, msgs_dummy, 0.7, 512, session_id="chamber-lc-test")
+        self.assertEqual(p_or.get("session_id"), "chamber-or-test")
+        self.assertNotIn("prompt_cache_key", p_or)
+        self.assertEqual(p_oa.get("prompt_cache_key"), "chamber-oa-test")
+        self.assertNotIn("session_id", p_oa)
+        self.assertNotIn("session_id", p_lc)
+        self.assertNotIn("prompt_cache_key", p_lc)
+
+        # 2. HttpBackend.complete sends x-session-id header & parses cache hit fallbacks
+        captured = {}
+
+        class _FakeHTTPResp(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                self.close()
+
+        def _make_urlopen(resp_obj):
+            def _fake_urlopen(req, timeout=120):
+                captured["headers"] = {k.lower(): v for k, v in req.header_items()}
+                captured["body"] = json.loads(req.data.decode("utf-8"))
+                return _FakeHTTPResp(json.dumps(resp_obj).encode("utf-8"))
+            return _fake_urlopen
+
+        backend_http = HttpBackend(allow_paid=True)
+        with patch.dict("os.environ", {"TEST_OR_KEY": "sk-test-secret"}), patch(
+            "urllib.request.urlopen",
+            side_effect=_make_urlopen({
+                "model": "deepseek/deepseek-chat",
+                "choices": [{"message": {"content": "Reply"}, "finish_reason": "stop"}],
+                "usage": {"prompt_tokens": 2000, "completion_tokens": 50, "prompt_cache_hit_tokens": 1800},
+            }),
+        ):
+            res_ds = backend_http.complete(
+                "ALPHA",
+                {**or_ep, "api_key_env": "TEST_OR_KEY"},
+                p_or,
+            )
+        self.assertEqual(captured["headers"].get("x-session-id"), "chamber-or-test")
+        self.assertEqual(captured["body"].get("session_id"), "chamber-or-test")
+        self.assertEqual(res_ds.cached_tokens, 1800)
+        self.assertEqual(res_ds.cache_source, "usage.prompt_cache_hit_tokens")
+
+        with patch.dict("os.environ", {"TEST_OR_KEY": "sk-test-secret"}), patch(
+            "urllib.request.urlopen",
+            side_effect=_make_urlopen({
+                "model": "anthropic/claude-sonnet",
+                "choices": [{"message": {"content": "Reply"}, "finish_reason": "stop"}],
+                "usage": {"prompt_tokens": 2000, "completion_tokens": 50, "cache_read_input_tokens": 1600},
+            }),
+        ):
+            res_anth = backend_http.complete(
+                "ALPHA",
+                {**or_ep, "api_key_env": "TEST_OR_KEY"},
+                p_or,
+            )
+        self.assertEqual(res_anth.cached_tokens, 1600)
+        self.assertEqual(res_anth.cache_source, "usage.cache_read_input_tokens")
+
+        # 3. ContextIntelligence api_prefix & auto(openrouter) consolidates static system+fixed prefix + stride eviction
+        ctx = ContextIntelligence(default_safety_margin=100)
+        sys_sec = {"preamble": "Chamber invariant rules.", "protocol": "Commands go at bottom."}
+        fixed_sec = {"topic": "Topic: Dedekind ERH.", "doc_manifest": "Docs: manifest entries."}
+        tail_a = {"agent_identity": "You are ALPHA.", "scratchpad": "ALPHA note."}
+        tail_b = {"agent_identity": "You are BETA.", "scratchpad": "BETA note."}
+
+        t1, _ = ctx.assemble_and_budget(
+            agent_name="ALPHA",
+            endpoint={"provider": "openrouter"},
+            system_sections=sys_sec,
+            fixed_sections=fixed_sec,
+            public_messages=[],
+            effective_context=32768,
+            context_source="config",
+            tail_sections=tail_a,
+            prompt_layout="auto",
+        )
+        t2, _ = ctx.assemble_and_budget(
+            agent_name="BETA",
+            endpoint={"provider": "mock"},
+            system_sections=sys_sec,
+            fixed_sections=fixed_sec,
+            public_messages=[{"id": "m1", "turn": 1, "speaker": "ALPHA", "content": "Initial extraction."}],
+            effective_context=32768,
+            context_source="config",
+            tail_sections=tail_b,
+            prompt_layout="api_prefix",
+        )
+        self.assertEqual([m["role"] for m in t1], ["system", "user"])
+        self.assertEqual([m["role"] for m in t2], ["system", "user"])
+        self.assertEqual(t1[0]["content"], t2[0]["content"])
+        self.assertIn("Chamber invariant rules.", t1[0]["content"])
+        self.assertIn("Topic: Dedekind ERH.", t1[0]["content"])
+        self.assertTrue(t2[1]["content"].startswith("--- Public Conversation ---\n[m1 | turn 1] ALPHA: Initial extraction."))
+
+        many_msgs = [
+            {"id": f"m{i}", "turn": i, "speaker": "ALPHA" if i % 2 else "BETA", "content": f"Msg #{i} " + ("weil form " * 18)}
+            for i in range(1, 30)
+        ]
+        trim_28, acc_28 = ctx.assemble_and_budget(
+            agent_name="ALPHA",
+            endpoint={"provider": "openrouter"},
+            system_sections=sys_sec,
+            fixed_sections=fixed_sec,
+            public_messages=many_msgs[:-1],
+            effective_context=1200,
+            context_source="config",
+            reserved_output=400,
+            safety_margin=100,
+            tail_sections=tail_a,
+            prompt_layout="auto",
+            kv_evict_stride=8,
+        )
+        trim_29, acc_29 = ctx.assemble_and_budget(
+            agent_name="BETA",
+            endpoint={"provider": "openrouter"},
+            system_sections=sys_sec,
+            fixed_sections=fixed_sec,
+            public_messages=many_msgs,
+            effective_context=1200,
+            context_source="config",
+            reserved_output=400,
+            safety_margin=100,
+            tail_sections=tail_b,
+            prompt_layout="auto",
+            kv_evict_stride=8,
+        )
+        self.assertEqual(acc_28.omitted_messages_count % 8, 0)
+        if acc_28.omitted_messages_count == acc_29.omitted_messages_count:
+            # Shared conversation prefix stays identical before tail when stride does not advance
+            pub_28 = trim_28[1]["content"].split("\n\nYou are ")[0]
+            self.assertTrue(trim_29[1]["content"].startswith(pub_28))
+
+        # 4. End-to-end Chamber with OpenRouter endpoint & prompt_layout="auto"
+        cfg = {
+            "name": "openrouter_prefix_cache_e2e",
+            "run_id": "or_prefix_run_01",
+            "topic": "Verify API prefix caching & session_id.",
+            "scheduler": "round_robin",
+            "prompt_layout": "auto",
+            "endpoints": {
+                "hermes": {
+                    "provider": "openrouter",
+                    "remote": False,
+                    "base_url": "https://openrouter.ai/api/v1",
+                    "model": "deepseek/deepseek-chat",
+                }
+            },
+            "limits": {"max_turns": 2},
+            "agents": [
+                {"name": "ALPHA", "endpoint": "hermes", "capabilities": "full", "identity": "You are ALPHA."},
+                {"name": "BETA", "endpoint": "hermes", "capabilities": "full", "identity": "You are BETA."},
+            ],
+        }
+        mock_be = MockBackend({"ALPHA": ["Opening theorem statement."], "BETA": ["Confirmed theorem statement."]})
+        ch = Chamber(cfg, run_dir=self.root / "or_prefix_e2e", backend=mock_be, quiet=True, copy_dir="").run()
+        self.assertEqual(len(mock_be.calls), 2)
+        p1, p2 = mock_be.calls[0][1], mock_be.calls[1][1]
+        self.assertEqual(p1.get("session_id"), "chamber-or_prefix_run_01")
+        self.assertEqual(p2.get("session_id"), "chamber-or_prefix_run_01")
+        self.assertEqual([m["role"] for m in p1["messages"]], ["system", "user"])
+        self.assertEqual([m["role"] for m in p2["messages"]], ["system", "user"])
+        self.assertEqual(p1["messages"][0]["content"], p2["messages"][0]["content"])
+        self.assertIn("Topic: Verify API prefix caching", p1["messages"][0]["content"])
+        self.assertEqual(ch.compute_metrics()["run_id"], "or_prefix_run_01")
+
+    def test_stop_sequences_exclude_peer_names(self):
+        cfg = {
+            "name": "stops_test",
+            "topic": "Verify stops exclude peer names.",
+            "scheduler": "round_robin",
+            "limits": {"max_turns": 2},
+            "agents": [
+                {"name": "ALPHA", "endpoint": "local", "capabilities": "full"},
+                {"name": "PROSE_BRIDGE_LEAD", "endpoint": "local", "capabilities": "full"},
+            ],
+        }
+        backend = MockBackend({
+            "ALPHA": ["Line one.\nPROSE_BRIDGE_LEAD: please verify Lemma 2.1.\n@NOTE: follow up"],
+            "PROSE_BRIDGE_LEAD": ["Verified Lemma 2.1 cleanly."],
+        })
+        ch = Chamber(cfg, run_dir=self.root / "stops_run", backend=backend, quiet=True, copy_dir="").run()
+        stops = backend.calls[0][1].get("stop") or []
+        self.assertNotIn("\nPROSE_BRIDGE_LEAD:", stops)
+        self.assertNotIn("\nALPHA:", stops)
+        self.assertIn("\n--- Public Conversation", stops)
+        self.assertIn("\n--- Shared Blackboard", stops)
+        self.assertIn("\n--- Session Status", stops)
+        self.assertIn("\n--- Workspace Artifacts", stops)
+        self.assertEqual(ch.agents["ALPHA"].note, "follow up")
+
+    def test_truncated_trailing_artifact_write_guard(self):
+        cfg = {
+            "name": "trunc_guard_test",
+            "topic": "Reject truncated trailing artifact writes while preserving earlier valid actions.",
+            "scheduler": "round_robin",
+            "artifacts": {
+                "seed": {"notes": "# Notes\n\nSeed line.\n"},
+                "visible": ["notes"],
+            },
+            "limits": {"max_turns": 4},
+            "agents": [
+                {"name": "ALPHA", "endpoint": "local", "capabilities": "full"},
+                {"name": "BETA", "endpoint": "local", "capabilities": "full"},
+            ],
+        }
+        mid_word = "This theorem statement keeps rolling across lines until it gets sliced mid sentence without any closing mark " * 2
+        backend = MockBackend({
+            "ALPHA": [
+                Result(
+                    content=(
+                        "Logging note first, then starting append that hits length.\n"
+                        "@NOTE: preserved note before truncated write\n"
+                        "@APPEND notes: Extracted bound [connes_"
+                    ),
+                    finish_reason="length",
+                    prompt_tokens=100,
+                    completion_tokens=400,
+                ),
+                Result(
+                    content="@APPEND notes: Complete interval $x \\in [0, 1)$ verified cleanly.",
+                    finish_reason="stop",
+                    prompt_tokens=120,
+                    completion_tokens=60,
+                ),
+            ],
+            "BETA": [
+                Result(
+                    content=(
+                        "Second turn tests unclosed fence and mid-word ending.\n"
+                        "@APPEND notes: ```python\nx = 1"
+                    ),
+                    finish_reason="length",
+                    prompt_tokens=110,
+                    completion_tokens=300,
+                ),
+                Result(
+                    content=f"@APPEND notes: {mid_word.rstrip()}",
+                    finish_reason="length",
+                    prompt_tokens=120,
+                    completion_tokens=300,
+                ),
+            ],
+        })
+        ch = Chamber(cfg, run_dir=self.root / "trunc_run", backend=backend, quiet=True, copy_dir="").run()
+        # Earlier valid @NOTE executed on Turn 1; all three truncated trailing writes were rejected!
+        self.assertEqual(ch.agents["ALPHA"].note, "preserved note before truncated write")
+        rejected_writes = [
+            e for e in ch.events
+            if e.type == "ARTIFACT_WRITE" and e.status == "rejected" and "truncated trailing write rejected" in e.detail
+        ]
+        self.assertEqual(len(rejected_writes), 3)
+        # Only Turn 3 complete finish_reason="stop" write (even with [0, 1)) succeeded (notes goes v1 -> v2)
+        self.assertEqual(ch.artifacts.versions["notes.md"], 2)
+        text = ch.artifacts.read("BETA", "notes")[2]
+        self.assertNotIn("[connes_", text)
+        self.assertIn("x \\in [0, 1)", text)
+
+    def test_action_divider_and_double_attribution_dedup(self):
+        # 1. Standalone --- actions --- divider closes preceding multiline append & is stripped from speech
+        p = parse_reply(
+            "Opening discussion.\n\n---\n\nKept divider rule above.\n\n--- actions ---\n"
+            "@APPEND notes: First line of note\nSecond line of note\n"
+            "=== ACTION ===\n"
+            "@NOTE: clean scratchpad\n"
+            "NEXT: BETA",
+            me="ALPHA",
+            names=("ALPHA", "BETA"),
+        )
+        self.assertEqual(p.issues, [])
+        self.assertIn("---", p.message)
+        self.assertNotIn("actions ---", p.message)
+        self.assertEqual(p.next_speaker, "BETA")
+        self.assertEqual([a["type"] for a in p.actions], ["ARTIFACT_WRITE", "UPDATE_NOTE"])
+        self.assertEqual(p.actions[0]["content"], "First line of note\nSecond line of note")
+        self.assertEqual(p.actions[1]["content"], "clean scratchpad")
+
+        # 2. @APPEND double-attribution dedup
+        mgr = ArtifactManager(self.root / "attrib_arts")
+        mgr.write("ALPHA", "ledger", "create", "# Ledger\n\nInitial row.", turn=0, attribution=False)
+        mgr.write(
+            "ALPHA",
+            "ledger",
+            "append",
+            "| A | B | C | [doc @ 10] |\n\n— *ALPHA, turn 4*",
+            turn=4,
+            attribution=True,
+        )
+        stored = mgr.read("ALPHA", "ledger")[2]
+        self.assertEqual(stored.count("— *ALPHA, turn 4*"), 1)
+
+    def test_section_owners_smallest_sections_resolve_hint_and_run_id(self):
+        long_a = "Verified primary proof derivation of H0-H12 and Estimate C bounds. " * 10
+        peer_only_b = "Peer commentary on sixfold covering obstruction [gan_ichino_2014_ggp @ 53250]."
+        ref_ok = (
+            "### Audit Findings\n"
+            "Verified primary LaTeX theorems, kernel hashes, Banks Theorem 1.3 exponents, and Grenie-Molteni bounds."
+        )
+        spec_warn = {
+            "artifact": "monograph",
+            "require_modified": True,
+            "min_bytes": 500,
+            "section_owners": {
+                "[Section Alpha]": "ALPHA",
+                "[Section Beta]": "BETA",
+                "[Red-Team Referee Report]": "CHAIR",
+            },
+            "enforce_section_owners": False,
+            "required_sections": ["[Section Alpha]", "[Section Beta]", "[Red-Team Referee Report]"],
+        }
+        mgr = ArtifactManager(self.root / "owner_arts")
+        mgr.write(
+            "SYSTEM", "monograph", "create",
+            "# Mono\n\n## [Section Alpha]\n\n## [Section Beta]\n\n## [Red-Team Referee Report]\n",
+            turn=0, attribution=False,
+        )
+        mgr.read("ALPHA", "monograph", turn=1)
+        mgr.write("ALPHA", "monograph", "replace_section", long_a, section="[Section Alpha]", turn=1)
+        # Only ALPHA wrote into [Section Beta] via append_section (designated owner BETA has not authored it!)
+        mgr.write("ALPHA", "monograph", "append_section", peer_only_b, section="[Section Beta]", turn=1)
+        mgr.read("CHAIR", "monograph", turn=1)
+        mgr.write("CHAIR", "monograph", "replace_section", ref_ok, section="[Red-Team Referee Report]", turn=1)
+
+        ok_w, _, det_w = validate_artifact(mgr, spec_warn)
+        self.assertTrue(ok_w)
+        self.assertEqual(det_w["unauthored_by_owner"], {"[Section Beta]": "BETA"})
+        self.assertTrue(any("not yet been authored by designated owner BETA" in w for w in det_w["warnings"]))
+
+        spec_enforce = dict(spec_warn, enforce_section_owners=True)
+        ok_e, issues_e, det_e = validate_artifact(mgr, spec_enforce)
+        self.assertFalse(ok_e)
+        self.assertEqual(det_e["unauthored_by_owner"], {"[Section Beta]": "BETA"})
+        self.assertTrue(any("has not been authored by designated owner BETA" in iss for iss in issues_e))
+
+        # Once BETA authors [Section Beta] via @SECTION, enforcement passes!
+        mgr.read("BETA", "monograph", turn=2)
+        mgr.write(
+            "BETA", "monograph", "replace_section",
+            "Authoritative Gan-Ichino GGP derivation by owner BETA.\n\n" + peer_only_b,
+            section="[Section Beta]", turn=2,
+        )
+        ok_e2, issues_e2, det_e2 = validate_artifact(mgr, spec_enforce)
+        self.assertTrue(ok_e2, msg=issues_e2)
+        self.assertEqual(det_e2["unauthored_by_owner"], {})
+
+        # End-to-end Chamber: Smallest sections in Session Status, @RESOLVE hint on active claim, and run_id in metrics
+        cfg = {
+            "name": "owners_and_ux_e2e",
+            "run_id": "ux_metrics_run_08",
+            "topic": "Test smallest sections summary, resolve UX hint, and run_id.",
+            "scheduler": "round_robin",
+            "board_visible": True,
+            "artifacts": {
+                "seed": {
+                    "monograph": "# Mono\n\n## [Section Alpha]\n\n## [Section Beta]\n\n## [Red-Team Referee Report]\n",
+                },
+                "visible": ["monograph"],
+                "validation": spec_enforce,
+            },
+            "limits": {"max_turns": 3},
+            "agents": [
+                {"name": "ALPHA", "endpoint": "local", "capabilities": "full"},
+                {"name": "BETA", "endpoint": "local", "capabilities": "full"},
+                {"name": "CHAIR", "endpoint": "local", "capabilities": "full"},
+            ],
+        }
+        e2e_backend = MockBackend({
+            "ALPHA": [
+                "@CLAIM: Banks effective bound includes d_K^{1/2}\n"
+                f"@SECTION monograph | [Section Alpha]: {long_a}"
+            ],
+            "BETA": [
+                "@RESOLVE c1: Calling resolve on active claim\n"
+                f"@SECTION monograph | [Section Beta]: Authoritative owner derivation. {peer_only_b}"
+            ],
+            "CHAIR": [f"@SECTION monograph | [Red-Team Referee Report]: {ref_ok}"],
+        })
+        run_dir = self.root / "ux_e2e_run"
+        ch = Chamber(cfg, run_dir=run_dir, backend=e2e_backend, quiet=True, copy_dir="").run()
+        # CHAIR Turn 3 Session Status saw Smallest sections summary (>= 3 sections in deliverable)
+        t3_tail = e2e_backend.calls[2][1]["messages"][-1]["content"]
+        self.assertIn("Smallest sections:", t3_tail)
+        # BETA Turn 2 @RESOLVE on active c1 gave clear @VOTE hint
+        self.assertTrue(any(
+            e.type == "RESOLVE" and e.status == "rejected" and "use @VOTE c1 yes|no for active claims" in e.detail
+            for e in ch.events
+        ))
+        # run_id present in compute_metrics() and persisted metrics.json
+        metrics_json = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
+        self.assertEqual(metrics_json["run_id"], "ux_metrics_run_08")
 
 
 if __name__ == "__main__":

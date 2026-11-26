@@ -56,6 +56,7 @@ PROMPT_SECTION_LEAK_RE = re.compile(
     r"^\s*---\s*(?:Workspace Artifacts|Shared Blackboard|Your Private Scratchpad|Private Whispers|Public Conversation|Channel\b).*---\s*$",
     re.I,
 )
+_ACTION_DIVIDER_RE = re.compile(r"^\s*[-=*_]{3,}\s*actions?\s*[-=*_]{3,}\s*$", re.I)
 _FIRST_PERSON_IMPERSONATION_RE = re.compile(
     r"^(?:i\s+(?:confirm|concur|agree|accept|retract|withdraw|have\s+completed|am\s+entering|will\s+update)\b|"
     r"as\s+[A-Za-z0-9_]+\b)",
@@ -838,6 +839,9 @@ def _extract_commands(text: str, p: Parsed, known_names: Optional[Set[str]] = No
     speech, i = [], 0
     while i < len(lines):
         line = lines[i]
+        if _ACTION_DIVIDER_RE.match(line):
+            i += 1
+            continue
         c = CTRL_RE.match(line.strip())
         if c:
             key, val = c.group(1).upper(), c.group(2).strip().strip("*`<>[]\"'. ")
@@ -862,7 +866,7 @@ def _extract_commands(text: str, p: Parsed, known_names: Optional[Set[str]] = No
                 "WORLD", "REVERT", "ARTIFACT_REVERT", "ROLLBACK"
             ):
                 j = i + 1
-                while j < len(lines) and not _is_chamber_command_line(lines[j]) and not _is_valid_ctrl_line(lines[j], known_names):
+                while j < len(lines) and not _is_chamber_command_line(lines[j]) and not _is_valid_ctrl_line(lines[j], known_names) and not _ACTION_DIVIDER_RE.match(lines[j]):
                     after.append(lines[j])
                     j += 1
                 i = j
