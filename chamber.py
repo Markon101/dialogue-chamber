@@ -499,6 +499,14 @@ class Chamber:
                 self.visible_artifacts.append(self.artifacts.normalize(aname))
             except ArtifactError:
                 pass
+        self.artifact_preview_limits: Dict[str, int] = {}
+        raw_prev = art_cfg.get("preview_chars")
+        if isinstance(raw_prev, dict):
+            for k, v in raw_prev.items():
+                try:
+                    self.artifact_preview_limits[self.artifacts.normalize(str(k))] = max(500, int(v))
+                except (ArtifactError, TypeError, ValueError):
+                    pass
 
         # In-memory state collections
         self.public_messages: List[Message] = []
@@ -535,6 +543,7 @@ class Chamber:
         self.deliverable_issues: List[str] = []
         self.pending_validation_feedback: List[str] = []
         self._turn_replaced_artifacts: Set[str] = set()
+        self._turn_replaced_sections: Set[Tuple[str, str]] = set()
         self._turn_board_touched: Set[str] = set()
         self.speaker_transitions: List[Tuple[int, str, str]] = []
         self.resurrection_events: List[dict] = []
@@ -730,7 +739,8 @@ class Chamber:
                     sz_b = len(text.encode("utf-8"))
                     trail = self.artifacts.recent_history_summary(fname, limit=4)
                     trail_line = f"Version history: {trail}\n" if trail else ""
-                    art_blocks.append(f"[Shared Artifact {fname} (v{ver}, {sz_b}B)]\n{trail_line}{preview_artifact(fname, text, limit=preview_limit)}")
+                    art_prev_limit = self.artifact_preview_limits.get(fname, preview_limit)
+                    art_blocks.append(f"[Shared Artifact {fname} (v{ver}, {sz_b}B)]\n{trail_line}{preview_artifact(fname, text, limit=art_prev_limit)}")
                 except ArtifactError:
                     pass
         if "ARTIFACT_WRITE" in agent.capabilities or "ARTIFACT_READ" in agent.capabilities:
@@ -1273,6 +1283,7 @@ class Chamber:
                 deduped_actions.insert(max_act - 1, term_act)
 
         self._turn_replaced_artifacts.clear()
+        self._turn_replaced_sections.clear()
         self._turn_board_touched.clear()
         trunc_guard_act = (
             parsed.actions[-1]
@@ -1304,6 +1315,7 @@ class Chamber:
                 self._check_resurrection(agent.name, parsed.message, exempt_claim_ids=set(self._turn_board_touched))
         finally:
             self._turn_replaced_artifacts.clear()
+            self._turn_replaced_sections.clear()
             self._turn_board_touched.clear()
 
     def _apply_action(self, agent: AgentState, act: dict):
@@ -1771,10 +1783,21 @@ class Chamber:
                 )
                 self._emit(f"  ⏪ artifact {fname} (reverted to v{restored_from} by {agent.name} → v{ver}, {size_bytes}B, {delta_bytes:+d}B)")
             else:
+                sec_turn_key = (
+                    (norm_name, re.sub(r"\s+", " ", str(section or "").strip().strip("[]# ").lower()))
+                    if (mode == "replace_section" and norm_name and section)
+                    else None
+                )
                 if mode == "replace" and not force and norm_name and norm_name in self._turn_replaced_artifacts:
                     self._record(
                         agent.name, atype, "rejected", target=norm_name,
                         detail=f"duplicate @REPLACE on {norm_name} in the same turn ignored to protect your earlier write; combine edits or use @SECTION",
+                    )
+                    return
+                if mode == "replace_section" and not force and sec_turn_key and sec_turn_key in self._turn_replaced_sections:
+                    self._record(
+                        agent.name, atype, "rejected", target=norm_name,
+                        detail=f"duplicate @SECTION on {norm_name} | {section} in the same turn ignored to protect your earlier write; combine edits into one @SECTION call",
                     )
                     return
                 try:
@@ -1787,6 +1810,8 @@ class Chamber:
                     return
                 if mode == "replace":
                     self._turn_replaced_artifacts.add(fname)
+                elif mode == "replace_section" and section:
+                    self._turn_replaced_sections.add((fname, re.sub(r"\s+", " ", str(section or "").strip().strip("[]# ").lower())))
                 try:
                     size_bytes = os.lstat(self.artifacts._path(fname)).st_size
                 except OSError:

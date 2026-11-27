@@ -47,18 +47,30 @@ def section_heading_regex(section_spec: str) -> re.Pattern:
 def find_section_span(text: str, section_spec: str):
     """Find ``(heading_start, heading_end, body_end, level)`` for ``section_spec`` in ``text``.
 
-    Returns ``None`` if no matching section heading exists. ``body_end`` extends to
-    the next Markdown heading of equal/higher level (or next bracketed marker when
+    Prefers the shallowest non-fenced matching heading so an accidentally nested
+    subsection heading never shadows a top-level section heading. ``body_end`` extends
+    to the next Markdown heading of equal/higher level (or next bracketed marker when
     un-hashed), ignoring headings inside fenced code blocks.
     """
     pat = section_heading_regex(section_spec)
-    m = pat.search(text)
-    if not m:
+    candidates = []
+    in_fence = False
+    pos = 0
+    for raw_ln in str(text or "").splitlines(keepends=True):
+        ln_no_nl = raw_ln.rstrip("\r\n")
+        if ln_no_nl.lstrip().startswith(("```", "~~~")):
+            in_fence = not in_fence
+        elif not in_fence and pat.match(ln_no_nl):
+            hm = re.match(r"^[ \t]*(#{1,6})(?=[ \t]|$)", ln_no_nl)
+            match_level = len(hm.group(1)) if hm else 99
+            real_level = match_level if hm else None
+            candidates.append((match_level, pos, pos + len(ln_no_nl), real_level))
+        pos += len(raw_ln)
+    if not candidates:
         return None
-    line_text = text[m.start():m.end()]
-    hm = re.match(r"^[ \t]*(#{1,6})(?=[ \t]|$)", line_text)
-    level = len(hm.group(1)) if hm else None
-    tail = text[m.end():]
+    candidates.sort(key=lambda c: (c[0], c[1]))
+    _, h_start, h_end, level = candidates[0]
+    tail = text[h_end:]
     body_end = len(text)
     in_fence = False
     for lm in re.finditer(r"([^\n]*)", tail):
@@ -66,7 +78,7 @@ def find_section_span(text: str, section_spec: str):
         if not ln:
             continue
         stripped = ln.lstrip()
-        if stripped.startswith("```"):
+        if stripped.startswith(("```", "~~~")):
             in_fence = not in_fence
             continue
         if in_fence:
@@ -74,12 +86,12 @@ def find_section_span(text: str, section_spec: str):
         hm2 = re.match(r"^[ \t]*(#{1,6})[ \t]+\S", ln)
         if hm2:
             if level is None or len(hm2.group(1)) <= level:
-                body_end = m.end() + lm.start()
+                body_end = h_end + lm.start()
                 break
         elif level is None and re.match(r"^[ \t]*\[[^\]\n]{1,120}\](?:[ \t]*[:\-–—].*)?[ \t]*$", ln):
-            body_end = m.end() + lm.start()
+            body_end = h_end + lm.start()
             break
-    return m.start(), m.end(), body_end, level
+    return h_start, h_end, body_end, level
 
 
 def normalize_section_body_headings(body: str, parent_level: int) -> str:
@@ -179,6 +191,37 @@ def _extract_atx_headings(text: str, min_level: int = 3, max_level: int = 6):
         if norm_h:
             out.append((norm_h, raw_h))
     return out
+
+
+def _find_embedded_other_section_heading(body_text: str, other_text: str, max_level: int):
+    """Return a heading in ``body_text`` that collides with a sibling section heading in ``other_text``."""
+    if not body_text or not other_text or max_level < 1:
+        return None
+    other_pats = []
+    seen_norm = set()
+    for norm_h, raw_h in _extract_atx_headings(other_text, min_level=1, max_level=max_level):
+        if norm_h not in seen_norm:
+            seen_norm.add(norm_h)
+            other_pats.append((norm_h, section_heading_regex(raw_h)))
+    if not other_pats:
+        return None
+
+    in_fence = False
+    for ln in str(body_text or "").splitlines():
+        if ln.lstrip().startswith(("```", "~~~")):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        hm = re.match(r"^[ \t]*(#{1,6})[ \t]+(.+?)[ \t]*$", ln)
+        if not hm:
+            continue
+        raw_h = hm.group(2).strip()
+        norm_h = re.sub(r"\s+", " ", raw_h.strip("[]*_")).strip().lower()
+        for other_norm, pat in other_pats:
+            if norm_h == other_norm or pat.match(ln):
+                return raw_h
+    return None
 
 
 def _strip_fences_and_normalize_prose(text: str) -> str:
@@ -734,6 +777,15 @@ class ArtifactManager:
                     canonical_heading = old[h_start:h_end].rstrip("\n")
                     eff_level = level if level is not None else 2
                     body_norm = normalize_section_body_headings(body_without_heading, eff_level)
+                    embedded_other = _find_embedded_other_section_heading(
+                        body_norm, old[:h_start] + "\n" + old[b_end:], max_level=eff_level,
+                    )
+                    if embedded_other:
+                        raise ArtifactError(
+                            f"{fname} {mode} rejected: body embeds heading {embedded_other!r} which already exists "
+                            f"as another section in {fname}; update each section with its own @SECTION command "
+                            f"instead of nesting it inside {sec_spec}."
+                        )
                     if mode == "append_section":
                         dup_reason = find_duplicate_append_reason(
                             old[h_end:b_end],
@@ -750,8 +802,25 @@ class ArtifactManager:
                         existing_block = old[h_start:b_end].rstrip("\n")
                         section_block = f"{existing_block}\n\n{body_norm}" if body_norm else existing_block
                     else:
+                        if not force:
+                            old_sec_bytes = len(old[h_end:b_end].strip().encode("utf-8"))
+                            new_sec_bytes = len(body_norm.encode("utf-8"))
+                            if old_sec_bytes >= 300 and is_placeholder_stub(body_norm):
+                                raise ArtifactError(
+                                    f"{fname} replace_section rejected: replacement for {sec_spec} looks like a "
+                                    f"placeholder/meta-stub rather than full section content."
+                                )
+                            if min_replace_ratio and old_sec_bytes >= 1000:
+                                min_sec_allowed = max(250, int(old_sec_bytes * float(min_replace_ratio)))
+                                if new_sec_bytes < min_sec_allowed:
+                                    raise ArtifactError(
+                                        f"{fname} replace_section rejected: would shrink {sec_spec} from "
+                                        f"{old_sec_bytes}B to {new_sec_bytes}B (< {int(float(min_replace_ratio) * 100)}% "
+                                        f"of current section size); preserve verified content when consolidating or "
+                                        f"use @APPEND_SECTION to add new subsections."
+                                    )
                         section_block = f"{canonical_heading}\n\n{body_norm}" if body_norm else canonical_heading
-                    parts = [old[:h_start].rstrip("\n"), section_block, old[b_end:].lstrip("\n")]
+                    parts = [old[:h_start].rstrip("\n"), section_block, old[b_end:].strip("\n")]
                     new = "\n\n".join(p for p in parts if p) + "\n"
                 else:
                     heading_line = sec_spec if sec_spec.startswith(("#", "[")) else f"## {sec_spec}"
@@ -900,6 +969,12 @@ SECTION_STUB_PATTERNS = (
 REFEREE_SECTION_RE = re.compile(r"\b(?:referee|red[- ]?team|final\s+audit|verification\s+report)\b", re.I)
 
 
+_META_STUB_PATTERNS = (
+    r"^\(?this\s+section\s+(?:is|has\s+been|will\s+be)\s+(?:replaced|updated|expanded|populated|moved)\b",
+    r"^\(?(?:see|refer\s+to)\s+(?:the\s+)?(?:content|text|section|body)\s+(?:above|below)\b",
+)
+
+
 def is_placeholder_stub(text: str) -> bool:
     """Return True if ``text`` is an unfilled template or stub replacement rather than full content."""
     s = str(text or "").strip()
@@ -908,7 +983,7 @@ def is_placeholder_stub(text: str) -> bool:
     if re.fullmatch(r"<[^<>\n]{1,160}>", s):
         return True
     if len(s) < 250:
-        for pat in DEFAULT_PLACEHOLDER_PATTERNS:
+        for pat in DEFAULT_PLACEHOLDER_PATTERNS + _META_STUB_PATTERNS:
             if re.search(pat, s, re.I):
                 return True
         if re.fullmatch(r"\[(?:END|DONE|COMPLETE|FINAL)[^\]]*\]", s, re.I):

@@ -1523,6 +1523,162 @@ class ArtifactCollaborationAndAuditsTests(unittest.TestCase):
         metrics_json = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
         self.assertEqual(metrics_json["run_id"], "ux_metrics_run_08")
 
+    def test_cross_section_nesting_guard_and_shallowest_span_and_no_newline_bloat(self):
+        # 1. Cross-section heading collision guard prevents nesting a sibling section heading
+        mgr = ArtifactManager(self.root / "nest_arts")
+        seed = (
+            "# Monograph\n\n"
+            "## [Executive Overview]\nInitial overview.\n\n"
+            "## [Red-Team Referee Report]\nInitial referee.\n"
+        )
+        mgr.write("SYSTEM", "monograph", "create", seed, turn=0, attribution=False)
+        mgr.read("CHAIR", "monograph", turn=1)
+
+        with self.assertRaises(ArtifactError) as ctx_nest:
+            mgr.write(
+                "CHAIR", "monograph", "replace_section",
+                "### Synthesis\nOverview body.\n\n## [Red-Team Referee Report]\nEmbedded referee text.",
+                section="[Executive Overview]", turn=1,
+            )
+        self.assertIn("embeds heading", str(ctx_nest.exception))
+        self.assertIn("own @SECTION command", str(ctx_nest.exception))
+
+        with self.assertRaises(ArtifactError) as ctx_app_nest:
+            mgr.write(
+                "CHAIR", "monograph", "append_section",
+                "### [Red-Team Referee Report]\nEmbedded inside append_section.",
+                section="[Executive Overview]", turn=1,
+            )
+        self.assertIn("embeds heading", str(ctx_app_nest.exception))
+
+        # 2. Repeated replace_section edits on an earlier section must NOT accumulate trailing blank lines (+1B bloat)
+        for t in range(1, 7):
+            mgr.read("CHAIR", "monograph", turn=t)
+            mgr.write(
+                "CHAIR", "monograph", "replace_section",
+                f"### Synthesis Pass {t}\nClean overview text without trailing blank line drift.",
+                section="[Executive Overview]", turn=t,
+            )
+        final_text = mgr.read("CHAIR", "monograph", turn=7)[2]
+        self.assertTrue(final_text.endswith("\n"))
+        self.assertFalse(final_text.endswith("\n\n"))
+
+        # 3. find_section_span selects shallowest non-fenced heading and ignores fenced code headings
+        tricky = (
+            "# Master\n\n"
+            "## [Overview]\n"
+            "```md\n"
+            "## [Referee]\n"
+            "Fenced fake heading.\n"
+            "```\n\n"
+            "### [Referee]\n"
+            "Nested deeper fake.\n\n"
+            "## [Referee]\n"
+            "Real top-level referee body.\n"
+        )
+        span = find_section_span(tricky, "[Referee]")
+        self.assertIsNotNone(span)
+        hs, he, be, lvl = span
+        self.assertEqual(lvl, 2)
+        self.assertEqual(tricky[hs:he], "## [Referee]")
+        self.assertEqual(tricky[he:be].strip(), "Real top-level referee body.")
+
+    def test_replace_section_anti_wipe_meta_stub_and_same_turn_guard(self):
+        mgr = ArtifactManager(self.root / "wipe_arts")
+        long_sec = (
+            "### Detailed Automorphic Core\n"
+            + ("Verified Gan-Ichino seesaw identity and LinkDIV dependency chain across unitary groups. " * 14)
+        )
+        mgr.write(
+            "SYSTEM", "monograph", "create",
+            f"# Mono\n\n## [Automorphic Core]\n\n{long_sec}\n\n## [Other Section]\nKept safe.\n",
+            turn=0, attribution=False,
+        )
+        mgr.read("GGP", "monograph", turn=1)
+
+        # 1. Meta-stub replacement on a substantial section is rejected even with min_replace_ratio=0
+        with self.assertRaises(ArtifactError) as ctx_meta:
+            mgr.write(
+                "GGP", "monograph", "replace_section",
+                "(This section is replaced with the high-density content above to resolve stubs and duplicate headings).",
+                section="[Automorphic Core]", turn=1,
+            )
+        self.assertIn("placeholder/meta-stub", str(ctx_meta.exception))
+
+        # 2. Shrinking a >= 1000B section below 25% is rejected when min_replace_ratio=0.25
+        with self.assertRaises(ArtifactError) as ctx_shrink:
+            mgr.write(
+                "GGP", "monograph", "replace_section",
+                "Short replacement losing 90% of verified formulas.",
+                section="[Automorphic Core]", turn=1, min_replace_ratio=0.25,
+            )
+        self.assertIn("would shrink [Automorphic Core]", str(ctx_shrink.exception))
+
+        # 3. Legitimate tightening (~60% of size) succeeds
+        tight_sec = (
+            "### Consolidated Automorphic Core\n"
+            + ("Verified Gan-Ichino seesaw identity and LinkDIV dependency chain across unitary groups. " * 9)
+        )
+        _, v2 = mgr.write(
+            "GGP", "monograph", "replace_section",
+            tight_sec, section="[Automorphic Core]", turn=1, min_replace_ratio=0.25,
+        )
+        self.assertEqual(v2, 2)
+
+        # 4. End-to-end Chamber same-turn duplicate @SECTION guard (mimics v8 Turn 199 failure mode)
+        cfg = {
+            "name": "same_turn_sec_guard",
+            "topic": "Protect same-turn section write against duplicate trailing overwrite.",
+            "scheduler": "round_robin",
+            "artifacts": {
+                "seed": {"monograph": "# Mono\n\n## [Automorphic Core]\n\n## [Higher Rank]\n"},
+                "visible": ["monograph"],
+            },
+            "limits": {"max_turns": 1},
+            "agents": [{"name": "GGP", "endpoint": "local", "capabilities": "full"}],
+        }
+        good_auto = "Full seesaw identity and LinkDIV chain derivation. " * 12
+        good_hi = "Rank-2 modular obstruction analysis and BSD separation. " * 10
+        backend = MockBackend({
+            "GGP": [
+                f"@SECTION monograph | [Automorphic Core]: {good_auto}\n"
+                f"@SECTION monograph | [Higher Rank]: {good_hi}\n"
+                "@SECTION monograph | [Automorphic Core]: Consolidated second overwrite in same turn."
+            ]
+        })
+        ch = Chamber(cfg, run_dir=self.root / "same_turn_sec_run", backend=backend, quiet=True, copy_dir="").run()
+        stored = ch.artifacts.read("GGP", "monograph")[2]
+        self.assertIn("Full seesaw identity", stored)
+        self.assertIn("Rank-2 modular obstruction", stored)
+        self.assertNotIn("Consolidated second overwrite", stored)
+        self.assertTrue(any(
+            e.type == "ARTIFACT_WRITE" and e.status == "rejected" and "duplicate @SECTION" in e.detail
+            for e in ch.events
+        ))
+
+    def test_per_artifact_preview_chars_config(self):
+        long_mono = "# Mono\n\n## [Analysis]\n" + ("Verified proof derivation step. " * 80)
+        long_notes = "# Notes\n\n" + ("Raw scratch extraction note from LaTeX. " * 100)
+        cfg = {
+            "name": "per_art_preview_test",
+            "topic": "Per-artifact preview limits keep deliverable full while trimming notes.",
+            "scheduler": "round_robin",
+            "artifacts": {
+                "seed": {"monograph": long_mono, "debate_notes": long_notes},
+                "visible": ["monograph", "debate_notes"],
+                "preview_chars": {"monograph": 20000, "debate_notes": 600},
+            },
+            "limits": {"max_turns": 1, "artifact_preview_chars": 20000},
+            "agents": [{"name": "ALPHA", "endpoint": "local", "capabilities": "full"}],
+        }
+        backend = MockBackend({"ALPHA": ["Inspected both artifacts cleanly."]})
+        Chamber(cfg, run_dir=self.root / "preview_run", backend=backend, quiet=True, copy_dir="").run()
+        prompt_tail = backend.calls[0][1]["messages"][-1]["content"]
+        # monograph (~2.6KB < 20KB) appears verbatim in full; debate_notes (~4.1KB > 600B) is truncated!
+        self.assertIn(long_mono.strip(), prompt_tail)
+        self.assertNotIn("[Middle omitted; use @READ monograph", prompt_tail)
+        self.assertIn("[Middle omitted; use @READ debate_notes OFFSET", prompt_tail)
+
 
 if __name__ == "__main__":
     unittest.main()
