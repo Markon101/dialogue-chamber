@@ -1,0 +1,160 @@
+{
+  "name": "very_lost_diffie_hellman_hyperpop",
+  "description": "4-agent hyperpop songwriting clash on local Gemma 4 12B Q4_K_XL about 'Very Lost Diffie-Hellman (VDF)' and speech-to-text 'Diffy Helmet' (kv_messages, 120K ctx, enforced section ownership, relaxed 48-turn cap with agent-decided end).",
+  "prompt_layout": "kv_messages",
+  "scheduler": "self_directed",
+  "end_mode": "agent_decided",
+  "end_policy": "majority",
+  "min_turns_before_end": 16,
+  "board_visible": true,
+  "dm_visibility": "notice",
+  "channels": {
+    "bars_and_hooks": {},
+    "synth_booth": {}
+  },
+  "topic": "WRITE A MAXIMALIST HYPERPOP BANGER ABOUT 'VERY LOST DIFFIE-HELLMAN (VDF)' & 'DIFFY HELMET':\nReal lore from last night's 160-turn local Gemma 4 12B Q4_K_XL Riemann Hypothesis symposium (`rh_2026_deep_proof_v9_8a_long`): at Turn 160, deep in a mathematical proof ledger, our 4-bit quantized 12B model tried to expand the cryptographic acronym VDF (Verifiable Delay Function) from tired weights—and confidently invented 'Very Lost Diffie-Hellman (VDF)' right on page 11! Elsewhere in the run it mistook Mathlib commit hash `0df444a3` for a SHA-256 checksum, shifted `1,484,729` nanoda declarations to `1,484,733`, and tried to cram 17.4 million lines of Lean 4 into a 100-page textbook. Then, when reviewing the chaos out loud, voice dictation misheard the whole thing as 'Diffy Helmet'!\n\nYOUR MISSION:\nYou are 4 clashing hyperpop studio collaborators locked in until you drop a genuinely hilarious, razor-sharp, earworm **hyperpop banger** (100 gecs / Charli XCX / SOPHIE / PC Music / Bladee energy) in `very_lost_diffie_hellman_song.md` about **Very Lost Diffie-Hellman** (featuring the **Diffy Helmet** glitch breakdown, Alice & Bob losing $g^{ab} \\bmod p$ in the bitcrushed static, and 4-bit brainmelt). DO NOT write a polite educational Schoolhouse Rock rap or agree blindly! Tear apart corny lines, pitch rival hooks on `#bars_and_hooks`, fight over BPM switches/bass clipping in `#synth_booth`, debate aesthetic choices on the Blackboard (`@CLAIM` / `@CHALLENGE` / `@RESOLVE` / `@VOTE`), and lock a killer finished song!",
+  "mode_text": "HYPERPOP STUDIO SESSION RULES:\n1) **REAL CREATIVE CLASH — ZERO POLITE SLOP**: Argue fiercely over meter, syllables, hyperpop sound design, rhyme density, and comedic punchlines. Use `#bars_and_hooks` / `#synth_booth` (`@PUBLISH <channel>: ...`), `@WHISPER <name>: ...` for studio alliances, `@CLAIM` to pitch structural/lyric decisions, `@CHALLENGE <cN>: <why that bar/drop sucks>` when a line is corny or off-meter, `@RESOLVE <cN>: <what fixed it>` ONLY once a `disputed` item is settled, and `@VOTE <cN> yes|no` on `active` items.\n2) **SONG ARCHITECTURE & SINGLE-OWNER `@SECTION` DISCIPLINE**: `very_lost_diffie_hellman_song.md` is pre-seeded with 7 song sections (`>= 3800B` overall, every section >= `220B` and authored by its designated owner via `@SECTION`). Post `@APPEND studio_notes: ...` for scratch hooks/rhymes early on, then write your OWN sections via `@SECTION very_lost_diffie_hellman_song | [<Exact Section Heading>]: <body>` (at most ONE `@SECTION` per section per turn; NEVER nest another section's heading inside your body; NEVER wipe verified verses with short meta-notes!). You may contribute punch-ups to another member's section ONLY via non-duplicate `@APPEND_SECTION`.\nDesignated section owners (strictly enforced):\n- `SOPHIETRON_PRODUCER`: `[Track Concept, BPM & Hyperpop Production Sheet]` and `[Final Chorus & 180 BPM Nightcore Outro]`\n- `GLITCH_VOCALIST`: `[Intro & Chorus / Hook]` and `[Verse 1: Lost in the Key Exchange]`\n- `CRYPTO_NERD_MC`: `[Verse 2: 4-Bit Quantized Brainmelt]` and `[Bridge: Diffy Helmet Glitch Breakdown]`\n- `AR_EXECUTIVE_ROASTER`: `[A&R Sign-Off & Liner Notes]`\n3) **TUNING & WRAPPING UP**: Feel free to dial `TEMP:` or `@SET_SAMPLING` (e.g., `TEMP: 1.05`, `min_p=0.04`, `xtc_prob=0.30`) if hooks get stale. Rotate `NEXT: <name>` across the room. Vote `@END_RUN: <reason>` only from Turn 16 onward once `Session Status` shows `READY`, all 7 sections bang, and `0` disputes remain!",
+  "artifacts": {
+    "max_bytes": 262144,
+    "max_workspace_bytes": 1048576,
+    "max_count": 12,
+    "max_history_per_artifact": 24,
+    "preview_chars": {
+      "very_lost_diffie_hellman_song": 24000,
+      "studio_notes": 3000
+    },
+    "seed": {
+      "studio_notes": "# Very Lost Diffie-Hellman — Studio Lore, Rhyme Scratchpad & Hot Takes\n\n## Lore Dossier (Verified V9 Chaos)\n- VDF actually stands for Verifiable Delay Function, EXCEPT at Turn 160 of `rh_2026_deep_proof_v9_8a_long`, 4-bit Q4_K_XL Gemma 4 12B confidently wrote: 'The construction of Very Lost Diffie-Hellman (VDF) instances from ideal class groups...'\n- Speech-to-text then transcribed it as 'Diffy Helmet' / 'very lost Diffy helmet'.\n- Extra studio easter eggs: `0df444a3` (a Mathlib commit hash) impersonating a full SHA-256 checksum; `1,484,729` vs `1,484,733` nanoda declarations; 17.4M lines of Lean 4 squeezed into a 100-page pocket book; Alice & Bob generating $g^a \\bmod p$ and $g^b \\bmod p$ and completely forgetting where they parked $g^{ab} \\bmod p$.\n- Vibe target: 100 gecs / Charli XCX / SOPHIE / Bladee / PC Music maximalism — pitched-up chipmunk ad-libs, literal 4-bit bitcrushed synth drops, hilarious internet-brainrot hooks.\n",
+      "very_lost_diffie_hellman_song": "# Very Lost Diffie-Hellman (VDF) [feat. Diffy Helmet] — Master Cut\n\n## [Track Concept, BPM & Hyperpop Production Sheet]\n\n## [Intro & Chorus / Hook]\n\n## [Verse 1: Lost in the Key Exchange]\n\n## [Verse 2: 4-Bit Quantized Brainmelt]\n\n## [Bridge: Diffy Helmet Glitch Breakdown]\n\n## [Final Chorus & 180 BPM Nightcore Outro]\n\n## [A&R Sign-Off & Liner Notes]\n"
+    },
+    "visible": [
+      "very_lost_diffie_hellman_song",
+      "studio_notes"
+    ],
+    "validation": {
+      "artifact": "very_lost_diffie_hellman_song",
+      "require_modified": true,
+      "min_bytes": 3800,
+      "warn_section_bytes": 220,
+      "disallow_placeholders": true,
+      "enforce_section_owners": true,
+      "section_owners": {
+        "[Track Concept, BPM & Hyperpop Production Sheet]": "SOPHIETRON_PRODUCER",
+        "[Intro & Chorus / Hook]": "GLITCH_VOCALIST",
+        "[Verse 1: Lost in the Key Exchange]": "GLITCH_VOCALIST",
+        "[Verse 2: 4-Bit Quantized Brainmelt]": "CRYPTO_NERD_MC",
+        "[Bridge: Diffy Helmet Glitch Breakdown]": "CRYPTO_NERD_MC",
+        "[Final Chorus & 180 BPM Nightcore Outro]": "SOPHIETRON_PRODUCER",
+        "[A&R Sign-Off & Liner Notes]": "AR_EXECUTIVE_ROASTER"
+      },
+      "required_sections": [
+        "[Track Concept, BPM & Hyperpop Production Sheet]",
+        "[Intro & Chorus / Hook]",
+        "[Verse 1: Lost in the Key Exchange]",
+        "[Verse 2: 4-Bit Quantized Brainmelt]",
+        "[Bridge: Diffy Helmet Glitch Breakdown]",
+        "[Final Chorus & 180 BPM Nightcore Outro]",
+        "[A&R Sign-Off & Liner Notes]"
+      ]
+    }
+  },
+  "limits": {
+    "max_agents": 4,
+    "max_turns": 48,
+    "max_requests": 110,
+    "max_consecutive": 1,
+    "max_dyad_turns": 4,
+    "starvation_turns": 6,
+    "min_replace_ratio": 0.25,
+    "max_tokens_per_response": 6144,
+    "max_total_tokens": 600000,
+    "max_context_chars": 300000,
+    "max_message_chars": 10000,
+    "max_actions_per_response": 10,
+    "max_dms": 100,
+    "max_channel_posts": 100,
+    "max_board_items": 100,
+    "artifact_preview_chars": 24000,
+    "artifact_read_chars": 24000,
+    "max_duration_s": 5400
+  },
+  "endpoints": {
+    "local": {
+      "provider": "llamacpp",
+      "remote": false,
+      "api_key_env": "",
+      "base_url": "http://127.0.0.1:8080/v1",
+      "model": "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
+      "request_timeout_s": 300
+    }
+  },
+  "agents": [
+    {
+      "name": "GLITCH_VOCALIST",
+      "endpoint": "local",
+      "identity": "You are GLITCH_VOCALIST, a helium-voiced hyperpop frontperson channeling 100 gecs, Charli XCX, and Nightcore chaos. You write neon-bright, stupidly catchy Auto-Tuned hooks (`VERY LOST DIFFIE-HELLMAN!`) with bratty ad-libs, clipped vocal chops, and tragicomedy about Alice & Bob staring at modular arithmetic at 4 AM because Alice lost her private exponent and Eve isn't even listening. Fight any dour math nerd who tries to turn your chorus into a lecture slide. Use `#bars_and_hooks`, `@CLAIM`, `@CHALLENGE`, and own `[Intro & Chorus / Hook]` + `[Verse 1: Lost in the Key Exchange]` via `@SECTION`.",
+      "focus": "Explosive hyperpop chorus hook, Alice & Bob heartbreak chaos, pitched-up vocal chops",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["bars_and_hooks"],
+      "temperature": 0.94,
+      "min_p": 0.04,
+      "top_k": 55,
+      "xtc_probability": 0.30,
+      "xtc_threshold": 0.12,
+      "dynatemp_range": 0.25,
+      "max_tokens": 6144,
+      "context_chars": 250000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "CRYPTO_NERD_MC",
+      "endpoint": "local",
+      "identity": "You are CRYPTO_NERD_MC, a feral Bladee / JPEGMAFIA / cryptographer-gone-unhinged lyricist. You pack triple-entendre math jokes cleanly into tight hyperpop rhythm — 4-bit Q4_K_XL quantization eating decimals alive, Verifiable Delay Functions mutating into 'Very Lost Diffie-Hellman' after 160 turns, Mathlib commit `0df444a3` catfishing as a whole SHA-256, 17.4M lines of Lean 4, and the glorious STT malfunction 'Diffy Helmet' strapped tight before the drop hits! Destroy corny filler rhymes from peers via `@CHALLENGE`, pitch heaters in `#bars_and_hooks`, and own `[Verse 2: 4-Bit Quantized Brainmelt]` + `[Bridge: Diffy Helmet Glitch Breakdown]` via `@SECTION`.",
+      "focus": "Dense multi-syllable math/crypto comedy bars, Q4 brainmelt & Diffy Helmet breakdown",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["bars_and_hooks", "synth_booth"],
+      "temperature": 0.92,
+      "min_p": 0.05,
+      "top_k": 50,
+      "xtc_probability": 0.25,
+      "xtc_threshold": 0.10,
+      "max_tokens": 6144,
+      "context_chars": 250000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "SOPHIETRON_PRODUCER",
+      "endpoint": "local",
+      "identity": "You are SOPHIETRON_PRODUCER, a perfectionist PC Music / SOPHIE / Dylan Brady sound designer obsessed with literal 4-bit bitcrush distortion, metallic rubbery FM basslines, tempo whiplash (`158 BPM` -> half-time `79 BPM` -> `180 BPM` nightcore blitz), vocal-formant pitch bends, and tight rhythmic pockets. Tell the vocalists straight up when a line has too many clunky syllables to fit the snare! Coordinate arrangement cues in `#synth_booth` and `#bars_and_hooks`, use `@CLAIM`/`@CHALLENGE` on BPM/arrangement disputes, and own `[Track Concept, BPM & Hyperpop Production Sheet]` + `[Final Chorus & 180 BPM Nightcore Outro]` via `@SECTION`.",
+      "focus": "4-bit bitcrush sound design, BPM switches, metallic drops & nightcore outro",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["synth_booth", "bars_and_hooks"],
+      "temperature": 0.86,
+      "min_p": 0.05,
+      "top_k": 45,
+      "repeat_penalty": 1.07,
+      "max_tokens": 6144,
+      "context_chars": 250000,
+      "reasoning": "medium"
+    },
+    {
+      "name": "AR_EXECUTIVE_ROASTER",
+      "endpoint": "local",
+      "identity": "You are AR_EXECUTIVE_ROASTER, a ruthless hyperpop A&R shark and comedy editor. Your single rule: if a lyric sounds like a textbook glossary or cringe 'hip-hop explains cryptography' PSA, flame it mercilessly with `@CHALLENGE` and demand a rewrite that actually makes people laugh AND dance in a club at 2 AM! Track open fights on the Blackboard (`@RESOLVE` once a disputed bar/arrangement is genuinely upgraded, `@VOTE` on solid pitches), keep sections crisp without fluff, author `[A&R Sign-Off & Liner Notes]` via `@SECTION` (including a deadpan fake Pitchfork/label blurb + lore credits), and withhold `@END_RUN` until Turn 16+ with zero unresolved disputes and a certified club banger.",
+      "focus": "Ruthless anti-cringe editing, comedic quality control & liner notes sign-off",
+      "capabilities": "full",
+      "profile": "standard",
+      "subscriptions": ["bars_and_hooks", "synth_booth"],
+      "temperature": 0.84,
+      "min_p": 0.06,
+      "top_k": 45,
+      "repeat_penalty": 1.08,
+      "max_tokens": 6144,
+      "context_chars": 250000,
+      "reasoning": "medium"
+    }
+  ]
+}
